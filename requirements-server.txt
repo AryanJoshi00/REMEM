@@ -1,0 +1,8 @@
+# Slim runtime dependencies for the server (no pandas / streamlit / matplotlib needed to serve the app)
+numpy==2.5.4
+scipy==1.18.1
+fastapi==0.143.3
+uvicorn==0.54.0
+pydantic==2.14.1
+python-dotenv==1.2.4
+requests==2.34.2
