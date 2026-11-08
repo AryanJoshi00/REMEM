@@ -1,5 +1,6 @@
 data/raw/
 data/processed/
+data/pilot/
 __pycache__/
 *.pyc
 .env
@@ -8,3 +9,15 @@ node_modules/
 .expo/
 *.csv
 *.zip
+*.db
+*.sqlite
+*.sqlite3
+backups/
+.pytest_cache/
+experiments/results/*.parquet
+!experiments/results/*.csv
+*.log
+
+Oracle-SSH/
+*.key
+*.pem

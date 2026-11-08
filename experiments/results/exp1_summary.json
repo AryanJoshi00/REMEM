@@ -1,0 +1,22 @@
+{
+  "students": 3856,
+  "rows": 2152714,
+  "concepts": 172,
+  "same_concept_repeat_pairs": 1852292,
+  "repeats_gap>1h": 1011491,
+  "share_gap>1h": 0.5461,
+  "repeats_gap>1d": 724531,
+  "share_gap>1d": 0.3912,
+  "repeats_gap>3d": 444364,
+  "share_gap>3d": 0.2399,
+  "repeats_gap>7d": 270195,
+  "share_gap>7d": 0.1459,
+  "repeats_gap>30d": 88159,
+  "share_gap>30d": 0.0476,
+  "student_span_days_median": 59.8,
+  "student_span_days_p90": 330.1,
+  "interactions_per_student_median": 190,
+  "overall_accuracy": 0.6662,
+  "students_with_>=5_spaced_repeats(>=1d)": 3249,
+  "concepts_with_>=200_spaced_repeats": 159
+}

@@ -1,0 +1,21 @@
+{
+  "features": [
+    "m",
+    "log_n",
+    "ability",
+    "difficulty",
+    "rt_z"
+  ],
+  "w": [
+    -0.5316234213128195,
+    0.8,
+    0.9,
+    0.5599419954880289,
+    -0.09418014028471439,
+    0.0
+  ],
+  "beta": 0.5,
+  "curve": "power",
+  "lam": 0.0,
+  "source": "starter prior (FSRS-style scale) + EdNet ability/difficulty effects; see make_starter_prior.py"
+}
