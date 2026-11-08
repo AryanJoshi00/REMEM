@@ -1,0 +1,13 @@
+# Viva note 02 — Forgetting model, scheduler, and why the app uses a starter prior
+
+**The model in one line.** `p(correct) = (1 - slip) * m * R + guess * (1 - m * R)`, where `m` is BKT mastery, `R = (1 + k*dt/S)^(-beta)` is retrievability, and `k = 0.9^(-1/beta) - 1` so that `R(S) = 0.9`. S ("stability") is the number of days until predicted recall falls to 90%.
+
+**How S is learned when it is never observed.** S is part of the likelihood of the observed next answer: `log S = w0 + w1*m + w2*log(1+n) + w3*ability + w4*difficulty + w5*rt_z`. We maximise the likelihood of real next-answer correctness over training rows (ridge penalty), so S is whatever value best explains the data. At `dt -> 0`, `R -> 1` and the model reduces to plain BKT.
+
+**The scheduler** inverts the curve: `t_review = (S/k) * (theta^(-1/beta) - 1)`, clipped to [1, 180] days; concepts are ranked by lowest current R. After every answer the state is updated and S recomputed from the *post-update* features, so a miss lowers mastery and shortens the next interval, and repeated successes lengthen it (tested in `tests/test_stability_scheduler.py`).
+
+**What Experiment 3 found (be upfront).** Power-law beats exponential, and adding forgetting lowers log loss (0.6366 -> 0.6345) and calibration error (0.048 -> 0.041). But the effect is modest, features add little beyond one global S, and the fitted curve is almost flat (beta ~ 0.02, S ~ 100 days). The repetition coefficient comes out slightly negative: in observational logs, hard concepts get re-served, so repetition looks bad. That is selection, not psychology (spec limitation).
+
+**Why the app does not use the EdNet fit directly.** Scheduling from it would put reviews months apart for notes quizzes, and its repetition effect is not identifiable. The deployed model keeps the structure and the EdNet-supported ability/difficulty effects but uses an FSRS-style scale (beta = 0.5), a Loftus-style prior that mastery and repetition lengthen memory, and an intercept giving first-review S of about 2.5 days. All of this is declared as assumptions (`experiments/make_starter_prior.py`) and is tested by the pilot, with a labelled refit on pilot data.
+
+**Likely questions.** *Isn't a prior just making numbers up?* It is an explicit, documented assumption taken from an established scheduler's structure; the pilot measures whether predicted recall matches real answers, and SimLab shows how the scheduler behaves when growth is learnable. *Why not just use SM-2?* SM-2 has no probability of recall, so it cannot say how likely you are to remember now or explain a recommendation. *Does REMEM beat SM-2?* Not claimed from EdNet; the comparison is made in SimLab (known truth) and the pilot (real people, small n).
