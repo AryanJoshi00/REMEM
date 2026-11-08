@@ -1,0 +1,14 @@
+[Unit]
+Description=REMEM API + PWA
+After=network.target
+
+[Service]
+User=remem
+WorkingDirectory=/opt/remem
+EnvironmentFile=/opt/remem/.env
+ExecStart=/opt/remem/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

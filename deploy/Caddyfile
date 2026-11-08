@@ -1,0 +1,6 @@
+# Replace the host with your server's address-based name, e.g. 203-0-113-7.sslip.io (no domain purchase needed),
+# or your own domain. Caddy obtains and renews the HTTPS certificate automatically.
+YOUR-HOST-NAME {
+    encode gzip
+    reverse_proxy 127.0.0.1:8000
+}
