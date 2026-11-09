@@ -1,31 +1,55 @@
-"""REMEM admin dashboard (owner only; not public).
-Run:  streamlit run eval_dashboard/app.py
-Tabs: Pilot monitor (from a downloaded copy of the live DB) and Offline results (EdNet experiments).
+"""REMEM admin dashboard (owner only).   Run:  streamlit run eval_dashboard/app.py
+
+Pages: Pilot (live data pulled from the server), EdNet results, SimLab, Model.
+Pilot numbers are descriptive: ten people is too few for significance tests.
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
+import altair as alt
 import pandas as pd
 import streamlit as st
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from eval_dashboard import pilot  # noqa: E402
+from eval_dashboard.server import Server, ServerError  # noqa: E402
 
-RESULTS = ROOT / "experiments" / "results"
-ARTIFACTS = ROOT / "artifacts"
-PILOT_DB = ROOT / "data" / "pilot" / "remem_live.db"
+load_dotenv(ROOT / ".env")
+RESULTS, ARTIFACTS = ROOT / "experiments" / "results", ROOT / "artifacts"
+LIVE_DB = ROOT / "data" / "pilot" / "remem_live.db"
+ACCENT, INK, AMBER, GREEN, RED = "#3a3fe0", "#12162f", "#a85a00", "#17784f", "#b3261e"
 
 st.set_page_config(page_title="REMEM admin", page_icon="R", layout="wide")
-st.title("REMEM — admin dashboard")
-st.caption("Evidence policy: the pilot is too small for significance tests; arm comparisons below are descriptive. "
-           "The scheduler claim rests on SimLab + pilot, not on EdNet alone.")
-
-tab_pilot, tab_results, tab_sim, tab_model = st.tabs(["Pilot monitor", "Offline results (EdNet)", "SimLab", "Deployed model"])
+st.markdown(f"""
+<style>
+  #MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"] {{ display: none !important; }}
+  header[data-testid="stHeader"] {{ background: transparent; height: 0; }}
+  .block-container {{ max-width: 1080px; padding-top: 2.2rem; padding-bottom: 5rem; }}
+  html, body, [class*="css"] {{ font-family: "Avenir Next", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }}
+  h1 {{ font-size: 2rem !important; font-weight: 800 !important; letter-spacing: -.02em; padding: 0 0 .2rem !important; }}
+  h2, h3 {{ letter-spacing: -.01em; font-weight: 750 !important; }}
+  h2 {{ font-size: 1.3rem !important; margin-top: 2.2rem !important; }}
+  [data-testid="stMetricLabel"] p {{ font-size: .9rem; color: #545c7c; }}
+  [data-testid="stMetricValue"] {{ font-size: 1.9rem; font-weight: 800; letter-spacing: -.02em; }}
+  [data-testid="stSidebar"] {{ border-right: 1px solid #d3d8ea; }}
+  [data-testid="stSidebar"] h1 {{ font-size: 1.4rem !important; color: {ACCENT}; }}
+  .note {{ color: #545c7c; font-size: .95rem; margin: -.2rem 0 .8rem; }}
+  .flag {{ padding: .65rem .9rem; border-radius: 10px; margin: .35rem 0; background: #fff; border: 1px solid #d3d8ea; font-size: .97rem; }}
+  .flag.warn {{ border-color: {AMBER}; }}
+  .flag b {{ color: {AMBER}; }}
+  .st-key-danger {{ border: 1.5px solid {RED} !important; border-radius: 14px; background: #fff; padding: .4rem .6rem; }}
+  .st-key-danger h3 {{ color: {RED}; font-size: 1.1rem !important; }}
+  .st-key-open_reset button, [data-testid="stDialog"] button[kind="primaryFormSubmit"] {{ background: {RED}; border-color: {RED}; color: #fff; font-weight: 700; }}
+  .st-key-open_reset button:hover, [data-testid="stDialog"] button[kind="primaryFormSubmit"]:hover {{ background: #8f1d17; border-color: #8f1d17; color: #fff; }}
+  button[kind="primary"] {{ font-weight: 700; }}
+</style>""", unsafe_allow_html=True)
 
 
 def csv(name: str):
@@ -33,152 +57,323 @@ def csv(name: str):
     return pd.read_csv(p) if p.exists() else None
 
 
-# ------------------------------------------------------------------ pilot
-with tab_pilot:
-    path = Path(st.text_input("Database copy", str(PILOT_DB)))
-    if not path.exists():
-        st.info("No database copy yet. Run `deploy/fetch_pilot_db.ps1` to download a snapshot from the server.")
-    else:
-        age_h = (time.time() - path.stat().st_mtime) / 3600
-        st.caption(f"Snapshot file age: {age_h:.1f} h. Re-run the fetch script to refresh, then press R.")
-        conn = pilot.open_ro(path)
-        now_ms = int(time.time() * 1000)
+def note(text: str) -> None:
+    st.markdown(f'<p class="note">{text}</p>', unsafe_allow_html=True)
 
+
+def ago(seconds: float) -> str:
+    if seconds < 90:
+        return "just now"
+    if seconds < 5400:
+        return f"{seconds / 60:.0f} min ago"
+    if seconds < 172800:
+        return f"{seconds / 3600:.0f} hours ago"
+    return f"{seconds / 86400:.0f} days ago"
+
+
+# ------------------------------------------------------------------ sidebar: page + server connection
+st.sidebar.title("REMEM admin")
+page = st.sidebar.radio("Page", ["Pilot", "EdNet results", "SimLab", "Model"], label_visibility="collapsed")
+st.sidebar.divider()
+st.sidebar.markdown("**Live server**")
+srv: Server | None = st.session_state.get("srv")
+if srv is None:
+    url = st.sidebar.text_input("Server address", value=os.getenv("REMEM_SERVER_URL", ""), placeholder="https://your-server")
+    user = st.sidebar.text_input("Admin username", value=os.getenv("REMEM_ADMIN_USER", "aryan"))
+    pw = st.sidebar.text_input("Admin password", type="password")
+    if st.sidebar.button("Connect", type="primary", use_container_width=True):
+        try:
+            s = Server(url)
+            s.login(user, pw)
+            st.session_state["srv"] = s
+            st.session_state["flash"] = ("ok", "Connected.")
+            st.rerun()
+        except (ServerError, OSError, ValueError) as e:
+            st.sidebar.error(f"Could not connect: {e}")
+else:
+    st.sidebar.success("Connected")
+    if st.sidebar.button("Disconnect", use_container_width=True):
+        del st.session_state["srv"]
+        st.rerun()
+if LIVE_DB.exists():
+    st.sidebar.caption(f"Data copy: {ago(time.time() - LIVE_DB.stat().st_mtime)}")
+
+
+def refresh() -> None:
+    try:
+        saved = srv.download_snapshot(LIVE_DB)
+        st.session_state["flash"] = ("ok", f"Data refreshed. A dated backup was saved as {saved.name}.")
+    except (ServerError, OSError) as e:
+        st.session_state["flash"] = ("err", f"Could not refresh: {e}")
+
+
+flash = st.session_state.pop("flash", None)
+if flash:
+    (st.success if flash[0] == "ok" else st.error)(flash[1])
+
+
+# ------------------------------------------------------------------ pilot
+@st.dialog("Reset test data")
+def reset_dialog(server: Server) -> None:
+    st.markdown(f'<span style="color:{RED};font-weight:700">Proceed with caution. This cannot be undone.</span>', unsafe_allow_html=True)
+    st.write("This deletes the notes, quizzes, answers and review schedule of the accounts you choose. "
+             "The accounts and their passwords stay, so people can still sign in. A backup copy of the current data is saved to this computer first.")
+    try:
+        accts = server.accounts()
+    except ServerError as e:
+        st.error(str(e))
+        return
+    labels = {f"{a['username']} ({a['answers']} answers, {a['concepts']} concepts)": a["username"] for a in accts}
+    with st.form("reset_form", border=False):                              # one submit, so nothing depends on partial reruns
+        scope = st.radio("Which accounts?", ["Choose accounts", "Every account"], horizontal=True)
+        picked = st.multiselect("Accounts to reset (used when 'Choose accounts' is selected)", list(labels))
+        clear_consent = st.checkbox("Also ask them to accept the consent notice again")
+        typed = st.text_input("Type RESET to confirm")
+        go = st.form_submit_button("Delete the data", type="primary", use_container_width=True)
+    if go:
+        chosen = list(labels) if scope == "Every account" else picked
+        if not chosen:
+            st.error("Choose at least one account.")
+        elif typed.strip() != "RESET":
+            st.error("Type RESET in capitals to confirm.")
+        else:
+            try:
+                server.download_snapshot(LIVE_DB)                          # safety copy first
+                r = server.reset([labels[c] for c in chosen], clear_consent)
+                server.download_snapshot(LIVE_DB)
+                st.session_state["flash"] = ("ok", f"Reset done for {r['accounts']} account(s): removed {r['answers']} answers, {r['concepts']} concepts and {r['notes']} notes.")
+                st.rerun()
+            except (ServerError, OSError) as e:
+                st.error(f"Reset failed: {e}")
+
+
+def page_pilot() -> None:
+    top = st.columns([5, 1.4], vertical_alignment="bottom")
+    top[0].title("Pilot")
+    if srv is not None and top[1].button("Refresh data", use_container_width=True):
+        refresh()
+        st.rerun()
+    if not LIVE_DB.exists():
+        st.info("No pilot data on this computer yet. Connect to the server in the sidebar, then press Refresh data.")
+        return
+    conn = pilot.open_ro(LIVE_DB)
+    try:
+        now_ms = int(time.time() * 1000)
         users = pilot.users_table(conn, now_ms)
         stu = users[users["role"] == "student"]
-        health = pilot.llm_health(conn)
+        note(f"Data copied {ago(time.time() - LIVE_DB.stat().st_mtime)}. Ten people are too few for significance tests, so everything here is descriptive.")
+
+        st.header("Needs attention")
+        items = pilot.attention(conn, now_ms)
+        if not items:
+            st.markdown('<div class="flag">Nothing needs attention right now.</div>', unsafe_allow_html=True)
+        for it in items:
+            st.markdown(f'<div class="flag {"warn" if it["level"] == "warn" else ""}">{"<b>Check</b> " if it["level"] == "warn" else ""}{it["text"]}</div>', unsafe_allow_html=True)
+
+        st.header("Overview")
         adh = pilot.adherence(conn, now_ms)
+        c = st.columns(4)
+        c[0].metric("Accounts", len(stu))
+        c[1].metric("Accepted consent", int(stu["consented"].sum()))
+        c[2].metric("Have answered", int((stu["n_answers"] > 0).sum()))
+        c[3].metric("Answers in total", int(stu["n_answers"].sum()))
+        if adh["tracked"]:
+            note(f"{adh['overdue']} of {adh['tracked']} scheduled concepts are overdue right now; the median overdue concept is {adh['median_days_late']:.1f} days late.")
 
-        c = st.columns(5)
-        c[0].metric("Student accounts", len(stu))
-        c[1].metric("Consented", int(stu["consented"].sum()))
-        c[2].metric("Active (answered)", int((stu["n_answers"] > 0).sum()))
-        c[3].metric("Total answers", int(stu["n_answers"].sum()))
-        c[4].metric("Overdue concepts", f"{adh['overdue']}/{adh['tracked']}")
+        st.header("People")
+        show_all = st.checkbox("Include admin and demo accounts", value=False)
+        people = (users if show_all else stu).copy()
+        people["last_answer"] = people["days_since_last"].map(lambda d: "never" if pd.isna(d) else ("today" if d < 1 else ("1 day ago" if round(d) == 1 else f"{d:.0f} days ago")))
+        st.dataframe(people[["user_id", "username", "consented", "notes", "concepts", "n_answers", "last_answer"]], hide_index=True, width="stretch",
+                     column_config={"user_id": "ID", "username": "Account", "consented": st.column_config.CheckboxColumn("Consent"),
+                                    "notes": "Notes", "concepts": "Concepts", "n_answers": "Answers", "last_answer": "Last answer"})
 
-        st.subheader("Users")
-        st.dataframe(users, hide_index=True, width='stretch')
-        silent = stu[(stu["days_since_last"].isna()) | (stu["days_since_last"] > 3)]
-        if len(silent):
-            st.warning("No activity in 3+ days (or never): " + ", ".join(silent["username"]))
-
-        st.subheader("Activity per day (IST)")
+        st.header("Activity")
         da = pilot.daily_activity(conn)
         if da.empty:
-            st.write("No answers yet.")
+            note("No answers yet.")
         else:
-            st.bar_chart(da.set_index("day")[["answers", "reviews"]])
-            st.line_chart(da.set_index("day")[["active_users"]])
+            a, b = st.columns(2)
+            a.markdown("**Answers per day**")
+            a.bar_chart(da.set_index("day")[["answers"]], color=ACCENT, height=230)
+            b.markdown("**People who answered each day**")
+            b.bar_chart(da.set_index("day")[["active_users"]], color=GREEN, height=230)
 
-        st.subheader("Adherence")
-        if adh["tracked"]:
-            st.write(f"{adh['overdue']} of {adh['tracked']} tracked concepts are overdue now; "
-                     f"median lateness {adh['median_days_late']:.1f} days.")
-        else:
-            st.write("No scheduled concepts yet.")
+        st.header("How the three scheduling methods compare")
+        note("Each concept is given one method at random: REMEM (the model), SM-2 (a classic flashcard rule) or a fixed 3-day gap. Students never see which. "
+             "This counts review answers only, and with this few people the differences are not meaningful yet.")
+        arms = pilot.by_arm(conn).replace({"remem": "REMEM", "sm2": "SM-2", "fixed": "Fixed, every 3 days"})
+        st.dataframe(arms, hide_index=True, width="stretch", column_config={
+            "arm": "Method", "concepts": "Concepts", "review_answers": "Review answers",
+            "accuracy": st.column_config.ProgressColumn("Share correct", format="percent", min_value=0, max_value=1),
+            "mean_gap_days": st.column_config.NumberColumn("Average days since last review", format="%.1f")})
 
-        st.subheader("Arms (descriptive only)")
-        st.dataframe(pilot.by_arm(conn), hide_index=True, width='stretch')
-        st.caption("Arms are assigned per concept at random: remem / sm2 / fixed (3-day).")
-
-        st.subheader("Prediction calibration on review answers")
+        st.header("Are the predictions honest?")
+        note("REMEM predicts the chance of a correct answer before each review. If the predicted and the observed values match, the predictions can be trusted.")
         cal = pilot.calibration(conn)
         if cal.empty:
-            st.write("No review answers with predictions yet.")
+            note("No review answers yet.")
         else:
-            st.dataframe(cal, hide_index=True, width='stretch')
-            st.line_chart(cal.set_index("bin")[["predicted", "observed"]])
+            a, b = st.columns([1, 1])
+            a.dataframe(cal, hide_index=True, width="stretch", column_config={"bin": "Predicted range", "n": "Answers", "predicted": st.column_config.NumberColumn("Predicted", format="%.2f"),
+                                                                               "observed": st.column_config.NumberColumn("Observed", format="%.2f")})
+            long = cal.melt(id_vars="bin", value_vars=["predicted", "observed"], var_name="kind", value_name="value")
+            b.altair_chart(alt.Chart(long).mark_line(point=True).encode(
+                x=alt.X("bin:N", title=None, sort=None), y=alt.Y("value:Q", scale=alt.Scale(domain=[0, 1]), title=None),
+                color=alt.Color("kind:N", scale=alt.Scale(domain=["predicted", "observed"], range=[ACCENT, AMBER]), legend=alt.Legend(title=None, orient="bottom"))).properties(height=230), width="stretch")
 
-        st.subheader("LLM quiz generation")
-        d = st.columns(4)
-        d[0].metric("Notes processed", f"{health['notes_done']}/{health['notes_total']}")
-        d[1].metric("Failed notes", health["notes_failed"])
-        d[2].metric("Questions", health["questions"])
-        d[3].metric("Flagged by students", f"{health['flagged']} ({health['flag_rate']:.0%})" if health["questions"] else "0")
+        st.header("Quiz generation")
+        h = pilot.llm_health(conn)
+        c = st.columns(4)
+        c[0].metric("Notes turned into quizzes", f"{h['notes_done']} of {h['notes_total']}")
+        c[1].metric("Notes that failed", h["notes_failed"])
+        c[2].metric("Questions written", h["questions"])
+        c[3].metric("Flagged as bad", f"{h['flagged']}")
         errs = pilot.recent_errors(conn)
         if len(errs):
-            st.dataframe(errs, hide_index=True, width='stretch')
+            st.dataframe(errs, hide_index=True, width="stretch", column_config={"time_ist": "Time (IST)", "title": "Note", "error": "Error"})
 
-        st.subheader("Final test")
-        st.write("OPEN" if pilot.final_test_open(conn) else "Closed (set settings key `final_test_open`='1' on the server to open).")
-        with st.expander("Recent audit events"):
-            st.dataframe(pilot.recent_audit(conn), hide_index=True, width='stretch')
+        st.header("Final check")
+        note("One reserved question per concept, answered without feedback near the end of the pilot. Students only see it while it is open.")
+        if srv is None:
+            note(f"Currently {'open' if pilot.final_test_open(conn) else 'closed'} (as of the last data copy). Connect to the server to change it.")
+        else:
+            try:
+                is_open = srv.final_open()
+            except ServerError as e:
+                st.error(str(e))
+                is_open = None
+            if is_open is not None:
+                cols = st.columns([3, 1.4], vertical_alignment="center")
+                cols[0].markdown(f"The final check is **{'open' if is_open else 'closed'}**.")
+                if cols[1].button("Close it" if is_open else "Open it", use_container_width=True):
+                    srv.set_final(not is_open)
+                    st.rerun()
 
-# ---------------------------------------------------------------- results
-with tab_results:
-    st.subheader("Experiment 2 — baselines (held-out)")
+            st.header("Reset test data")
+        with st.container(border=True, key="danger"):
+            st.markdown("### Danger zone")
+            note("Use this after you have tried the app with an account and want a clean start. It deletes learning data only; accounts and passwords stay.")
+            if srv is None:
+                note("Connect to the server in the sidebar to use this.")
+            elif st.button("Reset test data...", key="open_reset"):
+                reset_dialog(srv)
+    finally:
+        conn.close()                                              # Windows cannot replace a database file that is still open
+
+
+# ------------------------------------------------------------------ EdNet results
+MODEL_NAMES = {
+    "A_bkt_no_forgetting": "A. Knowledge tracing only (no forgetting)", "B_exp_global": "B. Exponential forgetting, one curve for all",
+    "C_power_global": "C. Power-law forgetting, one curve for all", "D_power_features(REMEM)": "D. Power-law forgetting with student features (REMEM)",
+    "E_exp_features": "E. Exponential forgetting with student features", "D_minus_m": "D without mastery", "D_minus_log_n": "D without practice count",
+    "D_minus_ability": "D without student ability", "D_minus_difficulty": "D without question difficulty", "D_minus_rt_z": "D without response time"}
+
+
+def page_ednet() -> None:
+    st.title("EdNet results")
+    note("Held-out tests on the public EdNet dataset. Chronological split: the model is fitted on the past and judged on the future. Lower is better for log loss, Brier score and calibration error (ECE).")
+    st.header("Baselines")
     b = csv("exp2_baselines.csv")
     if b is not None:
-        st.dataframe(b, hide_index=True, width='stretch')
-    else:
-        st.write("Missing.")
-
-    st.subheader("Experiment 3 — forgetting model variants")
+        split = st.radio("Split", ["test", "val"], horizontal=True, key="b_split")
+        t = b[b["split"] == split].copy()
+        t["model"] = t["model"].replace({"majority": "Always the most common answer", "student_accuracy": "Each student's average", "concept_difficulty": "Each concept's difficulty", "bkt_no_forgetting": "Knowledge tracing (BKT)"})
+        st.dataframe(t[["subset", "model", "n", "auc", "logloss", "brier", "ece"]], hide_index=True, width="stretch", column_config={
+            "subset": "Rows", "model": "Model", "n": "Answers", "auc": st.column_config.NumberColumn("AUC (higher is better)", format="%.3f"),
+            "logloss": st.column_config.NumberColumn("Log loss", format="%.4f"), "brier": st.column_config.NumberColumn("Brier", format="%.4f"), "ece": st.column_config.NumberColumn("ECE", format="%.4f")})
+    st.header("Does modelling forgetting help?")
+    note("Only answers to a concept the student had already seen. Models A to E differ in how they treat the time since the last practice.")
     m = csv("exp3_forgetting_metrics.csv")
     if m is not None:
-        split = st.radio("Split", sorted(m["split"].unique()), index=len(m["split"].unique()) - 1, horizontal=True)
-        subset = st.radio("Subset", sorted(m["subset"].unique()), horizontal=True)
-        t = m[(m["split"] == split) & (m["subset"] == subset)].sort_values("logloss")
-        st.dataframe(t, hide_index=True, width='stretch')
-        st.caption("Lower logloss / brier / ece is better. Read together with the honest-findings note in Appendix F of the spec.")
+        c = st.columns(2)
+        split = c[0].radio("Split ", ["test", "val"], horizontal=True)
+        subset = c[1].radio("Rows ", ["repeats", "spaced>=1d"], horizontal=True, format_func=lambda s: "All repeats" if s == "repeats" else "Gap of a day or more")
+        t = m[(m["split"] == split) & (m["subset"] == subset)].copy().sort_values("logloss")
+        t["model"] = t["model"].map(lambda x: MODEL_NAMES.get(x, x))
+        st.dataframe(t[["model", "n", "auc", "logloss", "brier", "ece"]], hide_index=True, width="stretch", column_config={
+            "model": "Model", "n": "Answers", "auc": st.column_config.NumberColumn("AUC", format="%.3f"), "logloss": st.column_config.NumberColumn("Log loss", format="%.4f"),
+            "brier": st.column_config.NumberColumn("Brier", format="%.4f"), "ece": st.column_config.NumberColumn("ECE", format="%.4f")})
+        note("Reading: a power-law curve beats an exponential one, but adding student features to it changes very little.")
     cg = csv("exp3_calibration_by_gap.csv")
     if cg is not None:
-        st.subheader("Calibration by time gap")
-        models = st.multiselect("Models", sorted(cg["model"].unique()), default=sorted(cg["model"].unique())[:3])
-        piv = cg[cg["model"].isin(models)].pivot(index="bin", columns="model", values="abs_gap")
-        st.bar_chart(piv)
-    co = csv("exp3_coefficients.csv")
-    if co is not None:
-        st.subheader("Stability coefficients (EdNet fit)")
-        st.dataframe(co, hide_index=True, width='stretch')
+        st.header("Calibration by time since last practice")
+        note("Gap between predicted and observed correctness in each time bucket. Smaller bars are better.")
+        cg["model"] = cg["model"].map(lambda x: MODEL_NAMES.get(x, x))
+        models = st.multiselect("Models to compare", sorted(cg["model"].unique()), default=sorted(cg["model"].unique())[:3])
+        order = ["<5m", "5m-1h", "1h-6h", "6h-1d", "1-3d", "3-7d", "7-14d", "14-30d", "30-90d", ">90d"]
+        st.altair_chart(alt.Chart(cg[cg["model"].isin(models)]).mark_bar().encode(
+            x=alt.X("bin:N", sort=order, title="Time since last practice"), xOffset="model:N", y=alt.Y("abs_gap:Q", title="Gap between predicted and observed"),
+            color=alt.Color("model:N", legend=alt.Legend(title=None, orient="bottom"))).properties(height=300), width="stretch")
     g = csv("exp1_accuracy_by_gap.csv")
     if g is not None:
-        st.subheader("Experiment 1 — accuracy by gap")
-        st.dataframe(g, hide_index=True, width='stretch')
-    if (RESULTS / "exp1_gaps.png").exists():
-        st.image(str(RESULTS / "exp1_gaps.png"))
+        st.header("Do people forget over time in this data?")
+        note("Share correct by time since the last practice. It falls only slightly, which is why the app starts from a documented prior instead of the fitted curve.")
+        st.dataframe(g, hide_index=True, width="stretch", column_config={"bin": "Gap", "n": "Answers", "accuracy": st.column_config.NumberColumn("Share correct", format="%.3f"),
+                                                                           "resid_vs_student_mean": st.column_config.NumberColumn("Versus the student's own average", format="%+.3f")})
     log = csv("run_log.csv")
     if log is not None:
-        with st.expander("Run log"):
-            st.dataframe(log, hide_index=True, width='stretch')
+        with st.expander("Run log (every experiment run, with settings)"):
+            st.dataframe(log, hide_index=True, width="stretch")
 
-# ----------------------------------------------------------------- simlab
-with tab_sim:
-    st.caption("Simulated students with known true memory. Findings concern simulated learners only.")
-    md = csv("exp10_matched.csv")
-    fr = csv("exp10_frontier.csv")
+
+# ------------------------------------------------------------------ SimLab
+def page_simlab() -> None:
+    st.title("SimLab")
+    note("Simulated students whose real memory is known, so any scheduler can be judged against the truth. Results describe simulated learners only.")
+    md, fr = csv("exp10_matched.csv"), csv("exp10_frontier.csv")
     if md is None or fr is None:
-        st.write("Run `python experiments/exp10_simlab.py` first.")
-    else:
-        st.subheader("Reviews saved by REMEM (theta 0.85) at matched time-below-target")
-        t = md[md["matched_on"] == "below_target"].groupby(["gen", "phi", "baseline"]).agg(
-            saved_mean=("reviews_saved_pct", "mean"), saved_min=("reviews_saved_pct", "min"), saved_max=("reviews_saved_pct", "max")).round(1).reset_index()
-        st.dataframe(t, hide_index=True, width='stretch')
-        st.caption("Negative = REMEM needed more reviews. Differences inside the seed range are not demonstrated. "
-                   "Matching on delayed-test recall is unreliable (non-monotone) and not reported.")
-        gen = st.radio("Generator", sorted(fr["gen"].unique()), horizontal=True)
-        phi = st.radio("phi", sorted(fr["phi"].unique()), index=1, horizontal=True)
-        f = fr[(fr["gen"] == gen) & (fr["phi"] == phi)].groupby(["policy", "knob"], as_index=False).mean(numeric_only=True)
-        st.subheader("Trade-off: reviews per concept vs time below target")
-        import altair as alt
-        st.altair_chart(alt.Chart(f).mark_line(point=True).encode(
-            x=alt.X("reviews_per_concept", title="reviews per concept (60 days)"), y=alt.Y("frac_below_target", title="share of time below 0.85"),
-            color="policy", tooltip=["policy", "knob", "reviews_per_concept", "frac_below_target", "final_recall"]), width='stretch')
-        rc = csv("exp10_recovery.csv")
-        if rc is not None:
-            st.subheader("Estimator recovery (rank correlation of fitted S with true S)")
-            st.dataframe(rc.groupby(["gen", "phi"])[["spearman_S", "beta_fit"]].mean().round(2).reset_index(), hide_index=True, width='stretch')
+        st.info("Run `python experiments/exp10_simlab.py` to create these results.")
+        return
+    st.header("Reviews saved by REMEM")
+    note("Each competitor is tuned until it keeps students below 85% recall for the same share of time as REMEM. The table then shows how many fewer reviews REMEM needed. "
+         "A negative number means REMEM needed more. Differences smaller than the spread between runs are not shown to be real.")
+    t = md[md["matched_on"] == "below_target"].groupby(["gen", "phi", "baseline"]).agg(mean=("reviews_saved_pct", "mean"), lowest=("reviews_saved_pct", "min"), highest=("reviews_saved_pct", "max")).round(1).reset_index()
+    t["gen"] = t["gen"].map({"gen1": "Power-law (matches REMEM)", "gen2": "Exponential (mismatched)", "gen3": "Two-speed mixture (mismatched)"})
+    t["baseline"] = t["baseline"].map({"fixed": "Best fixed gap", "sm2": "SM-2"})
+    st.dataframe(t, hide_index=True, width="stretch", column_config={
+        "gen": "True forgetting curve", "phi": st.column_config.NumberColumn("Strength of spacing effect", format="%.1f"), "baseline": "Compared with",
+        "mean": st.column_config.NumberColumn("Reviews saved, average %", format="%.1f"), "lowest": st.column_config.NumberColumn("Lowest run %", format="%.1f"), "highest": st.column_config.NumberColumn("Highest run %", format="%.1f")})
+    st.header("Reviews against coverage")
+    note("Further left and lower is better: fewer reviews and less time below the 85% recall target.")
+    c = st.columns(2)
+    gen = c[0].radio("True forgetting curve", ["gen1", "gen2", "gen3"], horizontal=True, format_func=lambda g: {"gen1": "Power-law", "gen2": "Exponential", "gen3": "Mixture"}[g])
+    phi = c[1].radio("Spacing effect", sorted(fr["phi"].unique()), index=1, horizontal=True)
+    f = fr[(fr["gen"] == gen) & (fr["phi"] == phi)].groupby(["policy", "knob"], as_index=False).mean(numeric_only=True)
+    f["policy"] = f["policy"].map({"remem": "REMEM", "remem_global": "REMEM, one shared curve", "remem_prior": "REMEM, starter prior", "fixed": "Fixed gap", "sm2": "SM-2"})
+    st.altair_chart(alt.Chart(f).mark_line(point=True).encode(
+        x=alt.X("reviews_per_concept:Q", title="Reviews per concept in 60 days"), y=alt.Y("frac_below_target:Q", title="Share of time below 85% recall"),
+        color=alt.Color("policy:N", legend=alt.Legend(title=None, orient="bottom")), tooltip=["policy", "knob", "reviews_per_concept", "frac_below_target", "final_recall"]).properties(height=340), width="stretch")
+    rc = csv("exp10_recovery.csv")
+    if rc is not None:
+        st.header("Can the model recover each student's true memory strength?")
+        note("A rank correlation near 1 would mean yes. Values near zero mean the personalised estimates did not track the truth here.")
+        r = rc.groupby(["gen", "phi"])[["spearman_S", "beta_fit"]].mean().round(2).reset_index()
+        r["gen"] = r["gen"].map({"gen1": "Power-law", "gen2": "Exponential", "gen3": "Mixture"})
+        st.dataframe(r, hide_index=True, width="stretch", column_config={"gen": "True curve", "phi": "Spacing effect", "spearman_S": "Rank correlation", "beta_fit": "Fitted curve shape"})
 
-# ------------------------------------------------------------------ model
-with tab_model:
+
+# ------------------------------------------------------------------ deployed model
+def page_model() -> None:
+    st.title("Model")
+    note("The forgetting curve the app uses today. It is a documented starting prior because the EdNet fit is almost flat.")
     p = ARTIFACTS / "stability_model.json"
-    if p.exists():
-        sm = json.loads(p.read_text())
-        st.subheader("Deployed starter prior (D15)")
-        st.json(sm)
-        beta = float(sm.get("beta", 0.5))
-        k = 0.9 ** (-1 / beta) - 1
-        S = st.slider("Stability S (days)", 1.0, 60.0, 8.0)
-        days = list(range(0, 61))
-        st.line_chart(pd.DataFrame({"day": days, "retrievability": [(1 + k * d / S) ** (-beta) for d in days]}).set_index("day"))
-        st.caption("R(t) = (1 + k·t/S)^(−β) with R(S) = 0.9. The EdNet-fitted model (β≈0.02) is nearly flat, which is why the app uses this prior.")
+    if not p.exists():
+        st.info("No model file found.")
+        return
+    sm = json.loads(p.read_text())
+    beta = float(sm.get("beta", 0.5))
+    k = 0.9 ** (-1 / beta) - 1
+    S = st.slider("Memory strength (days until recall drops to 90%)", 1.0, 60.0, 8.0)
+    days = list(range(0, 61))
+    df = pd.DataFrame({"day": days, "recall": [(1 + k * d / S) ** (-beta) for d in days]})
+    st.altair_chart(alt.Chart(df).mark_area(opacity=0.12, color=ACCENT, line={"color": ACCENT, "strokeWidth": 3}).encode(
+        x=alt.X("day:Q", title="Days since last practice"), y=alt.Y("recall:Q", scale=alt.Scale(domain=[0, 1]), title="Chance of recalling")).properties(height=320), width="stretch")
+    st.markdown("Recall after *t* days is (1 + k·t/S)^(−β), with k chosen so that recall equals 90% when *t* = S.")
+    names = {"m": "Mastery", "log_n": "Practice count (log)", "ability": "Student ability", "difficulty": "Question difficulty", "rt_z": "Response time"}
+    coef = pd.DataFrame({"Factor": ["Baseline"] + [names.get(f, f) for f in sm["features"]], "Weight": [round(float(w), 3) for w in sm["w"][:len(sm["features"]) + 1]]})
+    st.dataframe(coef, hide_index=True, width="stretch")
+    note(f"Curve shape β = {beta:g}. Memory strength is exp(baseline + the weighted factors).")
+
+
+{"Pilot": page_pilot, "EdNet results": page_ednet, "SimLab": page_simlab, "Model": page_model}[page]()

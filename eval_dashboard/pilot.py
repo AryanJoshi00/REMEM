@@ -10,9 +10,16 @@ IST_OFFSET_MS = 5.5 * 3600 * 1000
 
 
 def open_ro(path) -> sqlite3.Connection:
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Load the database into memory and release the file at once, so the file can be replaced while the page is open
+    (Windows refuses to overwrite a file that is still held open)."""
+    src = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    mem = sqlite3.connect(":memory:")
+    try:
+        src.backup(mem)
+    finally:
+        src.close()
+    mem.row_factory = sqlite3.Row
+    return mem
 
 
 def _df(conn, sql, params=()):
@@ -115,3 +122,28 @@ def recent_audit(conn, limit=30) -> pd.DataFrame:
 def final_test_open(conn) -> bool:
     row = conn.execute("SELECT value FROM settings WHERE key='final_test_open'").fetchone()
     return bool(row and str(row[0]) in ("1", "true", "True"))
+
+
+def attention(conn, now_ms: int, stale_days: float = 3.0) -> list[dict]:
+    """Plain-language list of things the owner should look at. Each item: {level: 'warn' | 'info', text}."""
+    out = []
+    u = users_table(conn, now_ms)
+    s = u[(u["role"] == "student") & (u["active"] == 1)]
+    waiting = s[~s["consented"]]["username"].tolist()
+    if waiting:
+        out.append({"level": "info", "text": f"{len(waiting)} not signed in yet or consent not accepted: {', '.join(waiting)}."})
+    idle = s[s["consented"] & (s["n_answers"] == 0)]["username"].tolist()
+    if idle:
+        out.append({"level": "info", "text": f"Accepted consent but answered nothing: {', '.join(idle)}."})
+    silent = s[(s["n_answers"] > 0) & (s["days_since_last"] > stale_days)]
+    if len(silent):
+        names = ", ".join(f"{r.username} ({r.days_since_last:.0f} days)" for r in silent.itertuples())
+        out.append({"level": "warn", "text": f"No answers for more than {stale_days:g} days: {names}."})
+    h = llm_health(conn)
+    if h["notes_failed"]:
+        err = recent_errors(conn, 1)
+        why = f" Latest error: {err.iloc[0]['error']}" if len(err) and err.iloc[0]["error"] else ""
+        out.append({"level": "warn", "text": f"{h['notes_failed']} of {h['notes_total']} notes did not become a quiz.{why}"})
+    if h["questions"] >= 10 and h["flag_rate"] > 0.10:
+        out.append({"level": "warn", "text": f"Students flagged {h['flagged']} of {h['questions']} questions as bad ({h['flag_rate']:.0%})."})
+    return out

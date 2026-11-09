@@ -6,6 +6,7 @@ Examples (run from the repo root, venv active):
   python -m backend.admin_create_user reset p01
   python -m backend.admin_create_user disable p01
   python -m backend.admin_create_user list
+  python -m backend.admin_create_user resequence              # admin = 0, then user01 = 1, user02 = 2, ...
 """
 from __future__ import annotations
 
@@ -21,9 +22,31 @@ def gen_password(n: int = 12) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(n))
 
 
+ID_TABLES = ("sessions", "notes", "concepts", "responses", "state", "audit")
+
+
+def resequence(conn) -> list[tuple[int, int]]:
+    """Renumber accounts so that admin accounts come first starting at 0, then the others by username (1, 2, ...).
+    Every table that refers to a user is updated in the same transaction. Returns the (old, new) pairs that changed."""
+    users = conn.execute("SELECT user_id, username, role FROM users").fetchall()
+    order = sorted(users, key=lambda u: (u["role"] != "admin", u["username"]))
+    targets = {u["user_id"]: i for i, u in enumerate(order)}
+    if all(old == new for old, new in targets.items()):
+        return []
+    conn.execute("PRAGMA defer_foreign_keys=ON")               # ids pass through a temporary range; references are checked at commit
+    for t in ID_TABLES + ("users",):
+        conn.execute(f"UPDATE {t} SET user_id = user_id + 1000000 WHERE user_id IS NOT NULL")
+    for old, new in targets.items():
+        for t in ID_TABLES + ("users",):
+            conn.execute(f"UPDATE {t} SET user_id = ? WHERE user_id = ?", (new, old + 1000000))
+    top = max(targets.values())
+    conn.execute("UPDATE sqlite_sequence SET seq=? WHERE name='users'", (top,))
+    return [(old, new) for old, new in sorted(targets.items()) if old != new]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("action", choices=["create", "reset", "disable", "enable", "list"])
+    ap.add_argument("action", choices=["create", "reset", "disable", "enable", "list", "resequence"])
     ap.add_argument("username", nargs="?")
     ap.add_argument("--role", default="student", choices=["student", "demo", "admin"])
     ap.add_argument("--password", help="set a chosen password for reset (pilot convenience)")
@@ -33,6 +56,10 @@ def main() -> None:
         if a.action == "list":
             for r in conn.execute("SELECT username, role, active, consent_at IS NOT NULL AS consented FROM users ORDER BY user_id"):
                 print(f"{r['username']:<10} {r['role']:<8} active={r['active']} consented={r['consented']}")
+            return
+        if a.action == "resequence":
+            for old, new in resequence(conn):
+                print(f"{old} -> {new}")
             return
         if not a.username:
             ap.error("username required")

@@ -152,3 +152,5 @@ input[type="range"] { accent-color: var(--accent); padding: 0; min-height: 44px;
 /* reduced motion: keep the state change, drop the movement (bars appear filled, no skeleton pulse, no press scale) */
 @media (prefers-reduced-motion: reduce) { .meter i, .skel { animation: none; } button:active, .btn:active { transform: none; } }
 .flag { display: inline-flex; align-items: center; min-height: 44px; }
+.opt.picked { border-color: var(--accent); background: var(--tint); }
+.opt.picked .key { border-color: var(--accent); color: var(--accent); }

@@ -14,7 +14,7 @@ import numpy as np
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 
-from backend import auth, config, db, engine, llm, topics
+from backend import admin, auth, config, db, engine, llm, topics
 from backend.schemas import FlagIn, LoginIn, NoteIn, PasswordIn, RespondIn, TopicIn
 from models.stability import retrievability_power
 from scheduler.scheduler import t_review_days
@@ -238,7 +238,27 @@ def due(user=Depends(auth.consented_user)):
     new = [i for i in items if i["new"]]
     due_now = sorted([i for i in items if not i["new"] and i["due"]], key=lambda i: i["R_now"])
     upcoming = sorted([i for i in items if not i["new"] and not i["due"]], key=lambda i: i["due_in_days"])
-    return {"new": new, "due": due_now, "upcoming": upcoming, "theta": config.THETA}
+    with db.session() as conn:
+        fin = final_state(conn, user["user_id"])
+    return {"new": new, "due": due_now, "upcoming": upcoming, "theta": config.THETA, "final": {"open": fin["open"], "remaining": len(fin["items"])}}
+
+
+def final_state(conn, uid: int) -> dict:
+    """The delayed test: one reserved question per concept, available only while the owner has opened it."""
+    row = conn.execute("SELECT value FROM settings WHERE key='final_test_open'").fetchone()
+    if not row or row["value"] != "1":
+        return {"open": False, "items": []}
+    items = conn.execute("""SELECT c.concept_id, c.name FROM concepts c WHERE c.user_id=? AND EXISTS (
+                              SELECT 1 FROM questions q WHERE q.concept_id=c.concept_id AND q.is_final_test=1 AND q.flagged=0
+                              AND q.question_id NOT IN (SELECT question_id FROM responses WHERE user_id=? AND mode='final'))
+                            ORDER BY c.concept_id""", (uid, uid)).fetchall()
+    return {"open": True, "items": [dict(i) for i in items]}
+
+
+@api.get("/final")
+def final_check(user=Depends(auth.consented_user)):
+    with db.session() as conn:
+        return final_state(conn, user["user_id"])
 
 
 @api.get("/concepts")
@@ -367,6 +387,7 @@ def flag_question(body: FlagIn, user=Depends(auth.consented_user)):
     return {"ok": True}
 
 
+api.include_router(admin.router)
 app.mount("/api", api)
 if config.WEBAPP.exists():
     app.mount("/", StaticFiles(directory=config.WEBAPP, html=True), name="webapp")

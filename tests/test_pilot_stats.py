@@ -60,3 +60,11 @@ def test_empty_db(tmp_path):
     assert pilot.daily_activity(c).empty and pilot.calibration(c).empty
     assert pilot.adherence(c, NOW)["tracked"] == 0
     assert len(pilot.by_arm(c)) == 3
+
+
+def test_attention_list(tmp_path):
+    c = build(tmp_path)
+    items = pilot.attention(c, NOW)
+    text = " ".join(i["text"] for i in items)
+    assert "did not become a quiz" in text and "timeout" in text            # the failed note and its error
+    assert any(i["level"] == "warn" for i in items)

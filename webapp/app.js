@@ -142,6 +142,11 @@ function renderHome(d) {
   const nodes = [h("h1", {}, "Today")];
   const counts = [d.due.length ? d.due.length + " due" : "", d.new.length ? d.new.length + " new" : ""].filter(Boolean).join(", ");
   if (counts) nodes.push(h("p", { class: "muted" }, counts));
+  if (d.final && d.final.open && d.final.remaining) {
+    nodes.push(h("div", { class: "calm" }, h("b", {}, "Final check is open"),
+      h("p", { class: "muted" }, pl(d.final.remaining, "question") + ", one per concept. It takes a few minutes and doesn't change your schedule."),
+      h("a", { class: "btn primary block", href: "#/final" }, "Start the final check")));
+  }
   const lead = d.due[0] || d.new[0];
   const row = (c, kind) => {
     const href = kind === "later" ? "#/curve/" + c.concept_id : "#/practice/" + c.concept_id;
@@ -209,6 +214,41 @@ async function viewPractice(cid) {
   } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[i]), h("span", { class: "txt" }, text)));
   mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today"), h("span", { class: "where" }, q.concept || "")), h("h1", { class: "q" }, q.stem), h("div", { class: "opts" }, opts), fb,
         h("p", { class: "muted small" }, h("a", { class: "flag", href: "#/", onclick: async (e) => { e.preventDefault(); try { await api("/flag", { method: "POST", body: { question_id: q.question_id } }); toast("Thanks, question flagged"); } catch (x) { toast(x.message); } } }, "Report a bad question")));
+}
+
+async function viewFinal() {
+  const back = h("a", { class: "btn block", href: "#/" }, "Back to today");
+  mount(h("h1", {}, "Final check"), skeleton(2));
+  let f; try { f = await api("/final"); } catch (e) { return mount(h("h1", {}, "Final check"), h("div", { class: "err" }, e.message), back); }
+  if (!f.open || !f.items.length) {
+    return mount(h("h1", {}, "Final check"), h("div", { class: "calm" }, h("b", {}, f.open ? "You've answered every question" : "The final check isn't open"),
+      h("p", { class: "muted" }, f.open ? "Thank you. There is nothing more to do here." : "Your project owner will tell you when it opens.")), back);
+  }
+  const total = f.items.length; let right = 0;
+  mount(h("h1", {}, "Final check"), h("p", {}, pl(total, "question") + ", one for each concept you studied. You won't see whether an answer is right until the end, and your review schedule stays as it is."),
+    h("button", { class: "primary block", onclick: () => ask(0) }, "Begin"), h("p", {}, back));
+
+  async function ask(i) {
+    if (i >= total) {
+      store.del("remem_due");
+      return mount(h("h1", {}, "Final check done"), h("div", { class: "calm" }, h("b", {}, right + " of " + total + " correct"),
+        h("p", { class: "muted" }, "Thank you. These answers show how well REMEM timed your reviews.")), back);
+    }
+    mount(h("h1", {}, "Final check"), skeleton(2));
+    let q; try { q = await api("/question/next?concept=" + f.items[i].concept_id + "&final=1"); }
+    catch (e) { return mount(h("h1", {}, "Final check"), h("div", { class: "err" }, e.message), h("button", { class: "block", onclick: () => ask(i) }, "Try again"), h("p", {}, back)); }
+    const t0 = performance.now(); let sent = false;
+    const opts = q.options.map((text, k) => h("button", { class: "opt", onclick: async () => {
+      if (sent) return; sent = true; opts.forEach(b => { b.disabled = true; }); opts[k].classList.add("picked");
+      try {
+        const r = await api("/respond", { method: "POST", body: { question_id: q.question_id, chosen_index: k, rt_ms: Math.round(performance.now() - t0), idem_key: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()) } });
+        if (r.correct) right++;
+        ask(i + 1);
+      } catch (e) { sent = false; opts.forEach(b => { b.disabled = false; }); opts[k].classList.remove("picked"); toast(e.message); }
+    } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[k]), h("span", { class: "txt" }, text)));
+    mount(h("div", { class: "bar" }, h("span", { class: "where" }, "Question " + (i + 1) + " of " + total), h("span", { class: "where" }, q.concept || "")),
+      h("h1", { class: "q" }, q.stem), h("div", { class: "opts" }, opts));
+  }
 }
 
 async function viewNotes() {
@@ -319,6 +359,7 @@ function route() {
   switch (a) {
     case "consent": return viewConsent();
     case "notes": return viewNotes();
+    case "final": return viewFinal();
     case "concepts": return viewConcepts();
     case "practice": return viewPractice(Number(b));
     case "curve": return viewCurve(Number(b));

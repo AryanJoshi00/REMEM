@@ -281,3 +281,94 @@ def test_security_headers_and_no_public_docs(client):
     assert "default-src 'self'" in r.headers["content-security-policy"]
     assert client.get("/docs").status_code in (404, 405) and client.get("/openapi.json").status_code == 404
     assert client.get("/api/docs").status_code == 404 and client.get("/api/openapi.json").status_code == 404
+
+
+def test_admin_snapshot_reset_final_switch_and_access(client):
+    hs = login(client, "p01", "pw-for-p01!")
+    with db.session() as conn:
+        auth.create_user(conn, "boss", "boss-pass-12", "admin")
+    ha = login(client, "boss", "boss-pass-12", consent=False)
+    # students cannot use admin routes
+    for path in ("/api/admin/accounts", "/api/admin/snapshot", "/api/admin/final-test"):
+        assert client.get(path, headers=hs).status_code == 403
+    assert client.post("/api/admin/reset", json={"confirm": "RESET", "usernames": ["p01"]}, headers=hs).status_code == 403
+    cs = make_concepts(client, hs)
+    assert answer(client, hs, cs[0]["concept_id"], True).status_code == 200
+    accts = {a["username"]: a for a in client.get("/api/admin/accounts", headers=ha).json()["accounts"]}
+    assert accts["p01"]["answers"] == 1 and accts["p01"]["concepts"] == 2
+    # the snapshot is a real database without credentials
+    snap = client.get("/api/admin/snapshot", headers=ha)
+    assert snap.status_code == 200
+    import sqlite3, tempfile, os
+    fd, path = tempfile.mkstemp(suffix=".db"); os.close(fd)
+    open(path, "wb").write(snap.content)
+    c = sqlite3.connect(path)
+    assert c.execute("SELECT COUNT(*) FROM responses").fetchone()[0] == 1
+    assert c.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 0
+    assert all(bytes(r[0]) == b"\x00" for r in c.execute("SELECT pw_hash FROM users"))
+    c.close(); os.remove(path)
+    # reset needs the phrase, an account, and leaves the account usable
+    assert client.post("/api/admin/reset", json={"confirm": "yes", "usernames": ["p01"]}, headers=ha).status_code == 400
+    assert client.post("/api/admin/reset", json={"confirm": "RESET", "usernames": []}, headers=ha).status_code == 400
+    assert client.post("/api/admin/reset", json={"confirm": "RESET", "usernames": ["nobody"]}, headers=ha).status_code == 404
+    r = client.post("/api/admin/reset", json={"confirm": "RESET", "usernames": ["p01"]}, headers=ha).json()
+    assert r["answers"] == 1 and r["concepts"] == 2 and r["notes"] == 1 and r["accounts"] == 1
+    assert client.get("/api/due", headers=hs).json()["new"] == []                     # still signed in and consented, but empty
+    accts = {a["username"]: a for a in client.get("/api/admin/accounts", headers=ha).json()["accounts"]}
+    assert accts["p01"]["answers"] == 0 and accts["p01"]["notes"] == 0 and accts["p01"]["consented"]
+    # final test: closed -> open -> one question per concept -> answers recorded and not repeated
+    cs = make_concepts(client, hs)
+    assert client.get("/api/final", headers=hs).json() == {"open": False, "items": []}
+    assert client.post("/api/admin/final-test", json={"open": True}, headers=ha).json() == {"open": True}
+    fin = client.get("/api/final", headers=hs).json()
+    assert fin["open"] and len(fin["items"]) == 2
+    assert client.get("/api/due", headers=hs).json()["final"] == {"open": True, "remaining": 2}
+    q = client.get(f"/api/question/next?concept={fin['items'][0]['concept_id']}&final=1", headers=hs).json()
+    r = client.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": 0, "rt_ms": 5000, "idem_key": "final-key-1"}, headers=hs)
+    assert r.status_code == 200 and "correct" in r.json()
+    assert len(client.get("/api/final", headers=hs).json()["items"]) == 1
+    assert client.post("/api/admin/final-test", json={"open": False}, headers=ha).json() == {"open": False}
+    assert client.get(f"/api/question/next?concept={fin['items'][1]['concept_id']}&final=1", headers=hs).status_code == 403
+
+
+def test_resequence_gives_admin_zero_and_keeps_data_linked(tmp_path):
+    from backend import admin_create_user as acu
+    p = tmp_path / "r.db"
+    db.init_db(p)
+    with db.session(p) as conn:
+        a = auth.create_user(conn, "aryan", "x", "admin")
+        u1 = auth.create_user(conn, "user02", "x", "student")
+        u2 = auth.create_user(conn, "user01", "x", "student")
+        conn.execute("INSERT INTO notes(user_id,title,text,status,created_at) VALUES (?,?,?,?,1)", (u1, "n", "t", "done"))
+        conn.execute("INSERT INTO audit(ts,user_id,event) VALUES (1,?,'e')", (u2,))
+        changed = acu.resequence(conn)
+    with db.session(p) as conn:
+        ids = {r["username"]: r["user_id"] for r in conn.execute("SELECT * FROM users")}
+        assert ids == {"aryan": 0, "user01": 1, "user02": 2}
+        assert conn.execute("SELECT user_id FROM notes").fetchone()[0] == 2        # the note followed user02
+        assert conn.execute("SELECT user_id FROM audit").fetchone()[0] == 1        # and the audit row followed user01
+        assert acu.resequence(conn) == []                                          # idempotent
+        nid = auth.create_user(conn, "user03", "x", "student")
+        assert nid == 3
+
+
+def test_dashboard_server_client_end_to_end(client, tmp_path):
+    from eval_dashboard.server import Server, ServerError
+    hs = login(client, "p01", "pw-for-p01!")
+    with db.session() as conn:
+        auth.create_user(conn, "boss2", "boss-pass-22", "admin")
+    srv = Server("", http=client)
+    with pytest.raises(ServerError):
+        srv.login("p01", "pw-for-p01!")                                    # a student is not an admin
+    srv.login("boss2", "boss-pass-22")
+    cs = make_concepts(client, hs)
+    assert answer(client, hs, cs[0]["concept_id"], True).status_code == 200
+    live = tmp_path / "pilot" / "remem_live.db"
+    dated = srv.download_snapshot(live)
+    assert live.exists() and dated.parent.name == "backups" and dated.exists()
+    assert {a["username"]: a["answers"] for a in srv.accounts()}["p01"] == 1
+    assert srv.set_final(True) is True and srv.final_open() is True
+    r = srv.reset(["p01"])
+    assert r["answers"] == 1
+    with pytest.raises(ServerError):
+        srv.reset(["nobody"])
