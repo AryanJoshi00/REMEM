@@ -327,6 +327,9 @@ def test_admin_snapshot_reset_final_switch_and_access(client):
     r = client.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": 0, "rt_ms": 5000, "idem_key": "final-key-1"}, headers=hs)
     assert r.status_code == 200 and "correct" in r.json()
     assert len(client.get("/api/final", headers=hs).json()["items"]) == 1
+    again = client.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": 1, "rt_ms": 5000, "idem_key": "final-key-2"}, headers=hs)
+    assert again.status_code == 409                                                   # a final question cannot be answered twice
+    assert client.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": 0, "rt_ms": 5000, "idem_key": "final-key-1"}, headers=hs).status_code == 200   # same key = replay
     assert client.post("/api/admin/final-test", json={"open": False}, headers=ha).json() == {"open": False}
     assert client.get(f"/api/question/next?concept={fin['items'][1]['concept_id']}&final=1", headers=hs).status_code == 403
 

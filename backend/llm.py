@@ -15,7 +15,7 @@ import time
 import requests
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from backend import config
+from backend import config, db
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 N_VARIANTS = 5
@@ -160,10 +160,12 @@ def _call_gemini(prompt: str) -> str:
     raise RuntimeError(last)
 
 
-def generate_for_chunk(conn, chunk: str, caller=None) -> list[ConceptOut]:
+def generate_for_chunk(chunk: str, caller=None) -> list[ConceptOut]:
+    """Database access is in short separate sessions so no write lock is held while waiting for the LLM (SEC-001)."""
     caller = caller or _call_gemini
     h = chunk_hash(chunk)
-    row = conn.execute("SELECT json FROM llm_cache WHERE chunk_hash=? AND prompt_version=?", (h, config.PROMPT_VERSION)).fetchone()
+    with db.session() as conn:
+        row = conn.execute("SELECT json FROM llm_cache WHERE chunk_hash=? AND prompt_version=?", (h, config.PROMPT_VERSION)).fetchone()
     if row:
         return validate_chunk(json.loads(row["json"]), chunk)
     last_err = None
@@ -173,8 +175,9 @@ def generate_for_chunk(conn, chunk: str, caller=None) -> list[ConceptOut]:
             raw = json.loads(text)
             good = validate_chunk(raw, chunk)
             if good:
-                conn.execute("INSERT OR REPLACE INTO llm_cache(chunk_hash,prompt_version,json,created_at) VALUES (?,?,?,?)",
-                             (h, config.PROMPT_VERSION, json.dumps(raw), int(time.time() * 1000)))
+                with db.session() as conn:
+                    conn.execute("INSERT OR REPLACE INTO llm_cache(chunk_hash,prompt_version,json,created_at) VALUES (?,?,?,?)",
+                                 (h, config.PROMPT_VERSION, json.dumps(raw), int(time.time() * 1000)))
                 return good
             last_err = "no concept passed validation"
         except (ValidationError, json.JSONDecodeError, ValueError) as e:
@@ -182,12 +185,12 @@ def generate_for_chunk(conn, chunk: str, caller=None) -> list[ConceptOut]:
     raise RuntimeError(last_err or "generation failed")
 
 
-def generate_for_note(conn, text: str, caller=None) -> list[ConceptOut]:
+def generate_for_note(text: str, caller=None) -> list[ConceptOut]:
     out: list[ConceptOut] = []
     errors = 0
     for ch in split_chunks(text[:config.MAX_NOTE_CHARS]):
         try:
-            out.extend(generate_for_chunk(conn, ch, caller))
+            out.extend(generate_for_chunk(ch, caller))
         except RuntimeError:
             errors += 1
     out = dedupe_concepts(out)

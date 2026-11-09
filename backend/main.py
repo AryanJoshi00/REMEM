@@ -161,14 +161,16 @@ def change_password(body: PasswordIn, user=Depends(auth.current_user)):
 
 # ----------------------------------------------------------------------------- notes
 def run_generation(note_id: int) -> None:
-    with db.session() as conn:
+    with db.session() as conn:                       # short read; the slow LLM calls below run with no database lock held
         note = conn.execute("SELECT * FROM notes WHERE note_id=?", (note_id,)).fetchone()
         user = conn.execute("SELECT * FROM users WHERE user_id=?", (note["user_id"],)).fetchone()
-        try:
-            concepts = llm.generate_for_note(conn, note["text"])
-        except Exception as e:            # message is key-free by construction
+    try:
+        concepts = llm.generate_for_note(note["text"])
+    except Exception as e:                            # message is key-free by construction
+        with db.session() as conn:
             conn.execute("UPDATE notes SET status='failed', error=? WHERE note_id=?", (str(e)[:300], note_id))
-            return
+        return
+    with db.session() as conn:
         ts = now_ms()
         for c in concepts:
             arm = pick_arm(conn, user)
@@ -304,7 +306,10 @@ def next_question(concept: int, final: int = 0, user=Depends(auth.consented_user
 def respond(body: RespondIn, user=Depends(auth.consented_user)):
     models, ts = get_models(), now_ms()
     with db.session() as conn:
-        prev = conn.execute("SELECT result_json FROM responses WHERE idem_key=? AND user_id=?", (body.idem_key, user["user_id"])).fetchone()
+        # The key is stored with the user id in front, so two users can never collide (older rows hold the bare key).
+        body.idem_key = f"{user['user_id']}:{body.idem_key}"
+        raw_key = body.idem_key.split(":", 1)[1]
+        prev = conn.execute("SELECT result_json FROM responses WHERE idem_key IN (?,?) AND user_id=?", (body.idem_key, raw_key, user["user_id"])).fetchone()
         if prev:
             return json.loads(prev["result_json"])             # idempotent replay
         q = conn.execute("""SELECT q.*, c.arm, c.name, c.source_span FROM questions q JOIN concepts c ON c.concept_id=q.concept_id
@@ -317,6 +322,8 @@ def respond(body: RespondIn, user=Depends(auth.consented_user)):
             on = conn.execute("SELECT value FROM settings WHERE key='final_test_open'").fetchone()
             if not on or on["value"] != "1":
                 raise HTTPException(403, "The final test is not open")
+            if conn.execute("SELECT 1 FROM responses WHERE user_id=? AND question_id=? AND mode='final'", (user["user_id"], q["question_id"])).fetchone():
+                raise HTTPException(409, "This final-test question has already been answered")
             result = {"correct": correct, "correct_index": q["correct_idx"], "message": "Final test answer recorded."}
             conn.execute("""INSERT INTO responses(user_id,concept_id,question_id,idem_key,ts,correct,rt_ms,mode,arm,result_json)
                             VALUES (?,?,?,?,?,?,?,?,?,?)""", (user["user_id"], cid, q["question_id"], body.idem_key, ts, int(correct), body.rt_ms, "final", q["arm"], json.dumps(result)))

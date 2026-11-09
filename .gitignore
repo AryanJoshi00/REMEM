@@ -21,3 +21,6 @@ experiments/results/*.parquet
 Oracle-SSH/
 *.key
 *.pem
+
+# Security audit register (public repo: do not publish the weakness list)
+.security-audit/
