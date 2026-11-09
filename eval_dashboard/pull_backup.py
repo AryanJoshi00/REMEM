@@ -27,7 +27,7 @@ def main() -> int:
     try:
         srv = Server(url)
         srv.login(user, pw)
-        dated = srv.download_snapshot(ROOT / "data" / "pilot" / "remem_live.db")
+        dated = srv.download_snapshot(ROOT / "data" / "pilot" / "remem_live.db", keep_dated=30)
     except (ServerError, OSError) as e:
         print("Backup failed:", e, file=sys.stderr)
         return 1

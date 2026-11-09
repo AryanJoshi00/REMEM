@@ -18,7 +18,10 @@ from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+import importlib  # noqa: E402
 from eval_dashboard import pilot  # noqa: E402
+
+importlib.reload(pilot)
 from eval_dashboard.server import Server, ServerError  # noqa: E402
 
 load_dotenv(ROOT / ".env")
@@ -38,8 +41,19 @@ st.markdown(f"""
   h2 {{ font-size: 1.3rem !important; margin-top: 2.2rem !important; }}
   [data-testid="stMetricLabel"] p {{ font-size: .9rem; color: #545c7c; }}
   [data-testid="stMetricValue"] {{ font-size: 1.9rem; font-weight: 800; letter-spacing: -.02em; }}
-  [data-testid="stSidebar"] {{ border-right: 1px solid #d3d8ea; }}
-  [data-testid="stSidebar"] h1 {{ font-size: 1.4rem !important; color: {ACCENT}; }}
+  [data-testid="stSidebar"] {{ background: #ffffff; border-right: 1px solid #d3d8ea; }}
+  [data-testid="stSidebar"] > div:first-child {{ padding-top: .4rem; }}
+  [data-testid="stSidebarNav"] {{ padding-top: 0; }}
+  [data-testid="stSidebarNav"]::before {{ content: "remem admin"; display: block; padding: 1.2rem 1.1rem 1rem; font-size: 1.45rem; font-weight: 800; letter-spacing: -.03em; color: {ACCENT}; }}
+  [data-testid="stSidebarNavLink"] {{ margin: 2px .6rem; padding: .6rem .8rem; border-radius: 10px; font-weight: 600; color: #12162f; min-height: 44px; }}
+  [data-testid="stSidebarNavLink"]:hover {{ background: #eef0fb; }}
+  [data-testid="stSidebarNavLink"][aria-current="page"] {{ background: #e7e9fb; color: {ACCENT}; }}
+  [data-testid="stSidebarNavLink"][aria-current="page"] span {{ color: {ACCENT}; font-weight: 700; }}
+  [data-testid="stSidebarUserContent"] {{ padding: .6rem 1.1rem 1rem; }}
+  .conn {{ border-top: 1px solid #d3d8ea; padding-top: .9rem; font-size: .9rem; font-weight: 600; line-height: 1.5; }}
+  .conn span:not(.dot) {{ font-weight: 400; color: #545c7c; word-break: break-all; }}
+  .dot {{ display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: {GREEN}; margin-right: .5rem; }}
+  .dot.off {{ background: #a8aecd; }}
   .note {{ color: #545c7c; font-size: .95rem; margin: -.2rem 0 .8rem; }}
   .flag {{ padding: .65rem .9rem; border-radius: 10px; margin: .35rem 0; background: #fff; border: 1px solid #d3d8ea; font-size: .97rem; }}
   .flag.warn {{ border-color: {AMBER}; }}
@@ -71,45 +85,60 @@ def ago(seconds: float) -> str:
     return f"{seconds / 86400:.0f} days ago"
 
 
-# ------------------------------------------------------------------ sidebar: page + server connection
-st.sidebar.title("REMEM admin")
-page = st.sidebar.radio("Page", ["Pilot", "EdNet results", "SimLab", "Model"], label_visibility="collapsed")
-st.sidebar.divider()
-st.sidebar.markdown("**Live server**")
-srv: Server | None = st.session_state.get("srv")
-if srv is None:
-    url = st.sidebar.text_input("Server address", value=os.getenv("REMEM_SERVER_URL", ""), placeholder="https://your-server")
-    user = st.sidebar.text_input("Admin username", value=os.getenv("REMEM_ADMIN_USER", "aryan"))
-    pw = st.sidebar.text_input("Admin password", type="password")
-    if st.sidebar.button("Connect", type="primary", use_container_width=True):
+# ------------------------------------------------------------------ connection to the live server
+def get_server() -> Server | None:
+    """Connect with the details in .env if present (no form needed); otherwise the Pilot page shows a connect form."""
+    srv = st.session_state.get("srv")
+    if srv is not None:
+        return srv
+    url, pw = os.getenv("REMEM_SERVER_URL"), os.getenv("REMEM_ADMIN_PASSWORD")
+    if url and pw and "auto_failed" not in st.session_state:
         try:
             s = Server(url)
-            s.login(user, pw)
+            s.login(os.getenv("REMEM_ADMIN_USER", "aryan"), pw)
             st.session_state["srv"] = s
-            st.session_state["flash"] = ("ok", "Connected.")
-            st.rerun()
+            return s
         except (ServerError, OSError, ValueError) as e:
-            st.sidebar.error(f"Could not connect: {e}")
-else:
-    st.sidebar.success("Connected")
-    if st.sidebar.button("Disconnect", use_container_width=True):
-        del st.session_state["srv"]
-        st.rerun()
-if LIVE_DB.exists():
-    st.sidebar.caption(f"Data copy: {ago(time.time() - LIVE_DB.stat().st_mtime)}")
+            st.session_state["auto_failed"] = str(e)
+    return None
 
 
-def refresh() -> None:
+srv: Server | None = get_server()
+
+
+def connect_panel() -> None:
+    st.title("Pilot")
+    st.markdown("### Connect to the server")
+    if st.session_state.get("auto_failed"):
+        st.error(f"The details in .env did not work: {st.session_state['auto_failed']}")
+    note("The dashboard reads live data from your REMEM server using your admin account. "
+         "To skip this step next time, add <code>REMEM_SERVER_URL</code> and <code>REMEM_ADMIN_PASSWORD</code> to the <code>.env</code> file and restart the dashboard.")
+    with st.form("connect"):
+        url = st.text_input("Server address", value=os.getenv("REMEM_SERVER_URL", ""), placeholder="https://your-server")
+        user = st.text_input("Admin username", value=os.getenv("REMEM_ADMIN_USER", "aryan"))
+        pw = st.text_input("Admin password", type="password")
+        if st.form_submit_button("Connect", type="primary"):
+            try:
+                s = Server(url)
+                s.login(user, pw)
+                st.session_state["srv"] = s
+                st.session_state.pop("auto_failed", None)
+                st.rerun()
+            except (ServerError, OSError, ValueError) as e:
+                st.error(f"Could not connect: {e}")
+
+
+def refresh() -> bool:
     try:
-        saved = srv.download_snapshot(LIVE_DB)
-        st.session_state["flash"] = ("ok", f"Data refreshed. A dated backup was saved as {saved.name}.")
+        srv.download_snapshot(LIVE_DB)
+        st.session_state["fetched_at"] = time.time()
+        return True
     except (ServerError, OSError) as e:
-        st.session_state["flash"] = ("err", f"Could not refresh: {e}")
+        st.session_state["flash"] = ("err", f"Could not load the latest data: {e}")
+        return False
 
 
 flash = st.session_state.pop("flash", None)
-if flash:
-    (st.success if flash[0] == "ok" else st.error)(flash[1])
 
 
 # ------------------------------------------------------------------ pilot
@@ -117,7 +146,7 @@ if flash:
 def reset_dialog(server: Server) -> None:
     st.markdown(f'<span style="color:{RED};font-weight:700">Proceed with caution. This cannot be undone.</span>', unsafe_allow_html=True)
     st.write("This deletes the notes, quizzes, answers and review schedule of the accounts you choose. "
-             "The accounts and their passwords stay, so people can still sign in. A backup copy of the current data is saved to this computer first.")
+             "The accounts and their passwords stay, so people can still sign in.")
     try:
         accts = server.accounts()
     except ServerError as e:
@@ -138,9 +167,8 @@ def reset_dialog(server: Server) -> None:
             st.error("Type RESET in capitals to confirm.")
         else:
             try:
-                server.download_snapshot(LIVE_DB)                          # safety copy first
                 r = server.reset([labels[c] for c in chosen], clear_consent)
-                server.download_snapshot(LIVE_DB)
+                st.session_state.pop("fetched_at", None)                    # reload the data after the reset
                 st.session_state["flash"] = ("ok", f"Reset done for {r['accounts']} account(s): removed {r['answers']} answers, {r['concepts']} concepts and {r['notes']} notes.")
                 st.rerun()
             except (ServerError, OSError) as e:
@@ -148,20 +176,27 @@ def reset_dialog(server: Server) -> None:
 
 
 def page_pilot() -> None:
+    if srv is None and not LIVE_DB.exists():
+        return connect_panel()
+    if srv is not None and (not LIVE_DB.exists() or time.time() - st.session_state.get("fetched_at", 0) > 120):
+        refresh()                                                          # latest data on opening the page, then at most every two minutes
     top = st.columns([5, 1.4], vertical_alignment="bottom")
     top[0].title("Pilot")
-    if srv is not None and top[1].button("Refresh data", use_container_width=True):
+    if srv is not None and top[1].button("Refresh", icon=":material/refresh:", use_container_width=True):
         refresh()
         st.rerun()
+    msg = st.session_state.pop("flash", None) or flash
+    if msg:
+        (st.success if msg[0] == "ok" else st.error)(msg[1])
     if not LIVE_DB.exists():
-        st.info("No pilot data on this computer yet. Connect to the server in the sidebar, then press Refresh data.")
+        st.info("No data yet.")
         return
     conn = pilot.open_ro(LIVE_DB)
     try:
         now_ms = int(time.time() * 1000)
         users = pilot.users_table(conn, now_ms)
         stu = users[users["role"] == "student"]
-        note(f"Data copied {ago(time.time() - LIVE_DB.stat().st_mtime)}. Ten people are too few for significance tests, so everything here is descriptive.")
+        note(("Live data, loaded " if srv is not None else "Not connected. Showing the copy from ") + ago(time.time() - LIVE_DB.stat().st_mtime) + ". Ten people are too few for significance tests, so everything here is descriptive.")
 
         st.header("Needs attention")
         items = pilot.attention(conn, now_ms)
@@ -255,7 +290,7 @@ def page_pilot() -> None:
             st.markdown("### Danger zone")
             note("Use this after you have tried the app with an account and want a clean start. It deletes learning data only; accounts and passwords stay.")
             if srv is None:
-                note("Connect to the server in the sidebar to use this.")
+                note("Connect to the server to use this.")
             elif st.button("Reset test data...", key="open_reset"):
                 reset_dialog(srv)
     finally:
@@ -376,4 +411,21 @@ def page_model() -> None:
     note(f"Curve shape β = {beta:g}. Memory strength is exp(baseline + the weighted factors).")
 
 
-{"Pilot": page_pilot, "EdNet results": page_ednet, "SimLab": page_simlab, "Model": page_model}[page]()
+pages = [
+    st.Page(page_pilot, title="Pilot", icon=":material/groups:", url_path="pilot", default=True),
+    st.Page(page_ednet, title="EdNet results", icon=":material/science:", url_path="ednet"),
+    st.Page(page_simlab, title="SimLab", icon=":material/model_training:", url_path="simlab"),
+    st.Page(page_model, title="Model", icon=":material/show_chart:", url_path="model"),
+]
+nav = st.navigation(pages, position="sidebar")
+with st.sidebar:
+    if srv is not None:
+        host = srv.base.split("://")[-1]
+        st.markdown(f'<div class="conn"><span class="dot"></span>Connected<br><span>{host}</span></div>', unsafe_allow_html=True)
+        if st.button("Disconnect", key="disconnect", type="tertiary", icon=":material/logout:"):
+            st.session_state.pop("srv", None)
+            st.session_state["auto_failed"] = "Disconnected."
+            st.rerun()
+    else:
+        st.markdown('<div class="conn"><span class="dot off"></span>Not connected</div>', unsafe_allow_html=True)
+nav.run()

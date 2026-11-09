@@ -49,7 +49,7 @@ Open http://localhost:8000. Accounts are created by the owner only (at most 10 s
 streamlit run eval_dashboard/app.py
 ```
 
-In the sidebar enter the server address and the admin account, press Connect, then Refresh data. That downloads a copy of the live database (passwords removed) and keeps a dated backup in `data/pilot/backups/`. The same page can open or close the final check and reset test data. To take a backup without opening the dashboard, put `REMEM_SERVER_URL` and `REMEM_ADMIN_PASSWORD` in `.env` and run `python -m eval_dashboard.pull_backup` (it can be scheduled with Windows Task Scheduler).
+The Pilot page loads live data from the server with your admin account. Put `REMEM_SERVER_URL` and `REMEM_ADMIN_PASSWORD` in `.env` to connect automatically (otherwise a connect form appears). From the same page you can open or close the final check and reset test data (a confirmation dialog protects the reset). To keep dated backups on this computer, run `python -m eval_dashboard.pull_backup`, or schedule `deploy\pull_backup.cmd` with Windows Task Scheduler.
 
 ## Tests
 

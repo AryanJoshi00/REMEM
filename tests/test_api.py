@@ -364,8 +364,9 @@ def test_dashboard_server_client_end_to_end(client, tmp_path):
     cs = make_concepts(client, hs)
     assert answer(client, hs, cs[0]["concept_id"], True).status_code == 200
     live = tmp_path / "pilot" / "remem_live.db"
-    dated = srv.download_snapshot(live)
-    assert live.exists() and dated.parent.name == "backups" and dated.exists()
+    assert srv.download_snapshot(live) == live and live.exists() and not (live.parent / "backups").exists()   # no dated copies by default
+    dated = srv.download_snapshot(live, keep_dated=2)
+    assert dated.parent.name == "backups" and dated.exists()
     assert {a["username"]: a["answers"] for a in srv.accounts()}["p01"] == 1
     assert srv.set_final(True) is True and srv.final_open() is True
     r = srv.reset(["p01"])

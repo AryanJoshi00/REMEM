@@ -52,18 +52,20 @@ class Server:
         body = {"confirm": "RESET", "usernames": usernames, "clear_consent": clear_consent}
         return self._check(self.http.post(self.base + "/api/admin/reset", json=body, headers=self._h(), timeout=self.timeout)).json()
 
-    def download_snapshot(self, live_path: Path, keep: int = 30) -> Path:
-        """Save a consistent copy as `live_path` and a dated copy in `backups/` next to it (keeps the newest `keep`)."""
+    def download_snapshot(self, live_path: Path, keep_dated: int = 0) -> Path:
+        """Save a consistent copy of the database as `live_path`. With keep_dated > 0 also keep that many dated copies in `backups/`."""
         r = self._check(self.http.get(self.base + "/api/admin/snapshot", headers=self._h(), timeout=self.timeout))
         live_path = Path(live_path)
         live_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = live_path.with_suffix(".part")
         tmp.write_bytes(r.content)
-        dated_dir = live_path.parent / "backups"
-        dated_dir.mkdir(exist_ok=True)
-        dated = dated_dir / f"remem_{datetime.now():%Y%m%d_%H%M%S}.db"
-        shutil.copyfile(tmp, dated)
+        dated = live_path
+        if keep_dated > 0:
+            dated_dir = live_path.parent / "backups"
+            dated_dir.mkdir(exist_ok=True)
+            dated = dated_dir / f"remem_{datetime.now():%Y%m%d_%H%M%S}.db"
+            shutil.copyfile(tmp, dated)
+            for old in sorted(dated_dir.glob("remem_*.db"))[:-keep_dated]:
+                old.unlink()
         tmp.replace(live_path)
-        for old in sorted(dated_dir.glob("remem_*.db"))[:-keep]:
-            old.unlink()
         return dated
