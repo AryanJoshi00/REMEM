@@ -5,8 +5,6 @@ __pycache__/
 *.pyc
 .env
 venv/
-node_modules/
-.expo/
 *.csv
 *.zip
 *.db
@@ -21,6 +19,3 @@ experiments/results/*.parquet
 Oracle-SSH/
 *.key
 *.pem
-
-# Security audit register (public repo: do not publish the weakness list)
-.security-audit/
