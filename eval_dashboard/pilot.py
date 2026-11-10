@@ -114,11 +114,6 @@ def recent_errors(conn, limit=15) -> pd.DataFrame:
                         FROM notes WHERE status='failed' ORDER BY note_id DESC LIMIT ?""", (limit,))
 
 
-def recent_audit(conn, limit=30) -> pd.DataFrame:
-    return _df(conn, """SELECT datetime(ts/1000,'unixepoch','+330 minutes') AS time_ist, user_id, event, detail
-                        FROM audit ORDER BY id DESC LIMIT ?""", (limit,))
-
-
 def final_test_open(conn) -> bool:
     row = conn.execute("SELECT value FROM settings WHERE key='final_test_open'").fetchone()
     return bool(row and str(row[0]) in ("1", "true", "True"))
