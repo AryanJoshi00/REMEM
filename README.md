@@ -20,6 +20,7 @@ It is evaluated three ways: a held-out calibration study on the public EdNet dat
 | `preprocessing/` | EdNet sampling and causal feature construction |
 | `evaluation/`, `experiments/` | Metrics and one script per experiment; results in `experiments/results/` |
 | `simlab/` | Simulated-student lab used to compare schedulers with known truth |
+| `models/offsets.py`, `scheduler/replay.py` | Hierarchical offsets (Experiment 4) and replay checks (Experiment 6) |
 | `eval_dashboard/` | Streamlit dashboard for the pilot monitor and experiment results |
 | `deploy/`, `docs/DEPLOY.md` | Server setup (systemd, Caddy HTTPS, nightly backup) |
 | `docs/` | Specification, deployment guide, UX audit, per-module viva notes |
@@ -51,6 +52,14 @@ streamlit run eval_dashboard/app.py
 
 The Pilot page loads live data from the server with your admin account. Put `REMEM_SERVER_URL` and `REMEM_ADMIN_PASSWORD` in `.env` to connect automatically (otherwise a connect form appears). From the same page you can open or close the final check and reset test data (a confirmation dialog protects the reset). To keep dated backups on this computer, run `python -m eval_dashboard.pull_backup`, or schedule `deploy\pull_backup.cmd` with Windows Task Scheduler.
 
+## Offline demo (no internet, no API key)
+
+```powershell
+python -m backend.seed_demo --password demo-pass
+python -m uvicorn backend.main:app --port 8000
+```
+Sign in as `demo`. The account comes with the three ready-made topics, taken from the pre-written question bank in `artifacts/fallback/`, and a short study history, so the Today screen shows concepts that are due, coming up and new. The same bank is used automatically if the language model fails while a ready-made topic is being turned into a quiz (set `REMEM_FALLBACK=0` to turn that off).
+
 ## Tests
 
 ```powershell
@@ -68,6 +77,8 @@ python -m experiments.exp2_bkt_baseline
 python -m experiments.exp3_forgetting
 python -m experiments.make_starter_prior
 python experiments/exp10_simlab.py
+python -m experiments.exp4_personalisation
+python -m experiments.exp6_replay
 ```
 
 Outputs are written to `experiments/results/` (tables and a figure) and appended to `experiments/results/run_log.csv`. Fitted parameters used by the app are in `artifacts/`.

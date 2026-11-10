@@ -346,10 +346,74 @@ def page_ednet() -> None:
         note("Share correct by time since the last practice. It falls only slightly, which is why the app starts from a documented prior instead of the fitted curve.")
         st.dataframe(g, hide_index=True, width="stretch", column_config={"bin": "Gap", "n": "Answers", "accuracy": st.column_config.NumberColumn("Share correct", format="%.3f"),
                                                                            "resid_vs_student_mean": st.column_config.NumberColumn("Versus the student's own average", format="%+.3f")})
+    exp4_section()
+    exp6_section()
     log = csv("run_log.csv")
     if log is not None:
         with st.expander("Run log (every experiment run, with settings)"):
             st.dataframe(log, hide_index=True, width="stretch")
+
+
+OFFSET_NAMES = {"G": "Global model only", "G+c": "+ concept offsets", "G+c+s": "+ concept and student offsets", "full": "+ pair offsets (shrunk)", "full_raw": "+ pair offsets (no shrinkage)"}
+STRATA_ORDER = ["0 (new pair)", "1-2", "3-5", "6-10", "11-30", "31+"]
+
+
+def exp4_section() -> None:
+    ov, sp = csv("exp4_overall.csv"), csv("exp4_by_sparsity.csv")
+    if ov is None or sp is None:
+        return
+    st.header("Does personalising per concept and student help?")
+    note("Offsets nudge the memory strength up or down for a concept, a student, or one student on one concept. A prior pulls each offset toward zero, "
+         "so a pair with few answers stays close to the broader average. Lower log loss, Brier and ECE are better. Held-out test split, repeat answers only.")
+    t = ov[(ov["split"] == "test") & (ov["subset"] == "repeats")].copy()
+    t["model"] = t["model"].map(OFFSET_NAMES)
+    st.dataframe(t[["model", "n", "auc", "logloss", "brier", "ece"]], hide_index=True, width="stretch", column_config={
+        "model": "Model", "n": "Answers", "auc": st.column_config.NumberColumn("AUC", format="%.3f"), "logloss": st.column_config.NumberColumn("Log loss", format="%.5f"),
+        "brier": st.column_config.NumberColumn("Brier", format="%.5f"), "ece": st.column_config.NumberColumn("ECE", format="%.4f")})
+    st.markdown("**Log loss by how many earlier answers the student-concept pair had in training**")
+    piv = sp.pivot_table(index="stratum", columns="model", values="logloss").reindex(STRATA_ORDER)
+    piv = piv[[c for c in OFFSET_NAMES if c in piv.columns]].rename(columns=OFFSET_NAMES).reset_index().rename(columns={"stratum": "Earlier answers on the pair"})
+    st.dataframe(piv, hide_index=True, width="stretch")
+    summ = csv("exp4_offset_summary.csv")
+    note("The gains are small. Offsets help a little at every level, and shrinkage matters little here because the fitted forgetting curve on EdNet is almost flat, "
+         "so large changes in memory strength move the predictions only slightly." + (" Offset widths (prior sd) were chosen on validation data; the best student and pair width sat at the largest value tried." if summ is not None else ""))
+
+
+def exp6_section() -> None:
+    tc, sw = csv("exp6_timing_calibration.csv"), csv("exp6_theta_sweep.csv")
+    sj = RESULTS / "exp6_summary.json"
+    if tc is None or sw is None or not sj.exists():
+        return
+    names = {"fitted": "EdNet-fitted model", "prior": "Deployed starter prior"}
+    st.header("Would the recommended review times be trustworthy?")
+    note("For every logged review, REMEM's recommended gap (at the 85% target) is computed from what was known before it. Reviews are then grouped by how the real gap compares with the recommendation, "
+         "and the predicted chance of a correct answer is compared with what happened. This is a check of the predictions, not proof that following the schedule helps learning.")
+    summ = json.loads(sj.read_text())
+    rows = [{"Model": names[k], "Curve shape": v["beta"], "Median recommended gap (days)": v["median_recommended_gap_at_0.85"], "Recommendations at the 180-day limit": v["share_recommendations_at_max_rail"],
+             "Reviews within half to double the recommendation": v["n_near_reviews"], "Calibration error there (ECE)": v["near_ece"], "Verdict": v["verdict"]} for k, v in summ.items()]
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", column_config={
+        "Curve shape": st.column_config.NumberColumn(format="%.3f"), "Median recommended gap (days)": st.column_config.NumberColumn(format="%.1f"),
+        "Recommendations at the 180-day limit": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
+        "Calibration error there (ECE)": st.column_config.NumberColumn(format="%.3f")})
+    tc = tc.assign(model=tc["model"].map(names))
+    long = tc.melt(id_vars=["model", "bucket", "n"], value_vars=["predicted", "observed"], var_name="kind", value_name="value")
+    order = list(tc["bucket"].drop_duplicates())
+    st.altair_chart(alt.Chart(long).mark_bar().encode(
+        x=alt.X("bucket:N", sort=order, title="Real gap compared with the recommended gap"), xOffset="kind:N", y=alt.Y("value:Q", scale=alt.Scale(domain=[0, 1]), title="Chance of a correct answer"),
+        color=alt.Color("kind:N", scale=alt.Scale(domain=["predicted", "observed"], range=[ACCENT, AMBER]), legend=alt.Legend(title=None, orient="bottom")),
+        row=alt.Row("model:N", title=None), tooltip=["model", "bucket", "n", "kind", "value"]).properties(height=200, width=620), width="content")
+    st.markdown("**Target retention (θ) sweep**")
+    note("A higher target means earlier reviews and more of them. 'Near' counts real reviews within a quarter of the recommended gap.")
+    s2 = sw.assign(model=sw["model"].map(names))
+    st.dataframe(s2, hide_index=True, width="stretch", column_config={
+        "model": "Model", "theta": st.column_config.NumberColumn("Target θ", format="%.2f"), "mean_recommended_days": st.column_config.NumberColumn("Mean recommended gap (days)", format="%.1f"),
+        "median_recommended_days": st.column_config.NumberColumn("Median (days)", format="%.1f"), "share_at_max_rail": st.column_config.ProgressColumn("At 180-day limit", format="percent", min_value=0, max_value=1),
+        "share_at_min_rail": st.column_config.ProgressColumn("At 1-day limit", format="percent", min_value=0, max_value=1),
+        "reviews_per_concept_month": st.column_config.NumberColumn("Reviews per concept per month", format="%.2f"), "n_near_recommendation": "Real reviews near it",
+        "predicted_near": st.column_config.NumberColumn("Predicted correct", format="%.2f"), "observed_near": st.column_config.NumberColumn("Observed correct", format="%.2f")})
+    note("The fitted EdNet curve is almost flat, so it recommends the maximum gap for most targets and is not usable for scheduling. The starter prior recommends gaps of days to weeks, "
+         "but its predictions are not well calibrated for reviews that happen early. The scheduler claim therefore rests on SimLab and the live pilot.")
+
 
 
 # ------------------------------------------------------------------ SimLab

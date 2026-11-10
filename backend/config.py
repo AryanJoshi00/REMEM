@@ -27,6 +27,7 @@ FIXED_INTERVAL_DAYS = 3.0
 
 MAX_STUDENT_ACCOUNTS = 10
 NOTES_PER_DAY = int(os.getenv("REMEM_NOTES_PER_DAY", "3"))
+USE_FALLBACK_BANK = os.getenv("REMEM_FALLBACK", "1") == "1"       # ready-made topics fall back to the pre-written quiz when the language model fails
 MAX_NOTE_CHARS = 6000
 MAX_CHUNKS_PER_NOTE = 6
 SESSION_TTL_HOURS = 24 * 7

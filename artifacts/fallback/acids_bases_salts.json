@@ -1,0 +1,340 @@
+{
+ "concepts": [
+  {
+   "name": "Acids",
+   "source_span": "Acids are substances that release hydrogen ions (H⁺) when dissolved in water.",
+   "questions": [
+    {
+     "stem": "What do acids release when dissolved in water?",
+     "options": [
+      "Hydroxide ions (OH⁻)",
+      "Hydrogen ions (H⁺)",
+      "Chloride ions only",
+      "Oxygen gas"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which taste is generally associated with acids?",
+     "options": [
+      "Bitter",
+      "Sweet",
+      "Sour",
+      "Salty"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What happens to blue litmus paper in an acid?",
+     "options": [
+      "It turns red",
+      "It turns green",
+      "It stays blue",
+      "It turns colourless"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What pH values do acids have?",
+     "options": [
+      "Above 7",
+      "Exactly 7",
+      "Always 14",
+      "Below 7"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which of these is an acid found in lemons and oranges?",
+     "options": [
+      "Sulphuric acid",
+      "Hydrochloric acid",
+      "Acetic acid",
+      "Citric acid"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Bases",
+   "source_span": "Bases are substances that neutralise acids.",
+   "questions": [
+    {
+     "stem": "What do many bases release when dissolved in water?",
+     "options": [
+      "Hydrogen ions (H⁺)",
+      "Hydroxide ions (OH⁻)",
+      "Carbon dioxide",
+      "Oxygen"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which taste and feel are generally associated with bases?",
+     "options": [
+      "Sour and sticky",
+      "Bitter and slippery",
+      "Sweet and rough",
+      "Salty and dry"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What does a base do to red litmus paper?",
+     "options": [
+      "Turns it blue",
+      "Turns it green",
+      "Leaves it red",
+      "Turns it yellow"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which pH values do bases have?",
+     "options": [
+      "Below 7",
+      "Exactly 7",
+      "Above 7",
+      "Only 0"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which of these is a base?",
+     "options": [
+      "Hydrochloric acid (HCl)",
+      "Citric acid",
+      "Acetic acid (CH₃COOH)",
+      "Sodium hydroxide (NaOH)"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Salts",
+   "source_span": "Salts are ionic compounds generally formed when an acid reacts with a base in a neutralisation reaction.",
+   "questions": [
+    {
+     "stem": "How are salts generally formed?",
+     "options": [
+      "When an acid reacts with a base in a neutralisation reaction",
+      "When water evaporates",
+      "When a metal is heated in air",
+      "When a gas is cooled"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which of these is a salt used as common table salt?",
+     "options": [
+      "Sodium hydroxide (NaOH)",
+      "Hydrochloric acid (HCl)",
+      "Sodium chloride (NaCl)",
+      "Calcium hydroxide (Ca(OH)₂)"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which salt is found in limestone and chalk?",
+     "options": [
+      "Copper sulphate",
+      "Calcium carbonate",
+      "Sodium chloride",
+      "Magnesium hydroxide"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which salt is used in laboratories and agriculture?",
+     "options": [
+      "Calcium carbonate",
+      "Sodium chloride",
+      "Citric acid",
+      "Copper sulphate (CuSO₄)"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What kind of compounds are salts?",
+     "options": [
+      "Ionic compounds",
+      "Gases",
+      "Pure metals",
+      "Organic fuels"
+     ],
+     "correct_index": 0
+    }
+   ]
+  },
+  {
+   "name": "The pH scale",
+   "source_span": "The pH scale measures how acidic or basic a solution is.",
+   "questions": [
+    {
+     "stem": "What does the pH scale measure?",
+     "options": [
+      "How acidic or basic a solution is",
+      "The temperature of a solution",
+      "The mass of a solution",
+      "The colour of a solution"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Roughly what range does the pH scale cover?",
+     "options": [
+      "1 to 7",
+      "0 to 14",
+      "0 to 100",
+      "7 to 14"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What is the pH of pure water?",
+     "options": [
+      "0",
+      "14",
+      "7",
+      "10"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which has a lower pH, lemon juice or a soap solution?",
+     "options": [
+      "Soap solution",
+      "They are the same",
+      "Neither is on the pH scale",
+      "Lemon juice"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "A lower pH indicates:",
+     "options": [
+      "A stronger basic nature",
+      "A neutral solution",
+      "No acidity at all",
+      "A stronger acidic nature"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Indicators",
+   "source_span": "Indicators are substances used to identify whether a solution is acidic or basic.",
+   "questions": [
+    {
+     "stem": "What is an indicator used for?",
+     "options": [
+      "To identify whether a solution is acidic or basic",
+      "To heat a solution",
+      "To measure mass",
+      "To filter solids"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What colour does phenolphthalein show in a base?",
+     "options": [
+      "Colourless",
+      "Pink",
+      "Yellow",
+      "Red"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "How does methyl orange appear in an acid?",
+     "options": [
+      "Yellow",
+      "Pink",
+      "Red",
+      "Colourless"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "How does turmeric change in a base?",
+     "options": [
+      "It stays yellow",
+      "It turns blue",
+      "It turns colourless",
+      "It turns reddish-brown"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What colour does litmus show in an acid?",
+     "options": [
+      "Blue",
+      "Pink",
+      "Yellow",
+      "Red"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Neutralisation",
+   "source_span": "Neutralisation is a chemical reaction in which an acid reacts with a base to produce salt and water.",
+   "questions": [
+    {
+     "stem": "What does neutralisation produce?",
+     "options": [
+      "Salt and water",
+      "Only a gas",
+      "Only a salt",
+      "An acid and a base"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which equation shows neutralisation?",
+     "options": [
+      "Salt + Water → Acid + Base",
+      "Acid + Water → Base",
+      "Acid + Base → Salt + Water",
+      "Base + Salt → Acid"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What are the products of HCl + NaOH?",
+     "options": [
+      "H₂ and Cl₂",
+      "NaCl and H₂O",
+      "NaOH and HCl",
+      "Na and O₂"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Why is lime added to acidic soil in agriculture?",
+     "options": [
+      "To make it more acidic",
+      "To add salt",
+      "To warm the soil",
+      "To reduce its acidity"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What do antacids do in medicine?",
+     "options": [
+      "Neutralise excess stomach acid",
+      "Increase stomach acid",
+      "Kill all bacteria",
+      "Add vitamins"
+     ],
+     "correct_index": 0
+    }
+   ]
+  }
+ ]
+}

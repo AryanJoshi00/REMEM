@@ -878,6 +878,8 @@ Problem (1) → phone: log in, paste notes, quiz (3) → due list, retention cur
 | D16 | 2026-11-08 | BKT for brand-new notes concepts: L0 0.3, T 0.15, G 0.25, S 0.10 (assumption A5; EdNet's pooled L0 = 0.74 describes practised test-takers) |
 | D17 | 2026-11-08 | LLM calls try a list of models in order with retries: `gemini-2.5-flash` returned 404 (retired for new users) and some models time out or return 503 on the free tier. List lives in `GEMINI_MODELS` (`backend/config.py`) |
 | D18 | 2026-11-08 | API is served under `/api`; the PWA is served at `/` by the same process |
+| D19 | 2026-11-11 | **Pre-written fallback question bank** (`artifacts/fallback/`, 18 concepts, 90 questions for the three ready-made topics, validated by the same checks as model output). Used only when generating a quiz for a ready-made topic fails, or by the offline demo seed (`python -m backend.seed_demo`); pasted notes never use it. `REMEM_FALLBACK=0` turns it off |
+| D20 | 2026-11-11 | Hierarchical offsets (Experiment 4) are evaluated offline only and are **not deployed**: gains on EdNet are small and the app's prior is already global |
 
 ## Appendix D — Open items for the owner
 1. Confirm the viva date.
@@ -924,3 +926,30 @@ Reading: (1) power-law beats exponential (supports H1's curve choice; C vs B, D 
 | Gen-1, φ = 0.5 / 3.0 | −5% / 0% | 50% / 34% |
 
 Reading: (1) **REMEM matches, but does not beat, a fixed interval whose length is tuned using the simulator's truth** (differences within the seed range = "not demonstrated"); its advantage is that it needs no such tuning. (2) It needs about half the reviews of SM-2 at the same coverage in this simulator; this depends on the assumed true dynamics and SM-2's quality mapping (no response times in SimLab, random fast/slow split), so it is not evidence about people. (3) Results hold under mis-specified generators. (4) Feature-based personalisation adds almost nothing: global-S REMEM uses 6.6/7.7/7.1 reviews vs 5.8/7.5/6.5 for the feature model at equal final recall, and rank correlation of fitted S with S_true is ≈ 0 to −0.4 with β often at its bound — the stability regression does not recover per-pair truth here, consistent with Exp 3. (5) Matching on delayed-test recall is non-monotone in the knob and unreliable; only the time-below-target matching is reported. These findings are stated plainly in the report; personalisation is not claimed.
+
+**Exp 4 (personalisation by hierarchical offsets) - run 2026-11-11, EdNet test split, repeat rows (297,133).** Offsets on log S (concept, then student, then pair) fitted by backfitting on top of the EdNet-fitted global model; prior widths chosen level by level on validation log loss from {0.1, 0.25, 0.5, 1, 2, 4, 8}.
+
+| Model | log loss | Brier | ECE | AUC |
+|---|---|---|---|---|
+| Global model only | 0.63452 | 0.22148 | 0.0413 | 0.6197 |
+| + concept offsets (τ = 2) | 0.63429 | 0.22134 | 0.0404 | 0.6193 |
+| + student offsets (τ = 8) | 0.63389 | 0.22117 | 0.0391 | 0.6198 |
+| + pair offsets, shrunk (τ = 8) | 0.63378 | 0.22113 | 0.0387 | 0.6200 |
+| + pair offsets, no shrinkage (τ = 50) | 0.63381 | 0.22113 | 0.0387 | 0.6199 |
+
+By earlier answers on the pair (log loss, global → shrunk → unshrunk): 0 (new pair) 0.6337 → 0.6334 → 0.6334; 1-2: 0.6472 → 0.6449 → 0.6457; 3-5: 0.6504 → 0.6466 → 0.6469; 6-10: 0.6377 → 0.6354 → 0.6358; 11-30: 0.6515 → 0.6477 → 0.6475; 31+: 0.6165 → 0.6141 → 0.6140.
+
+Reading: (1) personalisation helps a little at every level (total log-loss gain 0.0007, ECE 0.041 → 0.039), mostly from the student level; (2) **H2 is supported only weakly**: shrinking the pair offset beats fitting it unshrunk for pairs with up to 10 earlier answers (by 0.0003-0.0008 log loss) and is slightly worse from 11 answers up; the differences are tiny; (3) the selected widths for the student and pair levels sit at the **top of the grid**, i.e. validation prefers almost no shrinkage, because the fitted EdNet forgetting curve is almost flat (β = 0.022) so large changes in S move predictions very little (offset sd 1.9, 2.1 and 1.1 in log S); (4) not deployed (D20). The personalisation claim is therefore narrowed to "small, consistent improvements offline".
+
+**Exp 6 (scheduler replay checks) - run 2026-11-11, EdNet test split, repeat rows.** For every logged review the recommended gap at θ = 0.85 is computed from the state before it; reviews are grouped by actual gap ÷ recommended gap.
+
+| Stability model | median S | median recommended gap | at the 180-day limit | reviews within 0.5-2x of the recommendation | ECE there | verdict |
+|---|---|---|---|---|---|---|
+| EdNet-fitted (β = 0.022) | 81 d | 180 d | 100% | 4,491 | 0.051 | unreliable |
+| Deployed starter prior (β = 0.5) | 11.8 d | 19.3 d | 2.3% | 21,927 | 0.067 | unreliable |
+
+θ sweep, starter prior (mean recommended gap / reviews per concept-month): 0.75: 62 d / 1.16; 0.80: 49 d / 1.60; 0.85: 36 d / 2.34; 0.90: 22 d / 3.84; 0.95: 10 d / 8.26. The fitted model recommends 180 d for θ ≤ 0.85, 85 d at 0.90 and 6.7 d at 0.95.
+
+Reading: (1) the EdNet-fitted curve is too flat to schedule from (it recommends the maximum gap for most targets), confirming D15; (2) the starter prior recommends sensible gaps but its predictions are not well calibrated near them: for reviews at 0.5-0.8x of the recommendation it predicts 0.62 correct against 0.51 observed (n = 11,394) and for reviews more than 4x late it predicts 0.48 against 0.58 observed (n = 11,494); (3) **disclosure:** the verdict rule was first written on the narrow band 0.8-1.25x ("on time"), where the prior's ECE is 0.042 (n = 5,658) and would have passed the 0.05 threshold; the band was then widened to 0.5-2x for more reviews, where it fails (0.067). Both numbers are reported and the wider-band verdict is the one used; (4) per the failure rule the scheduler recommendations are flagged as unreliable on EdNet, which is itself an English-test dataset unlike study notes; the scheduler claim rests on SimLab and the live pilot, and the replay is circular as evidence of benefit (§18).
+
+**Fallback question bank and demo seed - built 2026-11-11 (D19).** 18 concepts (6 per ready-made topic) x 5 questions, grounded in each topic's own sentences, validated by the same code as model output. A topic note whose generation fails now falls back to the bank instead of failing; the offline demo account is created with `python -m backend.seed_demo`.
