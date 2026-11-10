@@ -7,6 +7,7 @@ from __future__ import annotations
 import shutil
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 class ServerError(Exception):
@@ -18,7 +19,12 @@ class Server:
         if http is None:
             import requests
             http = requests
-        self.base, self.http, self.timeout, self.token = base_url.rstrip("/"), http, timeout, None
+        base = base_url.rstrip("/")
+        if base:                                                       # an empty address is used only by the tests (relative URLs)
+            u = urlparse(base)
+            if u.scheme != "https" and u.hostname not in ("localhost", "127.0.0.1", "::1"):
+                raise ValueError("Use an https:// address: the admin password must not travel unencrypted.")
+        self.base, self.http, self.timeout, self.token = base, http, timeout, None
 
     def _h(self):
         return {"Authorization": "Bearer " + self.token} if self.token else {}

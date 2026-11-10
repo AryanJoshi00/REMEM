@@ -22,6 +22,17 @@ def gen_password(n: int = 12) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(n))
 
 
+def reset_password(conn, username: str, password: str) -> bool:
+    """Set a new password and sign the account out everywhere. False when the username does not exist."""
+    row = conn.execute("SELECT user_id FROM users WHERE username=?", (username,)).fetchone()
+    if row is None:
+        return False
+    h, salt = auth.hash_password(password)
+    conn.execute("UPDATE users SET pw_hash=?, salt=? WHERE user_id=?", (h, salt, row["user_id"]))
+    auth.revoke_user_sessions(conn, row["user_id"])
+    return True
+
+
 ID_TABLES = ("sessions", "notes", "concepts", "responses", "state", "audit")
 
 
@@ -69,8 +80,7 @@ def main() -> None:
             print(f"Created {a.role} '{a.username}'. Password (shown once): {pw}")
         elif a.action == "reset":
             pw = a.password or gen_password()
-            h, salt = auth.hash_password(pw)
-            n = conn.execute("UPDATE users SET pw_hash=?, salt=? WHERE username=?", (h, salt, a.username)).rowcount
+            n = int(reset_password(conn, a.username, pw))
             print(f"New password for '{a.username}' (shown once): {pw}" if n else "No such user")
         else:
             conn.execute("UPDATE users SET active=? WHERE username=?", (1 if a.action == "enable" else 0, a.username))

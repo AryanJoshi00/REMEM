@@ -26,6 +26,26 @@ def verify_password(password: str, pw_hash: bytes, salt: bytes) -> bool:
     return hmac.compare_digest(h, pw_hash)
 
 
+_DUMMY = hash_password("not-a-real-password")           # used only to make unknown usernames cost the same time as real ones
+
+
+def verify_dummy(password: str) -> None:
+    """Run a password check against a throw-away hash so a login for a non-existent username takes as long as a real one."""
+    verify_password(password, *_DUMMY)
+
+
+def purge_expired_sessions(conn) -> None:
+    conn.execute("DELETE FROM sessions WHERE expires_at<=?", (int(time.time() * 1000),))
+
+
+def revoke_user_sessions(conn, user_id: int, keep_token: str | None = None) -> None:
+    """Sign a user out everywhere (optionally keeping the session that made the request)."""
+    if keep_token is None:
+        conn.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+    else:
+        conn.execute("DELETE FROM sessions WHERE user_id=? AND token_hash<>?", (user_id, _hash_token(keep_token)))
+
+
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 

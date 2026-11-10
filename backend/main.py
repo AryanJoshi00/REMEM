@@ -121,12 +121,15 @@ def login(body: LoginIn):
     auth.check_rate_limit(body.username)
     with db.session() as conn:
         u = conn.execute("SELECT * FROM users WHERE username=? AND active=1", (body.username,)).fetchone()
+        if u is None:
+            auth.verify_dummy(body.password)                    # same work as a real check, so timing does not reveal which usernames exist
         ok = u is not None and auth.verify_password(body.password, u["pw_hash"], u["salt"])
         if not ok:
             auth.register_failure(body.username)
             db.audit(conn, "failed_login", u["user_id"] if u else None, ts=now_ms())
             raise HTTPException(401, "Wrong username or password")
         auth.clear_failures(body.username)
+        auth.purge_expired_sessions(conn)
         token = auth.create_session(conn, u["user_id"])
         db.audit(conn, "login", u["user_id"], ts=now_ms())
         consent = bool(u["consent_at"]) and u["consent_version"] == config.CONSENT_VERSION
@@ -149,12 +152,13 @@ def consent(user=Depends(auth.current_user)):
 
 
 @api.post("/auth/password")
-def change_password(body: PasswordIn, user=Depends(auth.current_user)):
+def change_password(body: PasswordIn, user=Depends(auth.current_user), token: str = Depends(auth._bearer)):
     if not auth.verify_password(body.old_password, user["pw_hash"], user["salt"]):
         raise HTTPException(401, "Wrong current password")
     h, salt = auth.hash_password(body.new_password)
     with db.session() as conn:
         conn.execute("UPDATE users SET pw_hash=?, salt=? WHERE user_id=?", (h, salt, user["user_id"]))
+        auth.revoke_user_sessions(conn, user["user_id"], keep_token=token)      # every other signed-in device must sign in again
         db.audit(conn, "password_change", user["user_id"], ts=now_ms())
     return {"ok": True}
 
