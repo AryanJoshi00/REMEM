@@ -1,0 +1,28 @@
+{
+  "fitted": {
+    "beta": 0.022050034785408627,
+    "median_stability_days": 81.06198210788217,
+    "median_recommended_gap_at_0.85": 180.0,
+    "share_recommendations_at_max_rail": 1.0,
+    "n_on_time_reviews": 1373,
+    "on_time_ece": 0.08918467151437555,
+    "n_near_reviews": 4491,
+    "near_ece": 0.05100988079558215,
+    "overall_ece": 0.04126635133522649,
+    "overall_logloss": 0.6345220181475315,
+    "verdict": "unreliable"
+  },
+  "prior": {
+    "beta": 0.5,
+    "median_stability_days": 11.80021328949536,
+    "median_recommended_gap_at_0.85": 19.321747893981577,
+    "share_recommendations_at_max_rail": 0.022962780976868945,
+    "n_on_time_reviews": 5658,
+    "on_time_ece": 0.04203881049050792,
+    "n_near_reviews": 21927,
+    "near_ece": 0.06670083122657919,
+    "overall_ece": 0.03329496140991892,
+    "overall_logloss": 0.6351081170580815,
+    "verdict": "unreliable"
+  }
+}

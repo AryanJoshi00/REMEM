@@ -14,7 +14,7 @@ import numpy as np
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 
-from backend import admin, auth, config, db, engine, llm, topics
+from backend import admin, auth, config, db, engine, fallback, llm, topics
 from backend.schemas import FlagIn, LoginIn, NoteIn, PasswordIn, RespondIn, TopicIn
 from models.stability import retrievability_power
 from scheduler.scheduler import t_review_days
@@ -167,9 +167,11 @@ def run_generation(note_id: int) -> None:
     try:
         concepts = llm.generate_for_note(note["text"])
     except Exception as e:                            # message is key-free by construction
-        with db.session() as conn:
-            conn.execute("UPDATE notes SET status='failed', error=? WHERE note_id=?", (str(e)[:300], note_id))
-        return
+        concepts = fallback.concepts_for(note["topic_id"]) if config.USE_FALLBACK_BANK else None     # ready-made topics only
+        if not concepts:
+            with db.session() as conn:
+                conn.execute("UPDATE notes SET status='failed', error=? WHERE note_id=?", (str(e)[:300], note_id))
+            return
     with db.session() as conn:
         ts = now_ms()
         for c in concepts:
