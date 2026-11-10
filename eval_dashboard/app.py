@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+import html  # noqa: E402
 import importlib  # noqa: E402
 from eval_dashboard import pilot  # noqa: E402
 
@@ -203,7 +204,7 @@ def page_pilot() -> None:
         if not items:
             st.markdown('<div class="flag">Nothing needs attention right now.</div>', unsafe_allow_html=True)
         for it in items:
-            st.markdown(f'<div class="flag {"warn" if it["level"] == "warn" else ""}">{"<b>Check</b> " if it["level"] == "warn" else ""}{it["text"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="flag {"warn" if it["level"] == "warn" else ""}">{"<b>Check</b> " if it["level"] == "warn" else ""}{html.escape(it["text"])}</div>', unsafe_allow_html=True)
 
         st.header("Overview")
         adh = pilot.adherence(conn, now_ms)
@@ -485,7 +486,7 @@ nav = st.navigation(pages, position="sidebar")
 with st.sidebar:
     if srv is not None:
         host = srv.base.split("://")[-1]
-        st.markdown(f'<div class="conn"><span class="dot"></span>Connected<br><span>{host}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="conn"><span class="dot"></span>Connected<br><span>{html.escape(host)}</span></div>', unsafe_allow_html=True)
         if st.button("Disconnect", key="disconnect", type="tertiary", icon=":material/logout:"):
             st.session_state.pop("srv", None)
             st.session_state["auto_failed"] = "Disconnected."

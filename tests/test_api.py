@@ -376,3 +376,58 @@ def test_dashboard_server_client_end_to_end(client, tmp_path):
     assert r["answers"] == 1
     with pytest.raises(ServerError):
         srv.reset(["nobody"])
+
+
+def test_password_change_signs_out_other_devices_but_not_this_one(client):
+    h1 = login(client, "p01", "pw-for-p01!")
+    h2 = login(client, "p01", "pw-for-p01!", consent=False)                     # a second device
+    assert client.get("/api/due", headers=h2).status_code == 200
+    r = client.post("/api/auth/password", json={"old_password": "pw-for-p01!", "new_password": "a-brand-new-pass-1"}, headers=h1)
+    assert r.status_code == 200
+    assert client.get("/api/due", headers=h1).status_code == 200                 # the device that changed it stays signed in
+    assert client.get("/api/due", headers=h2).status_code == 401                 # the other device must sign in again
+    assert client.post("/api/auth/login", json={"username": "p01", "password": "a-brand-new-pass-1"}).status_code == 200
+
+
+def test_cli_password_reset_signs_the_account_out_everywhere(client):
+    from backend import admin_create_user as acu
+    h = login(client, "p01", "pw-for-p01!")
+    other = login(client, "p02", "pw-for-p02!")
+    with db.session() as conn:
+        assert acu.reset_password(conn, "p01", "reset-pass-123") is True
+        assert acu.reset_password(conn, "nobody", "x") is False
+    assert client.get("/api/due", headers=h).status_code == 401
+    assert client.get("/api/due", headers=other).status_code == 200              # other accounts are untouched
+    assert client.post("/api/auth/login", json={"username": "p01", "password": "reset-pass-123"}).status_code == 200
+
+
+def test_unknown_username_costs_the_same_password_check(client, monkeypatch):
+    calls = []
+    real = auth.verify_password
+    monkeypatch.setattr(auth, "verify_password", lambda *a, **k: (calls.append(1), real(*a, **k))[1])
+    assert client.post("/api/auth/login", json={"username": "no-such-user", "password": "whatever-123"}).status_code == 401
+    assert len(calls) == 1                                                        # the dummy check ran
+    calls.clear()
+    assert client.post("/api/auth/login", json={"username": "p01", "password": "wrong-pass-123"}).status_code == 401
+    assert len(calls) == 1                                                        # a real user costs exactly one check too
+    assert client.post("/api/auth/login", json={"username": "p01", "password": "pw-for-p01!"}).status_code == 200
+
+
+def test_expired_sessions_are_removed_at_login(client):
+    with db.session() as conn:
+        uid = conn.execute("SELECT user_id FROM users WHERE username='p01'").fetchone()[0]
+        conn.execute("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES ('old1',?,1000)", (uid,))
+        conn.execute("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES ('old2',?,2000)", (uid,))
+    login(client, "p01", "pw-for-p01!")
+    with db.session() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM sessions WHERE token_hash IN ('old1','old2')").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] >= 1      # the new session is there
+
+
+def test_dashboard_refuses_plain_http_except_local():
+    from eval_dashboard.server import Server
+    for ok in ("https://example.org", "http://localhost:8765", "http://127.0.0.1:8000", ""):
+        Server(ok)
+    for bad in ("http://example.org", "ftp://example.org", "example.org"):
+        with pytest.raises(ValueError):
+            Server(bad)
