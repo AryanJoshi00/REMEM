@@ -57,7 +57,7 @@ async function api(path, opts = {}) {
 }
 function signOut(call = true) {
   if (call && S.token) fetch("api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + S.token } }).catch(() => {});
-  S.token = S.role = S.user = null;
+  setBadge(0); S.token = S.role = S.user = null;
   ["remem_token", "remem_role", "remem_user", "remem_queue", "remem_due"].forEach(store.del);
   if ("caches" in window) caches.delete("remem-api").catch(() => {});
   location.hash = "#/login"; route();
@@ -79,6 +79,73 @@ async function flushQueue() {
 window.addEventListener("online", flushQueue);
 
 const pl = (n, w) => n + " " + w + (Number(n) === 1 ? "" : "s");     // 1 day, 2 days
+// ---------------------------------------------------------------- add to home screen
+let deferredInstall = null;                         // Chrome / Edge / Android: the browser's own install prompt, when it offers one
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredInstall = e; });
+window.addEventListener("appinstalled", () => { deferredInstall = null; store.set("remem_installed", "1"); });
+
+function env() {
+  const ua = navigator.userAgent || "";
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const inApp = /FBAN|FBAV|Instagram|WhatsApp|Line\/|Snapchat|MicroMessenger|Twitter|LinkedInApp|GSA\//i.test(ua) || /; wv\)/.test(ua);
+  return { standalone, ios, inApp, android: /Android/.test(ua), samsung: /SamsungBrowser/.test(ua), iosOtherBrowser: ios && /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua) };
+}
+function installBannerHidden() { const t = Number(store.get("remem_install_hide") || 0); return Date.now() - t < 7 * 86400000; }
+function setBadge(n) {                              // the number of concepts due, shown on the home-screen icon where the phone allows it
+  try { if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n); else if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) { /* not supported */ }
+}
+function installBanner() {
+  const e = env();
+  if (e.standalone || installBannerHidden()) return null;
+  return h("div", { class: "calm install" }, h("b", {}, "Keep REMEM one tap away"),
+    h("p", { class: "muted" }, "Add it to your home screen. It opens like an app and the icon shows how many concepts are due."),
+    h("div", { class: "grid2" }, h("a", { class: "btn primary chunky", href: "#/install" }, "Show how"),
+      h("button", { class: "chunky", onclick: () => { store.set("remem_install_hide", String(Date.now())); route(); } }, "Not now")));
+}
+function phoneArt() {
+  const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 120 150"); svg.setAttribute("class", "phone-art"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "A phone with the REMEM icon on its home screen");
+  const add = (tag, a) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); svg.append(el); return el; };
+  add("rect", { x: 14, y: 6, width: 92, height: 138, rx: 16, class: "pa-body" });
+  add("rect", { x: 22, y: 20, width: 76, height: 112, rx: 8, class: "pa-screen" });
+  [0, 1, 2].forEach(r => [0, 1, 2].forEach(c => { if (!(r === 1 && c === 1)) add("rect", { x: 30 + c * 22, y: 30 + r * 26, width: 16, height: 16, rx: 5, class: "pa-app" }); }));
+  add("rect", { x: 52, y: 56, width: 16, height: 16, rx: 5, class: "pa-remem" });
+  add("circle", { cx: 70, cy: 56, r: 6, class: "pa-badge" });
+  return svg;
+}
+function stepList(steps) {
+  return h("ol", { class: "steps" }, steps.map((t, i) => h("li", {}, h("span", { class: "n", "aria-hidden": "true" }, String(i + 1)), h("span", { class: "t" }, t))));
+}
+function viewInstall() {
+  const e = env();
+  const back = h("a", { class: "btn block", href: S.token ? "#/" : "#/login" }, S.token ? "Back to today" : "Back to sign in");
+  if (e.standalone) return mount(h("h1", {}, "Already on your home screen"), phoneArt(), h("p", { class: "muted" }, "You're using REMEM as an app. Nothing more to do."), back);
+  const nodes = [h("h1", {}, "Keep REMEM one tap away"), phoneArt(), h("p", {}, "Put REMEM on your home screen. It opens full screen like an app, and the icon shows how many concepts are due.")];
+  if (e.inApp) {
+    const copy = h("button", { class: "chunky block", onclick: async () => { try { await navigator.clipboard.writeText(location.origin + "/"); toast("Link copied. Paste it in Chrome or Safari."); } catch (x) { toast("Copy the address from the menu instead."); } } }, "Copy the link");
+    nodes.push(h("div", { class: "panel" }, h("b", {}, "First, open it in your browser"), h("p", { class: "muted" }, "This page is open inside another app (such as WhatsApp or Instagram), and those can't add to the home screen. Tap the menu or the compass icon and choose Open in browser (Chrome or Safari), or copy the link and paste it there."), copy));
+  }
+  if (deferredInstall) {
+    nodes.push(h("button", { class: "primary chunky block", onclick: async () => { deferredInstall.prompt(); try { await deferredInstall.userChoice; } catch (x) { /* dismissed */ } deferredInstall = null; route(); } }, "Add to home screen"));
+    nodes.push(h("p", { class: "muted small" }, "Prefer to do it yourself? The steps are below."));
+  }
+  let steps, title;
+  if (e.ios) { title = e.iosOtherBrowser ? "On iPhone, in your browser" : "On iPhone, in Safari"; steps = [e.iosOtherBrowser ? "Tap the Share button (a square with an arrow) in the toolbar or the address bar." : "Tap the Share button (a square with an arrow) at the bottom of Safari.", "Scroll down in the sheet and tap Add to Home Screen.", "Tap Add in the top corner. REMEM appears on your home screen."]; }
+  else if (e.samsung) { title = "On Samsung Internet"; steps = ["Tap the menu (three lines) at the bottom right.", "Tap Add page to, then Home screen.", "Tap Add."]; }
+  else if (e.android) { title = "On Android, in Chrome"; steps = ["Tap the menu (three dots) at the top right.", "Tap Install app. If you see Add to Home screen instead, tap that.", "Tap Install or Add. REMEM appears on your home screen."]; }
+  else { title = "On a computer"; steps = ["Look for the install icon at the right end of the address bar, or open the browser menu.", "Choose Install REMEM (Chrome and Edge).", "Confirm. REMEM opens in its own window."]; }
+  nodes.push(h("h2", {}, title), stepList(steps));
+  nodes.push(h("details", { class: "own" }, h("summary", {}, "Can't see the option?"),
+    h("ul", { class: "muted" },
+      h("li", {}, "Open the link in Chrome (Android) or Safari (iPhone). Links opened from WhatsApp, Instagram or similar usually can't be added."),
+      h("li", {}, "On iPhone, other browsers can add it only on recent iOS versions; Safari always can."),
+      h("li", {}, "Private or incognito tabs hide the option. Open a normal tab."),
+      h("li", {}, "You can use REMEM in the browser without adding it. Nothing is lost."))));
+  nodes.push(h("p", {}, back));
+  mount(nodes);
+}
+
 // ---------------------------------------------------------------- nav
 const ICONS = {       // one drawn set: 24px grid, 1.8 stroke, round caps
   today: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12.5l3 3 5-6",
@@ -127,7 +194,8 @@ function viewLogin() {
     } catch (ex) { err.textContent = ex.message; go.disabled = false; }
   } }, h("div", {}, h("label", { for: "u" }, "Username"), u), h("div", {}, h("label", { for: "p" }, "Password"), h("div", { class: "pw" }, p, showBtn)), err, go);
   u.id = "u"; p.id = "p";
-  mount(h("h1", {}, "Remember what you study"), h("p", { class: "muted" }, "REMEM tells you what to revise, and when. Your project owner gives you a username and password."), form);
+  mount(h("h1", {}, "Remember what you study"), h("p", { class: "muted" }, "REMEM tells you what to revise, and when. Your project owner gives you a username and password."), form,
+    env().standalone ? null : h("p", {}, h("a", { href: "#/install" }, "Add REMEM to your home screen")));
 }
 
 function viewConsent() {
@@ -139,9 +207,11 @@ function viewConsent() {
 }
 
 function renderHome(d) {
+  setBadge(d.due.length);
   const nodes = [h("h1", {}, "Today")];
   const counts = [d.due.length ? d.due.length + " due" : "", d.new.length ? d.new.length + " new" : ""].filter(Boolean).join(", ");
   if (counts) nodes.push(h("p", { class: "muted" }, counts));
+  const ib = installBanner(); if (ib) nodes.push(ib);
   if (d.final && d.final.open && d.final.remaining) {
     nodes.push(h("div", { class: "calm" }, h("b", {}, "Final check is open"),
       h("p", { class: "muted" }, pl(d.final.remaining, "question") + ", one per concept. It takes a few minutes and doesn't change your schedule."),
@@ -347,6 +417,7 @@ function viewMe() {
     h("h2", {}, "Change password"),
     h("div", { class: "stack" }, h("div", {}, h("label", { for: "op" }, "Current password"), old), h("div", {}, h("label", { for: "np" }, "New password (8 or more characters)"), nw), msg,
       h("button", { onclick: async () => { try { await api("/auth/password", { method: "POST", body: { old_password: old.value, new_password: nw.value } }); msg.className = "ok"; msg.textContent = "Password changed."; old.value = nw.value = ""; } catch (e) { msg.className = "err"; msg.textContent = e.message; } } }, "Update password")),
+    env().standalone ? null : h("p", {}, h("a", { class: "btn block", href: "#/install" }, "Add to home screen")),
     h("p", {}, h("button", { class: "block", onclick: () => signOut() }, "Sign out")));
 }
 
@@ -354,6 +425,7 @@ function viewMe() {
 function route() {
   const hash = location.hash || "#/";
   renderNav();
+  if (hash.startsWith("#/install")) return viewInstall();
   if (!S.token) return viewLogin();
   const [, a, b] = hash.split("/");
   switch (a) {

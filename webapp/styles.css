@@ -154,3 +154,17 @@ input[type="range"] { accent-color: var(--accent); padding: 0; min-height: 44px;
 .flag { display: inline-flex; align-items: center; min-height: 44px; }
 .opt.picked { border-color: var(--accent); background: var(--tint); }
 .opt.picked .key { border-color: var(--accent); color: var(--accent); }
+
+/* add to home screen: friendly, chunky buttons and numbered steps (the steps are a real sequence) */
+.btn.chunky, button.chunky { border-bottom-width: 4px; border-radius: 16px; font-weight: 700; }
+.btn.chunky:active, button.chunky:active { transform: translateY(2px); border-bottom-width: 2px; }
+.btn.primary.chunky, button.primary.chunky { border-bottom-color: color-mix(in srgb, var(--accent) 60%, #000); }
+.install { margin-top: 12px; }
+.install .grid2 { margin-top: 12px; }
+.phone-art { display: block; width: 132px; height: auto; margin: 8px auto 12px; }
+.pa-body { fill: var(--ink); } .pa-screen { fill: var(--surface); } .pa-app { fill: var(--rule); }
+.pa-remem { fill: var(--accent); } .pa-badge { fill: var(--badge); }
+.steps { list-style: none; margin: 8px 0 0; padding: 0; }
+.steps li { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.steps .n { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 800; }
+.steps .t { padding-top: 3px; }
