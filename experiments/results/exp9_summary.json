@@ -1,0 +1,25 @@
+{
+  "k": 15,
+  "tau_days": 1.0,
+  "threshold": 0.05,
+  "w_link_F": -1.3497834756243654,
+  "effect_on_log_S_at_F_p90": -6.269239953993847,
+  "share_rows_F_above_0.1": 0.8151635799456809,
+  "n_test_rows": 297133,
+  "logloss_gain_overall": {
+    "mean_diff": 0.0019178786402638333,
+    "lo": 0.0012967474849307971,
+    "hi": 0.0025277956190564604,
+    "n_students": 802
+  },
+  "logloss_gain_spaced_1d": {
+    "mean_diff": 0.0022376118106919043,
+    "lo": 0.0016434810787821152,
+    "hi": 0.0028191019314362745,
+    "n_students": 797
+  },
+  "specific_to_related_concepts": true,
+  "verdict": "supported, specific to related concepts",
+  "base_val_logloss": 0.6226997292343854,
+  "link_val_logloss": 0.6217928470261012
+}

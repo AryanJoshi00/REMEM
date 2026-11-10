@@ -20,7 +20,7 @@ It is evaluated three ways: a held-out calibration study on the public EdNet dat
 | `preprocessing/` | EdNet sampling and causal feature construction |
 | `evaluation/`, `experiments/` | Metrics and one script per experiment; results in `experiments/results/` |
 | `simlab/` | Simulated-student lab used to compare schedulers with known truth |
-| `models/offsets.py`, `scheduler/replay.py` | Hierarchical offsets (Experiment 4) and replay checks (Experiment 6) |
+| `models/offsets.py`, `models/links.py`, `scheduler/replay.py` | Hierarchical offsets (Experiment 4), concept-link feature (Experiment 9) and replay checks (Experiment 6) |
 | `eval_dashboard/` | Streamlit dashboard for the pilot monitor and experiment results |
 | `deploy/`, `docs/DEPLOY.md` | Server setup (systemd, Caddy HTTPS, nightly backup) |
 | `docs/` | Specification, deployment guide, UX audit, per-module viva notes |
@@ -79,6 +79,8 @@ python -m experiments.make_starter_prior
 python experiments/exp10_simlab.py
 python -m experiments.exp4_personalisation
 python -m experiments.exp6_replay
+python -m experiments.exp9_concept_link
+python -m experiments.exp7_ablations
 ```
 
 Outputs are written to `experiments/results/` (tables and a figure) and appended to `experiments/results/run_log.csv`. Fitted parameters used by the app are in `artifacts/`.
@@ -88,6 +90,7 @@ Outputs are written to `experiments/results/` (tables and a figure) and appended
 - BKT without forgetting beats the majority, concept-difficulty and student-accuracy baselines on a chronological held-out split.
 - On EdNet, a power-law forgetting term improves calibration over a non-forgetting model, but feature-driven personalisation adds very little. The app therefore starts from a documented prior (see the specification, decision D15).
 - In SimLab, threshold scheduling matches a fixed interval that was tuned with knowledge of the true memory, and needs about half the reviews of SM-2 at the same coverage. It does not show a benefit from per-student personalisation.
+- Small offline gains from per-concept and per-student offsets, and a larger one from the recent-failures-on-related-concepts feature (about half of that gain is a general recent-failure signal). The forgetting term and the power-law curve matter most; single student features add almost nothing. None of these extensions is deployed.
 
 These are results on simulated learners and one public dataset; they are not evidence that the app improves learning for people. The live pilot is small and is analysed descriptively.
 

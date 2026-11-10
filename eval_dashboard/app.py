@@ -349,6 +349,8 @@ def page_ednet() -> None:
                                                                            "resid_vs_student_mean": st.column_config.NumberColumn("Versus the student's own average", format="%+.3f")})
     exp4_section()
     exp6_section()
+    exp7_section()
+    exp9_section()
     log = csv("run_log.csv")
     if log is not None:
         with st.expander("Run log (every experiment run, with settings)"):
@@ -414,6 +416,73 @@ def exp6_section() -> None:
         "predicted_near": st.column_config.NumberColumn("Predicted correct", format="%.2f"), "observed_near": st.column_config.NumberColumn("Observed correct", format="%.2f")})
     note("The fitted EdNet curve is almost flat, so it recommends the maximum gap for most targets and is not usable for scheduling. The starter prior recommends gaps of days to weeks, "
          "but its predictions are not well calibrated for reviews that happen early. The scheduler claim therefore rests on SimLab and the live pilot.")
+
+
+
+def _signed(x: float) -> str:
+    return f"{x:+.4f}"
+
+
+def exp7_section() -> None:
+    ab = csv("exp7_ablations.csv")
+    if ab is None:
+        return
+    st.header("Which parts of the model matter?")
+    note("Each row removes or swaps one part and scores the result on the same held-out repeat answers. "
+         "The change is the difference in log loss from the full model, with a 95% interval from resampling students. "
+         "A part counts as mattering only when the whole interval is on the worse side of zero. Uncertainty comes from resampling students, not from refitting with other random seeds.")
+    t = ab.copy()
+    order = {"Reference": 0, "Forgetting": 1, "Forgetting curve": 2, "Features": 3, "Extensions": 4}
+    t["_o"] = t["group"].map(order)
+    t = t.sort_values(["_o", "logloss"], ascending=[True, True])
+
+    def plain(r):
+        if r["group"] == "Reference":
+            return "Reference"
+        if r["verdict"] == "no demonstrable difference":
+            return "No demonstrable difference"
+        size = r.get("effect_size", "")
+        if r["group"] == "Extensions":
+            return ("Helps" if r["verdict"].startswith("better") else "Hurts") + f" ({size})"
+        return ("Removing it helps" if r["verdict"].startswith("better") else "The part matters") + f" ({size})"
+    t["Result"] = t.apply(plain, axis=1)
+    t["Change in log loss"] = t.apply(lambda r: "" if r["group"] == "Reference" else f"{_signed(r['delta_logloss'])}  ({_signed(r['ci_low'])} to {_signed(r['ci_high'])})", axis=1)
+    st.dataframe(t[["group", "label", "logloss", "ece", "Change in log loss", "Result"]], hide_index=True, width="stretch", column_config={
+        "group": "Kind", "label": "Model", "logloss": st.column_config.NumberColumn("Log loss", format="%.5f"), "ece": st.column_config.NumberColumn("ECE", format="%.4f")})
+    note("Positive change = worse than the full model. The size in brackets is a reading aid: under 0.0005 negligible, under 0.002 small, otherwise moderate. "
+         "Modelling forgetting and the shape of the curve matter most; each student or concept feature adds almost nothing on its own; the link feature is the largest single gain. "
+         "The target-retention trade-off is in the replay section above.")
+
+
+def exp9_section() -> None:
+    sj = RESULTS / "exp9_summary.json"
+    ctrl, ov = csv("exp9_controls.csv"), csv("exp9_overall.csv")
+    if not sj.exists() or ctrl is None or ov is None:
+        return
+    s9 = json.loads(sj.read_text())
+    g, gs = s9["logloss_gain_overall"], s9["logloss_gain_spaced_1d"]
+    st.header("Do recent mistakes on related concepts help?")
+    note("A related concept is one that students who struggle with this concept also tend to struggle with (a correlation measured on the training period only). "
+         "The feature adds up a student's recent failures on related concepts, fading over time, and the model learns whether that shortens or lengthens memory strength.")
+    c = st.columns(3)
+    c[0].metric("Gain, all repeats", f"{g['mean_diff']:.4f}", help=f"95% interval {g['lo']:.4f} to {g['hi']:.4f}")
+    c[1].metric("Gain, gaps of 1+ day", f"{gs['mean_diff']:.4f}", help=f"95% interval {gs['lo']:.4f} to {gs['hi']:.4f}")
+    c[2].metric("With a related failure", f"{s9['share_rows_F_above_0.1']:.0%}")
+    note(f"Verdict: <b>{html.escape(s9['verdict'])}</b>. Settings chosen on validation data: {s9['k']} neighbours per concept, fading over {s9['tau_days']:g} day.")
+    names = {"repeats": "All repeat answers", "spaced>=1d": "Gap of a day or more", "recent failure elsewhere (F>0.1)": "Recent related failure", "no recent related failure (F<=0.1)": "No recent related failure"}
+    o = ov.assign(subset=ov["subset"].map(names))
+    st.dataframe(o[["subset", "model", "n", "auc", "logloss", "brier", "ece"]], hide_index=True, width="stretch", column_config={
+        "subset": "Answers", "model": "Model", "n": "Count", "auc": st.column_config.NumberColumn("AUC", format="%.3f"), "logloss": st.column_config.NumberColumn("Log loss", format="%.5f"),
+        "brier": st.column_config.NumberColumn("Brier", format="%.5f"), "ece": st.column_config.NumberColumn("ECE", format="%.4f")})
+    st.markdown("**Is it really about related concepts?**")
+    note("Controls build the same feature with the links shuffled across concepts, or with every concept linked equally. "
+         "If those gain as much, the feature is only measuring that the student is having a bad stretch.")
+    cc = ctrl.copy()
+    cc["Gain over the global model"] = cc.apply(lambda r: f"{_signed(r['gain_over_global'])}  ({_signed(r['gain_lo'])} to {_signed(r['gain_hi'])})", axis=1)
+    cc["Real links better by"] = cc.apply(lambda r: f"{_signed(r['real_links_better_by'])}  ({_signed(r['better_lo'])} to {_signed(r['better_hi'])})", axis=1)
+    st.dataframe(cc[["control", "Gain over the global model", "Real links better by"]], hide_index=True, width="stretch", column_config={"control": "Control"})
+    note("About half of the gain also appears with meaningless links, so part of the feature is a general recent-failure signal; the rest depends on which concepts are linked. "
+         "EdNet's concepts are numbered tags, so the explanation in the app cannot name related concepts. The feature is not deployed.")
 
 
 
