@@ -267,8 +267,7 @@ def test_signup_form_comes_before_consent_and_steers_suggestions(client):
     assert [x["known"] for x in t["topics"] if x["id"] == "how_gps_works"] == [True]
     for _ in range(6):                                                                         # a known topic is never the suggestion
         assert t["suggested"] != "how_gps_works"
-    with db.session() as conn:                                                                 # admin and demo accounts skip the form
-        assert client.post("/api/auth/login", json={"username": "demo", "password": "demo-pass-1"}).json()["profile_ok"] is True
+    assert client.post("/api/auth/login", json={"username": "demo", "password": "demo-pass-1"}).json()["profile_ok"] is False   # test accounts see the full flow too
 
 
 def test_old_database_gets_topic_column(tmp_path):
