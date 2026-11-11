@@ -302,9 +302,10 @@ def page_pilot() -> None:
         note("Each concept is given one method at random: REMEM (the model), SM-2 (a classic flashcard rule) or a fixed 3-day gap. Students never see which. "
              "This counts review answers only, and with this few people the differences are not meaningful yet.")
         arms = pilot.by_arm(conn).replace({"remem": "REMEM", "sm2": "SM-2", "fixed": "Fixed, every 3 days"})
+        arms["accuracy"] = arms["accuracy"] * 100                                       # display copy: whole percents, since a few dozen answers cannot carry decimals
         st.dataframe(arms, hide_index=True, width="stretch", column_order=["arm", "concepts", "review_answers", "accuracy", "mean_gap_days"], column_config={
             "arm": "Method", "concepts": "Concepts", "review_answers": "Review answers",
-            "accuracy": st.column_config.NumberColumn("Share correct", format="percent"),
+            "accuracy": st.column_config.NumberColumn("Share correct", format="%.0f%%"),
             "mean_gap_days": st.column_config.NumberColumn("Average days since last review", format="%.1f")})
 
         st.header("Are the predictions honest?", anchor=False)
@@ -598,8 +599,10 @@ def page_simlab() -> None:
     t["gen"] = t["gen"].map({"gen1": "Power-law (matches REMEM)", "gen2": "Exponential (mismatched)", "gen3": "Two-speed mixture (mismatched)"})
     t["baseline"] = t["baseline"].map({"fixed": "Best fixed gap", "sm2": "SM-2"})
     st.dataframe(t, hide_index=True, width="stretch", column_config={
-        "gen": "True forgetting curve", "phi": st.column_config.NumberColumn("Strength of spacing effect", format="%.1f"), "baseline": "Compared with",
-        "mean": st.column_config.NumberColumn("Reviews saved, average %", format="%+.1f"), "lowest": st.column_config.NumberColumn("Lowest run %", format="%+.1f"), "highest": st.column_config.NumberColumn("Highest run %", format="%+.1f")})
+        "gen": st.column_config.TextColumn("True forgetting curve", width="medium"), "phi": st.column_config.NumberColumn("Strength of spacing effect", format="%.1f", width="small"),
+        "baseline": st.column_config.TextColumn("Compared with", width="small"),
+        "mean": st.column_config.NumberColumn("Reviews saved, average %", format="%+.1f", width="small"), "lowest": st.column_config.NumberColumn("Lowest run %", format="%+.1f", width="small"),
+        "highest": st.column_config.NumberColumn("Highest run %", format="%+.1f", width="small")})
     st.header("Reviews against coverage", anchor=False)
     note("Further left and lower is better: fewer reviews and less time below the 85% recall target.")
     c = st.columns(2)
