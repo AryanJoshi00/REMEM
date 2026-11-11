@@ -18,6 +18,7 @@
 | Without question difficulty | -0.00002 | no help (slightly better without it) |
 | Plus offsets (Experiment 4) | -0.0007 | helps, small |
 | Plus recent failures on related concepts (Experiment 9) | -0.0019 | helps, the largest single gain |
+| Plus both extensions together | -0.0027 | the best offline model: log loss 0.6318 and calibration error 0.032 against 0.6345 and 0.041 |
 
 **Say plainly.** The big levers are having a forgetting term and using the power-law curve. The student and concept features, taken one at a time, are negligible on EdNet. The two extensions help a little, the link feature most. The target-retention (theta) trade-off is Experiment 6.
 
