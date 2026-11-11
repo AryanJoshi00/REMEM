@@ -117,6 +117,30 @@ def note(text: str) -> None:
     st.markdown(f'<p class="note">{text}</p>', unsafe_allow_html=True)
 
 
+def band(text: str) -> None:
+    """A limitation or status line that must not be missed: full width, ink on a grey band (static text only)."""
+    st.markdown(f'<p class="band">{text}</p>', unsafe_allow_html=True)
+
+
+def separator() -> None:
+    st.markdown('<hr class="sep">', unsafe_allow_html=True)
+
+
+def calibration_chart(where, cal: pd.DataFrame) -> None:
+    long = cal.melt(id_vars="bin", value_vars=["predicted", "observed"], var_name="kind", value_name="value")
+    where.altair_chart(alt.Chart(long).mark_line(point=True).encode(
+        x=alt.X("bin:N", title=None, sort=None), y=alt.Y("value:Q", scale=alt.Scale(domain=[0, 1]), title=None),
+        color=alt.Color("kind:N", scale=alt.Scale(domain=["predicted", "observed"], range=[PREDICTED, OBSERVED]), legend=alt.Legend(title=None, orient="bottom"))).properties(height=230), width="stretch")
+
+
+def activity_charts(da: pd.DataFrame) -> None:
+    a, b = st.columns(2)
+    a.markdown("**Answers per day**")
+    a.bar_chart(da.set_index("day")[["answers"]], color=INK, height=230)
+    b.markdown("**People who answered each day**")
+    b.bar_chart(da.set_index("day")[["active_users"]], color=INK, height=230)
+
+
 def ago(seconds: float) -> str:
     if seconds < 90:
         return "just now"
@@ -155,7 +179,7 @@ def connect_panel() -> None:
         st.error(f"The details in .env did not work: {st.session_state['auto_failed']}")
     note("The dashboard reads live data from your REMEM server using your admin account. "
          "To skip this step next time, add <code>REMEM_SERVER_URL</code> and <code>REMEM_ADMIN_PASSWORD</code> to the <code>.env</code> file and restart the dashboard.")
-    with st.form("connect"):
+    with st.columns([1, 1.2])[0], st.form("connect"):
         url = st.text_input("Server address", value=os.getenv("REMEM_SERVER_URL", ""), placeholder="https://your-server")
         user = st.text_input("Admin username", value=os.getenv("REMEM_ADMIN_USER", "aryan"))
         pw = st.text_input("Admin password", type="password")
@@ -238,10 +262,11 @@ def page_pilot() -> None:
         now_ms = int(time.time() * 1000)
         users = pilot.users_table(conn, now_ms)
         stu = users[users["role"] == "student"]
-        note(("Live data, loaded " if srv is not None else "Not connected. Showing the copy from ") + ago(time.time() - LIVE_DB.stat().st_mtime) + ". Ten people are too few for significance tests, so everything here is descriptive.")
+        band(("Live data, loaded " if srv is not None else "Not connected. Showing the copy from ") + ago(time.time() - LIVE_DB.stat().st_mtime) + ". Ten people are too few for significance tests, so everything here is descriptive.")
 
+        # ---- status: what needs the owner now
         st.header("Needs attention", anchor=False)
-        items = pilot.attention(conn, now_ms)
+        items = sorted(pilot.attention(conn, now_ms), key=lambda it: it["level"] != "warn")       # warnings first (display order only)
         if not items:
             st.markdown('<div class="flag">Nothing needs attention right now.</div>', unsafe_allow_html=True)
         for it in items:
@@ -253,46 +278,19 @@ def page_pilot() -> None:
         c[0].metric("Accounts", len(stu))
         c[1].metric("Accepted consent", int(stu["consented"].sum()))
         c[2].metric("Have answered", int((stu["n_answers"] > 0).sum()))
-        c[3].metric("Answers in total", int(stu["n_answers"].sum()))
+        c[3].metric("Answers in total", f"{int(stu['n_answers'].sum()):,}")
         if adh["tracked"]:
             note(f"{adh['overdue']} of {adh['tracked']} scheduled concepts are overdue right now; the median overdue concept is {adh['median_days_late']:.1f} days late.")
 
-        st.header("People", anchor=False)
-        show_all = st.checkbox("Include the admin account", value=False)
-        people = (users if show_all else stu).copy()
-        people["last_answer"] = people["days_since_last"].map(lambda d: "never" if pd.isna(d) else ("today" if d < 1 else ("1 day ago" if round(d) == 1 else f"{d:.0f} days ago")))
-        st.dataframe(people[["user_id", "username", "consented", "notes", "concepts", "n_answers", "last_answer"]], hide_index=True, width="stretch",
-                     column_config={"user_id": "ID", "username": "Account", "consented": st.column_config.CheckboxColumn("Consent"),
-                                    "notes": "Notes", "concepts": "Concepts", "n_answers": "Answers", "last_answer": "Last answer"})
-
-        st.header("Participants", anchor=False)
-        prof = pilot.profiles_table(conn)
-        note("From the sign-up form. Private: only visible here, never shared. Names stay out of every result and write-up.")
-        if prof.empty:
-            note("Nobody has filled in the form yet.")
-        else:
-            st.dataframe(prof, hide_index=True, width="stretch",
-                         column_config={"username": "Account", "full_name": "Name", "contact": "Contact", "age": "Age", "known_topics": "Already know well"})
-            st.download_button("Download as CSV", prof.to_csv(index=False).encode("utf-8"), "participants.csv", "text/csv")
-
-        st.header("Activity", anchor=False)
-        da = pilot.daily_activity(conn)
-        if da.empty:
-            note("No answers yet.")
-        else:
-            a, b = st.columns(2)
-            a.markdown("**Answers per day**")
-            a.bar_chart(da.set_index("day")[["answers"]], color=INK, height=230)
-            b.markdown("**People who answered each day**")
-            b.bar_chart(da.set_index("day")[["active_users"]], color=GREEN, height=230)
-
+        # ---- results: what an examiner reads
+        separator()
         st.header("How the three scheduling methods compare", anchor=False)
         note("Each concept is given one method at random: REMEM (the model), SM-2 (a classic flashcard rule) or a fixed 3-day gap. Students never see which. "
              "This counts review answers only, and with this few people the differences are not meaningful yet.")
         arms = pilot.by_arm(conn).replace({"remem": "REMEM", "sm2": "SM-2", "fixed": "Fixed, every 3 days"})
-        st.dataframe(arms, hide_index=True, width="stretch", column_config={
+        st.dataframe(arms, hide_index=True, width="stretch", column_order=["arm", "concepts", "review_answers", "accuracy", "mean_gap_days"], column_config={
             "arm": "Method", "concepts": "Concepts", "review_answers": "Review answers",
-            "accuracy": st.column_config.ProgressColumn("Share correct", format="percent", min_value=0, max_value=1),
+            "accuracy": st.column_config.NumberColumn("Share correct", format="percent"),
             "mean_gap_days": st.column_config.NumberColumn("Average days since last review", format="%.1f")})
 
         st.header("Are the predictions honest?", anchor=False)
@@ -302,23 +300,48 @@ def page_pilot() -> None:
             note("No review answers yet.")
         else:
             a, b = st.columns([1, 1])
-            a.dataframe(cal, hide_index=True, width="stretch", column_config={"bin": "Predicted range", "n": "Answers", "predicted": st.column_config.NumberColumn("Predicted", format="%.2f"),
-                                                                               "observed": st.column_config.NumberColumn("Observed", format="%.2f")})
-            long = cal.melt(id_vars="bin", value_vars=["predicted", "observed"], var_name="kind", value_name="value")
-            b.altair_chart(alt.Chart(long).mark_line(point=True).encode(
-                x=alt.X("bin:N", title=None, sort=None), y=alt.Y("value:Q", scale=alt.Scale(domain=[0, 1]), title=None),
-                color=alt.Color("kind:N", scale=alt.Scale(domain=["predicted", "observed"], range=[PREDICTED, OBSERVED]), legend=alt.Legend(title=None, orient="bottom"))).properties(height=230), width="stretch")
+            a.dataframe(cal, hide_index=True, width="stretch", column_config={"bin": "Predicted range", "n": "Answers", "predicted": st.column_config.NumberColumn("Predicted", format="percent"),
+                                                                               "observed": st.column_config.NumberColumn("Observed", format="percent")})
+            calibration_chart(b, cal)
 
+        st.header("Activity", anchor=False)
+        da = pilot.daily_activity(conn)
+        if da.empty:
+            note("No answers yet.")
+        else:
+            activity_charts(da)
+
+        # ---- operations: the owner's controls
+        separator()
         st.header("Quiz generation", anchor=False)
         h = pilot.llm_health(conn)
         c = st.columns(4)
         c[0].metric("Notes turned into quizzes", f"{h['notes_done']} of {h['notes_total']}")
         c[1].metric("Notes that failed", h["notes_failed"])
-        c[2].metric("Questions written", h["questions"])
+        c[2].metric("Questions written", f"{h['questions']:,}")
         c[3].metric("Flagged as bad", f"{h['flagged']}")
         errs = pilot.recent_errors(conn)
         if len(errs):
             st.dataframe(errs, hide_index=True, width="stretch", column_config={"time_ist": "Time (IST)", "title": "Note", "error": "Error"})
+
+        st.header("People", anchor=False)
+        show_all = st.checkbox("Include the admin account", value=False)
+        people = (users if show_all else stu).copy()
+        people["last_answer"] = people["days_since_last"].map(lambda d: "never" if pd.isna(d) else ("today" if d < 1 else ("1 day ago" if round(d) == 1 else f"{d:.0f} days ago")))
+        people["consented"] = people["consented"].map({True: "Yes", False: "No"})          # text, not a checkbox that looks editable
+        st.dataframe(people[["username", "consented", "notes", "concepts", "n_answers", "last_answer"]], hide_index=True, width="stretch",
+                     column_config={"username": "Account", "consented": "Consent", "notes": "Notes", "concepts": "Concepts", "n_answers": "Answers", "last_answer": "Last answer"})
+
+        st.header("Participants", anchor=False)
+        prof = pilot.profiles_table(conn)
+        note("From the sign-up form. Private: only visible here, never shared. Names stay out of every result and write-up.")
+        if prof.empty:
+            note("Nobody has filled in the form yet.")
+        else:
+            with st.expander("Participants (private)", expanded=False):                 # closed by default: names and contacts stay off a shared screen
+                st.dataframe(prof, hide_index=True, width="stretch",
+                             column_config={"username": "Account", "full_name": "Name", "contact": "Contact", "age": "Age", "known_topics": "Already know well"})
+                st.download_button("Download as CSV", prof.to_csv(index=False).encode("utf-8"), "participants.csv", "text/csv")
 
         st.header("Final check", anchor=False)
         note("One reserved question per concept, answered without feedback near the end of the pilot. Students only see it while it is open.")
@@ -332,12 +355,13 @@ def page_pilot() -> None:
                 is_open = None
             if is_open is not None:
                 cols = st.columns([3, 1.4], vertical_alignment="center")
-                cols[0].markdown(f"The final check is **{'open' if is_open else 'closed'}**.")
+                state = "open" if is_open else "closed"
+                cols[0].markdown(f'The final check is <span class="pill {state}">{state}</span>.', unsafe_allow_html=True)
                 if cols[1].button("Close it" if is_open else "Open it", use_container_width=True):
                     srv.set_final(not is_open)
                     st.rerun()
 
-            st.header("Reset test data", anchor=False)
+        st.header("Reset test data", anchor=False)                                     # shown whether or not the dashboard is connected
         with st.container(border=True, key="danger"):
             st.subheader("Danger zone", anchor=False)
             note("Use this after you have tried the app with an account and want a clean start. It deletes learning data only; accounts and passwords stay.")
@@ -374,8 +398,8 @@ def page_ednet() -> None:
     m = csv("exp3_forgetting_metrics.csv")
     if m is not None:
         c = st.columns(2)
-        split = c[0].radio("Split ", ["test", "val"], horizontal=True)
-        subset = c[1].radio("Rows ", ["repeats", "spaced>=1d"], horizontal=True, format_func=lambda s: "All repeats" if s == "repeats" else "Gap of a day or more")
+        split = c[0].radio("Split", ["test", "val"], horizontal=True, key="f_split")
+        subset = c[1].radio("Rows", ["repeats", "spaced>=1d"], horizontal=True, key="f_rows", format_func=lambda s: "All repeats" if s == "repeats" else "Gap of a day or more")
         t = m[(m["split"] == split) & (m["subset"] == subset)].copy().sort_values("logloss")
         t["model"] = t["model"].map(lambda x: MODEL_NAMES.get(x, x))
         st.dataframe(t[["model", "n", "auc", "logloss", "brier", "ece"]], hide_index=True, width="stretch", column_config={
@@ -502,7 +526,7 @@ def exp7_section() -> None:
         "group": "Kind", "label": "Model", "logloss": st.column_config.NumberColumn("Log loss", format="%.5f"), "ece": st.column_config.NumberColumn("ECE", format="%.4f")})
     note("Positive change = worse than the full model. The size in brackets is a reading aid: under 0.0005 negligible, under 0.002 small, otherwise moderate. "
          "Modelling forgetting and the shape of the curve matter most; each student or concept feature adds almost nothing on its own; the link feature is the largest single gain. "
-         "The target-retention trade-off is in the replay section above.")
+         "The target-retention trade-off is in the section 'Would the recommended review times be trustworthy?' above.")
 
 
 def exp9_section() -> None:
@@ -519,7 +543,7 @@ def exp9_section() -> None:
     c[0].metric("Gain, all repeats", f"{g['mean_diff']:.4f}", help=f"95% interval {g['lo']:.4f} to {g['hi']:.4f}")
     c[1].metric("Gain, gaps of 1+ day", f"{gs['mean_diff']:.4f}", help=f"95% interval {gs['lo']:.4f} to {gs['hi']:.4f}")
     c[2].metric("With a related failure", f"{s9['share_rows_F_above_0.1']:.0%}")
-    note(f"Verdict: <b>{html.escape(s9['verdict'])}</b>. Settings chosen on validation data: {s9['k']} neighbours per concept, fading over {s9['tau_days']:g} day.")
+    note(f"Verdict: <b>{html.escape(s9['verdict'])}</b>. About half of the gain also appears with shuffled links (see the controls below). Settings chosen on validation data: {s9['k']} neighbours per concept, fading over {s9['tau_days']:g} day.")
     names = {"repeats": "All repeat answers", "spaced>=1d": "Gap of a day or more", "recent failure elsewhere (F>0.1)": "Recent related failure", "no recent related failure (F<=0.1)": "No recent related failure"}
     o = ov.assign(subset=ov["subset"].map(names))
     st.dataframe(o[["subset", "model", "n", "auc", "logloss", "brier", "ece"]], hide_index=True, width="stretch", column_config={
@@ -589,10 +613,12 @@ def page_model() -> None:
     df = pd.DataFrame({"day": days, "recall": [(1 + k * d / S) ** (-beta) for d in days]})
     st.altair_chart(alt.Chart(df).mark_area(opacity=0.12, color=INK, line={"color": INK, "strokeWidth": 3}).encode(
         x=alt.X("day:Q", title="Days since last practice"), y=alt.Y("recall:Q", scale=alt.Scale(domain=[0, 1]), title="Chance of recalling")).properties(height=320), width="stretch")
-    st.markdown("Recall after *t* days is (1 + k·t/S)^(−β), with k chosen so that recall equals 90% when *t* = S.")
+    st.markdown("Recall after *t* days is")
+    st.latex(r"R(t) = \left(1 + \frac{k\,t}{S}\right)^{-\beta}")
+    st.markdown("with k chosen so that recall equals 90% when *t* = S.")
     names = {"m": "Mastery", "log_n": "Practice count (log)", "ability": "Student ability", "difficulty": "Question difficulty", "rt_z": "Response time"}
     coef = pd.DataFrame({"Factor": ["Baseline"] + [names.get(f, f) for f in sm["features"]], "Weight": [round(float(w), 3) for w in sm["w"][:len(sm["features"]) + 1]]})
-    st.dataframe(coef, hide_index=True, width="stretch")
+    st.columns([1, 1.4])[0].dataframe(coef, hide_index=True, width="stretch", column_config={"Weight": st.column_config.NumberColumn("Weight", format="%.3f")})
     note(f"Curve shape β = {beta:g}. Memory strength is exp(baseline + the weighted factors).")
 
 
@@ -663,12 +689,14 @@ def page_findings() -> None:
         st.info("No results found. Run the experiments first (see the README).")
         return
     def tone(v: str) -> str:
-        return GREEN if v.startswith("Supported") else RED if v.startswith("Not supported") else "#545c7c" if v == "Pending" else AMBER
+        return GREEN if v.startswith("Supported") else RED if v.startswith("Not supported") else MUTED if v == "Pending" else AMBER
     for r in rows:
-        st.markdown(f'<div class="finding"><div class="fq">{html.escape(r["Question"])}</div>'
-                    f'<div class="fv" style="color:{tone(r["Verdict"])}">{html.escape(r["Verdict"])}</div>'
+        solid = " solid" if r["Verdict"] == "Supported" else ""                          # only a plain Supported is filled; qualified ones stay outlined
+        st.markdown(f'<div class="finding"><h3 class="fq">{html.escape(r["Question"])}</h3>'
+                    f'<div class="fv{solid}" style="color:{tone(r["Verdict"])}">{html.escape(r["Verdict"])}</div>'
                     f'<p>{html.escape(r["What we found"])}</p>'
-                    f'<p class="note">{html.escape(r["Why not stronger"])} Details: {html.escape(r["Details"])}.</p></div>', unsafe_allow_html=True)
+                    f'<p class="limit">{html.escape(r["Why not stronger"])}</p>'
+                    f'<p class="details">Details: {html.escape(r["Details"])}.</p></div>', unsafe_allow_html=True)
     st.header("In one paragraph", anchor=False)
     st.markdown("REMEM is a working, deployed revision scheduler whose parts are interpretable and tested. On public data the knowledge-tracing layer and a power-law forgetting term help, "
                 "but the gains from personalising per student or concept are small, and the data is too flat to learn a usable forgetting curve, so the app starts from a documented prior. "
