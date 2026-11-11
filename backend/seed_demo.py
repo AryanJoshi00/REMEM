@@ -1,6 +1,6 @@
 """Seed an offline demo account (spec 21.5 demo mode): no internet, no language model.
 
-Creates (or reuses) a `demo` account that is already consented, loads the three ready-made topics from the pre-written
+Creates (or reuses) a `demo` account that is already consented, loads the six ready-made topics from the pre-written
 question bank, and gives most concepts a short, plausible study history spread over the last few days, so the Today screen
 shows concepts that are due now, coming up later and new, and the retention curves have something to draw.
 
@@ -24,7 +24,7 @@ DAY_MS = config.MS_PER_DAY
 HISTORY = [
     (7.0, [True, True]), (6.0, [True]), (5.0, [False, True]), (4.0, []), (3.0, [True]), (2.0, []),
 ]
-LEAVE_NEW = {"photosynthesis": 5, "newtons_laws": 5, "acids_bases_salts": 4}     # concepts from this position on stay new, so the demo also shows first quizzes
+LEAVE_NEW = {"korean_hangul": 5, "photography_basics": 5, "central_asia": 5, "cognitive_biases": 5, "how_gps_works": 6, "nutrition_labels": 5}     # concepts from this position on stay new, so the demo also shows first quizzes
 
 
 def _clear(conn, uid: int) -> None:

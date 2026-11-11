@@ -7,9 +7,12 @@ from backend import config
 
 # id -> (file, subject, one-line blurb, rough minutes)
 CATALOG = [
-    ("photosynthesis", "photosynthesis.md", "Biology", "How plants turn light, water and CO₂ into food and oxygen.", 8),
-    ("newtons_laws", "newtons_laws.md", "Physics", "Inertia, F = ma and action–reaction, with everyday examples.", 8),
-    ("acids_bases_salts", "acids_bases_salts.md", "Chemistry", "Properties, pH scale, indicators and neutralisation.", 10),
+    ("korean_hangul", "korean_hangul.md", "Language", "Read the Korean alphabet: letters, sounds and how syllable blocks are built.", 8),
+    ("photography_basics", "photography_basics.md", "Photography", "Aperture, shutter speed and ISO: how a camera controls light.", 8),
+    ("central_asia", "central_asia.md", "Geography", "The five -stan countries: capitals, languages, landscapes and currencies.", 8),
+    ("cognitive_biases", "cognitive_biases.md", "Psychology", "Six common mental shortcuts that quietly bend our judgement.", 7),
+    ("how_gps_works", "how_gps_works.md", "Technology", "How satellites and clocks pin down your position.", 8),
+    ("nutrition_labels", "nutrition_labels.md", "Health", "Read serving sizes, macros, sugar and salt on food packaging.", 7),
 ]
 
 

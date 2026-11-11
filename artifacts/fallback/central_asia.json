@@ -1,0 +1,340 @@
+{
+ "concepts": [
+  {
+   "name": "The five countries",
+   "source_span": "Central Asia is a region of five countries that were once part of the Soviet Union",
+   "questions": [
+    {
+     "stem": "Which of these is a Central Asian country?",
+     "options": [
+      "Mongolia",
+      "Nepal",
+      "Iran",
+      "Uzbekistan"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What does the ending -stan mean?",
+     "options": [
+      "City of",
+      "Mountain of",
+      "Land of",
+      "River of"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "How many countries make up Central Asia as described here?",
+     "options": [
+      "Four",
+      "Five",
+      "Three",
+      "Seven"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "The five countries were once part of which country?",
+     "options": [
+      "The Soviet Union",
+      "The British Empire",
+      "The Roman Empire",
+      "The Ottoman Empire"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which old trade routes ran through Central Asia?",
+     "options": [
+      "The Amazon trail",
+      "The Spice Route to Brazil",
+      "The Panama canal",
+      "The Silk Road"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Kazakhstan",
+   "source_span": "Kazakhstan is the largest landlocked country in the world by area.",
+   "questions": [
+    {
+     "stem": "What is the capital of Kazakhstan?",
+     "options": [
+      "Astana",
+      "Bishkek",
+      "Dushanbe",
+      "Tashkent"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What is the currency of Kazakhstan?",
+     "options": [
+      "The tenge",
+      "The somoni",
+      "The rupee",
+      "The manat"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which main languages are used in Kazakhstan?",
+     "options": [
+      "Turkmen and Persian",
+      "Uzbek and Tajik",
+      "Kyrgyz and Mongolian",
+      "Kazakh and Russian"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "How does Kazakhstan rank among landlocked countries by area?",
+     "options": [
+      "The largest in the world",
+      "The smallest in Asia",
+      "The third largest in Africa",
+      "The only one in Europe"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What is steppe?",
+     "options": [
+      "Dense rainforest",
+      "Frozen sea",
+      "Volcanic rock",
+      "Dry grassland"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Uzbekistan",
+   "source_span": "Uzbekistan is doubly landlocked: it is surrounded only by other landlocked countries.",
+   "questions": [
+    {
+     "stem": "What is the capital of Uzbekistan?",
+     "options": [
+      "Tashkent",
+      "Ashgabat",
+      "Bishkek",
+      "Astana"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What does doubly landlocked mean?",
+     "options": [
+      "Located on two continents",
+      "Having two coastlines",
+      "Surrounded only by other landlocked countries",
+      "Having two capitals"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which Silk Road cities are in Uzbekistan?",
+     "options": [
+      "Dushanbe and Khujand",
+      "Astana and Almaty",
+      "Ashgabat and Mary",
+      "Samarkand and Bukhara"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which shrinking sea partly lies in Uzbekistan and Kazakhstan?",
+     "options": [
+      "The Dead Sea",
+      "The Aral Sea",
+      "The Black Sea",
+      "The Caspian Sea"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What language is spoken in Uzbekistan?",
+     "options": [
+      "Uzbek",
+      "Turkmen",
+      "Tajik",
+      "Kyrgyz"
+     ],
+     "correct_index": 0
+    }
+   ]
+  },
+  {
+   "name": "Kyrgyzstan",
+   "source_span": "Issyk-Kul is a large mountain lake that does not freeze in winter.",
+   "questions": [
+    {
+     "stem": "What is the capital of Kyrgyzstan?",
+     "options": [
+      "Tashkent",
+      "Dushanbe",
+      "Bishkek",
+      "Astana"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What is Issyk-Kul?",
+     "options": [
+      "The country's main river",
+      "A large mountain lake that does not freeze in winter",
+      "A mountain pass",
+      "A desert in the south"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What covers most of Kyrgyzstan?",
+     "options": [
+      "Desert",
+      "Rainforest",
+      "Mountains",
+      "Farmland"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which language is the main language of Kyrgyzstan?",
+     "options": [
+      "Turkmen",
+      "Kyrgyz",
+      "Uzbek",
+      "Tajik"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which Central Asian country has Bishkek as its capital?",
+     "options": [
+      "Kyrgyzstan",
+      "Turkmenistan",
+      "Tajikistan",
+      "Kazakhstan"
+     ],
+     "correct_index": 0
+    }
+   ]
+  },
+  {
+   "name": "Tajikistan",
+   "source_span": "More than 90 percent of the country is mountainous, including the Pamir Mountains.",
+   "questions": [
+    {
+     "stem": "What is the capital of Tajikistan?",
+     "options": [
+      "Tashkent",
+      "Bishkek",
+      "Dushanbe",
+      "Ashgabat"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What is the currency of Tajikistan?",
+     "options": [
+      "The tenge",
+      "The somoni",
+      "The rouble",
+      "The manat"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which mountains are in Tajikistan?",
+     "options": [
+      "The Andes",
+      "The Alps",
+      "The Pamir Mountains",
+      "The Rockies"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "The Tajik language is closely related to which language?",
+     "options": [
+      "Korean",
+      "Mongolian",
+      "Persian",
+      "Russian"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What share of Tajikistan is mountainous?",
+     "options": [
+      "About a third",
+      "About 10 percent",
+      "Half",
+      "More than 90 percent"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Turkmenistan",
+   "source_span": "The Karakum Desert covers about 70 percent of the country.",
+   "questions": [
+    {
+     "stem": "What is the capital of Turkmenistan?",
+     "options": [
+      "Astana",
+      "Bishkek",
+      "Ashgabat",
+      "Dushanbe"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which desert covers about 70 percent of Turkmenistan?",
+     "options": [
+      "The Thar",
+      "The Sahara",
+      "The Karakum Desert",
+      "The Gobi"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What is the currency of Turkmenistan?",
+     "options": [
+      "The manat",
+      "The rupee",
+      "The tenge",
+      "The somoni"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What is the Darvaza gas crater nicknamed?",
+     "options": [
+      "The Silk Hole",
+      "The Gates of Hell",
+      "The Eye of Asia",
+      "The Golden Pit"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Since when has the Darvaza gas crater been burning?",
+     "options": [
+      "Since 2010",
+      "Since the Silk Road era",
+      "Since the 1870s",
+      "Since the 1970s"
+     ],
+     "correct_index": 3
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,340 @@
+{
+ "concepts": [
+  {
+   "name": "Anchoring bias",
+   "source_span": "Anchoring bias is relying too heavily on the first piece of information we receive.",
+   "questions": [
+    {
+     "stem": "What is anchoring bias?",
+     "options": [
+      "Continuing something because of past effort",
+      "Remembering only information that agrees with us",
+      "Judging likelihood by how easily examples come to mind",
+      "Relying too heavily on the first piece of information we receive"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "A shirt marked down from 2000 to 1000 rupees seems cheap. Which bias is at work?",
+     "options": [
+      "Availability heuristic",
+      "Framing effect",
+      "Sunk cost fallacy",
+      "Anchoring bias"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "How do negotiators use anchoring?",
+     "options": [
+      "By asking for a discount",
+      "By naming the first number",
+      "By staying silent",
+      "By agreeing to every offer"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which of these is an example of anchoring?",
+     "options": [
+      "Reading only news that agrees with you",
+      "Judging a price by comparing it with the first, much higher price you saw",
+      "Fearing flights after a crash report",
+      "Staying in a job because you trained for years"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Anchoring bias involves which piece of information?",
+     "options": [
+      "The one our friends share",
+      "The first one we receive",
+      "The last one we receive",
+      "The most emotional one"
+     ],
+     "correct_index": 1
+    }
+   ]
+  },
+  {
+   "name": "Confirmation bias",
+   "source_span": "Confirmation bias is the tendency to look for, notice and remember information that supports what we already believe.",
+   "questions": [
+    {
+     "stem": "What is confirmation bias?",
+     "options": [
+      "The tendency to favour information that supports what we already believe",
+      "Avoiding all new information",
+      "Relying on the first number we hear",
+      "Judging by how vivid examples are"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Someone who thinks a team is unlucky remembers every loss and forgets the wins. This is:",
+     "options": [
+      "Anchoring bias",
+      "The sunk cost fallacy",
+      "The framing effect",
+      "Confirmation bias"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Why does confirmation bias make it hard to change our minds?",
+     "options": [
+      "We trust strangers too much",
+      "We have too little information",
+      "Evidence against our view is ignored or dismissed",
+      "We forget our own opinions"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Confirmation bias affects which information?",
+     "options": [
+      "Only numbers",
+      "Only what we hear from friends",
+      "What we look for, notice and remember",
+      "Only what we write down"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which behaviour shows confirmation bias?",
+     "options": [
+      "Changing your opinion after new evidence",
+      "Reading only articles that agree with your opinion",
+      "Asking an expert for the full picture",
+      "Comparing both sides equally"
+     ],
+     "correct_index": 1
+    }
+   ]
+  },
+  {
+   "name": "Sunk cost fallacy",
+   "source_span": "The sunk cost fallacy is continuing something because of the time, money or effort already spent, even when stopping would be better.",
+   "questions": [
+    {
+     "stem": "What is the sunk cost fallacy?",
+     "options": [
+      "Overestimating our own skill",
+      "Preferring information that agrees with us",
+      "Believing the first price we see",
+      "Continuing something because of the time, money or effort already spent"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Watching a boring film to the end because you paid for the ticket is an example of:",
+     "options": [
+      "The framing effect",
+      "The sunk cost fallacy",
+      "The Dunning-Kruger effect",
+      "Anchoring bias"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Why should a past cost not decide the choice?",
+     "options": [
+      "It is always a gain",
+      "The past cost cannot be recovered",
+      "It is always very small",
+      "It was a mistake to spend it"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What should the choice depend on instead?",
+     "options": [
+      "Past spending",
+      "The first price seen",
+      "Future benefits",
+      "How others feel"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which of these is a sunk cost?",
+     "options": [
+      "The price of a new product",
+      "A discount offered tomorrow",
+      "Money already spent on a ticket that cannot be refunded",
+      "Money you may earn next month"
+     ],
+     "correct_index": 2
+    }
+   ]
+  },
+  {
+   "name": "Availability heuristic",
+   "source_span": "The availability heuristic is judging how likely something is by how easily examples come to mind.",
+   "questions": [
+    {
+     "stem": "What is the availability heuristic?",
+     "options": [
+      "Judging how likely something is by how easily examples come to mind",
+      "Trusting the first piece of information",
+      "Looking for confirming evidence",
+      "Continuing because of past investment"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "After news about a plane crash, people think flying is more dangerous than driving. Which idea explains this?",
+     "options": [
+      "Anchoring",
+      "Framing",
+      "The availability heuristic",
+      "Sunk cost"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which events feel more common than they really are?",
+     "options": [
+      "Ones with no news coverage",
+      "Ones that happen to strangers",
+      "Vivid, recent or emotional ones",
+      "Quiet, old and boring ones"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "According to the example, which causes far more deaths?",
+     "options": [
+      "Both equally",
+      "Flying",
+      "Driving",
+      "Neither"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "The availability heuristic is mainly about:",
+     "options": [
+      "Options available to buy",
+      "Examples coming easily to mind",
+      "Time available to decide",
+      "Prices being available"
+     ],
+     "correct_index": 1
+    }
+   ]
+  },
+  {
+   "name": "Dunning-Kruger effect",
+   "source_span": "The Dunning-Kruger effect is the tendency of people with low skill in an area to overestimate their own ability.",
+   "questions": [
+    {
+     "stem": "What is the Dunning-Kruger effect?",
+     "options": [
+      "Everyone rating themselves exactly",
+      "Beginners always underestimating themselves",
+      "People with low skill tending to overestimate their ability",
+      "Experts always being right"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Why do beginners often overestimate themselves?",
+     "options": [
+      "They are always honest",
+      "They do not know enough to see their own mistakes",
+      "They compare themselves with experts",
+      "They practise too much"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "How can experts differ from beginners here?",
+     "options": [
+      "They always overestimate",
+      "They never make mistakes",
+      "They can underestimate how much they know compared with others",
+      "They ignore feedback"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which person fits the Dunning-Kruger effect?",
+     "options": [
+      "A teacher who checks sources",
+      "A champion who trains daily",
+      "A new learner who is sure they are excellent after one lesson",
+      "A student who asks for feedback"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "The effect is about:",
+     "options": [
+      "Prices and discounts",
+      "Memory for numbers",
+      "Sleep and attention",
+      "Skill and self-assessment"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Framing effect",
+   "source_span": "The framing effect is when our choice changes depending on how the same information is presented.",
+   "questions": [
+    {
+     "stem": "What is the framing effect?",
+     "options": [
+      "When we only see a picture frame",
+      "When our choice changes depending on how the same information is presented",
+      "When we trust the first price",
+      "When we follow the crowd"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which description do people tend to prefer for the same treatment?",
+     "options": [
+      "They cannot compare them",
+      "Losing 10 percent of patients",
+      "Neither of them",
+      "Saving 90 percent of patients"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "In the treatment example, the facts in both descriptions are:",
+     "options": [
+      "Different",
+      "Unknown",
+      "Opposite",
+      "Identical"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "A gain frame and a loss frame feel:",
+     "options": [
+      "Different, even for the same facts",
+      "Illegal",
+      "Exactly the same",
+      "Unreadable"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which sentence is a loss frame?",
+     "options": [
+      "Ninety percent of patients will survive",
+      "Most patients do well",
+      "Patients are improving",
+      "Ten percent of patients will die"
+     ],
+     "correct_index": 3
+    }
+   ]
+  }
+ ]
+}

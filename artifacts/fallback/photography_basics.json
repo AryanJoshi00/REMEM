@@ -1,0 +1,340 @@
+{
+ "concepts": [
+  {
+   "name": "The exposure triangle",
+   "source_span": "Three settings control exposure: aperture, shutter speed and ISO.",
+   "questions": [
+    {
+     "stem": "What is exposure in photography?",
+     "options": [
+      "The amount of light that reaches the camera sensor",
+      "The number of photos on a memory card",
+      "The size of the final print",
+      "The colour of the camera body"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which three settings make up the exposure triangle?",
+     "options": [
+      "Aperture, shutter speed and ISO",
+      "Shutter speed, focus and resolution",
+      "Aperture, white balance and zoom",
+      "Zoom, focus and flash"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What does a photo look like if too little light reaches the sensor?",
+     "options": [
+      "Perfectly sharp",
+      "Black and white",
+      "Bright and washed out",
+      "Dark"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What does a photo look like if too much light reaches the sensor?",
+     "options": [
+      "Dark",
+      "Bright and washed out",
+      "Blurred only at the edges",
+      "Always in focus"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which of these is NOT one of the three exposure settings?",
+     "options": [
+      "ISO",
+      "Aperture",
+      "Shutter speed",
+      "White balance"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Aperture",
+   "source_span": "A smaller f-number means a wider opening, so more light enters.",
+   "questions": [
+    {
+     "stem": "Which f-number lets in the most light?",
+     "options": [
+      "f/1.8",
+      "f/4",
+      "f/16",
+      "f/8"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What does a wide aperture give?",
+     "options": [
+      "Slower shutter speeds only",
+      "Colder colours",
+      "A shallow depth of field",
+      "A deep depth of field"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What does a narrow aperture give?",
+     "options": [
+      "Only fast shutter speeds",
+      "Both near and far objects sharp",
+      "A blurred background",
+      "A darker image only"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What is aperture?",
+     "options": [
+      "The time the shutter stays open",
+      "The sensor's sensitivity to light",
+      "The size of the opening in the lens that lets light in",
+      "The distance to the subject"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "In what is aperture measured?",
+     "options": [
+      "Seconds",
+      "Hertz",
+      "Pixels",
+      "f-numbers"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Shutter speed",
+   "source_span": "A fast shutter speed freezes motion, as in a sports photo.",
+   "questions": [
+    {
+     "stem": "What does a fast shutter speed do to moving subjects?",
+     "options": [
+      "Makes them smaller",
+      "Freezes the motion",
+      "Blurs the motion",
+      "Makes them brighter"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What happens to moving objects at a slow shutter speed?",
+     "options": [
+      "They disappear",
+      "They turn black and white",
+      "They look blurred",
+      "They look frozen"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which shutter speed is faster?",
+     "options": [
+      "1/8",
+      "1/30",
+      "1/4",
+      "1/1000"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What is shutter speed?",
+     "options": [
+      "How sensitive the sensor is",
+      "How far the flash reaches",
+      "How big the lens opening is",
+      "How long the sensor is exposed to light"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What is a common guide for the slowest shutter speed when holding the camera by hand?",
+     "options": [
+      "At least 1 over the focal length",
+      "Exactly 1/2000",
+      "Always 1/10",
+      "At least 1 second"
+     ],
+     "correct_index": 0
+    }
+   ]
+  },
+  {
+   "name": "ISO",
+   "source_span": "A high ISO such as 3200 makes the photo brighter in the dark but adds noise, which looks like grain.",
+   "questions": [
+    {
+     "stem": "What does a high ISO do?",
+     "options": [
+      "Makes the photo darker and sharper",
+      "Slows the shutter",
+      "Makes the photo brighter in the dark but adds noise",
+      "Widens the aperture"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What does the noise in a high-ISO photo look like?",
+     "options": [
+      "A black border",
+      "Grain",
+      "A mirror image",
+      "A colour tint"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which ISO gives the cleanest image if there is plenty of light?",
+     "options": [
+      "1600",
+      "100",
+      "12800",
+      "3200"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What is ISO?",
+     "options": [
+      "The length of the exposure",
+      "The size of the lens opening",
+      "The number of pixels",
+      "The sensitivity of the sensor to light"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "When would you raise the ISO?",
+     "options": [
+      "When you want less grain",
+      "When you want a slower shutter",
+      "When shooting in bright sunlight",
+      "When shooting in the dark"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Stops",
+   "source_span": "A stop is a doubling or halving of the amount of light.",
+   "questions": [
+    {
+     "stem": "What is a stop?",
+     "options": [
+      "A doubling or halving of the amount of light",
+      "A type of lens cap",
+      "A tenth of a second",
+      "A button that stops the shutter"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What happens if you open the aperture by one stop?",
+     "options": [
+      "Half as much light enters",
+      "The same amount of light enters",
+      "The ISO doubles",
+      "Twice as much light enters"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Doubling the ISO from 200 to 400 makes the image:",
+     "options": [
+      "Two stops brighter",
+      "One stop darker",
+      "One stop brighter",
+      "Unchanged"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which sequence lists aperture stops from widest to narrowest?",
+     "options": [
+      "f/2.8, f/4, f/1.4, f/2",
+      "f/1.4, f/2, f/2.8, f/4",
+      "f/4, f/2.8, f/2, f/1.4",
+      "f/2, f/1.4, f/4, f/2.8"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "If you use a faster shutter speed, how can you keep the same exposure?",
+     "options": [
+      "Use a wider aperture or a higher ISO",
+      "Move further away",
+      "Use a narrower aperture",
+      "Lower the ISO"
+     ],
+     "correct_index": 0
+    }
+   ]
+  },
+  {
+   "name": "Composition and light",
+   "source_span": "Golden hour is the hour after sunrise and the hour before sunset, when the light is soft and warm.",
+   "questions": [
+    {
+     "stem": "What is golden hour?",
+     "options": [
+      "Any hour with clouds",
+      "The hour after sunrise and the hour before sunset",
+      "The hour after midnight",
+      "The hour around noon"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What kind of light does golden hour have?",
+     "options": [
+      "Flickering",
+      "Harsh and blue",
+      "Completely dark",
+      "Soft and warm"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What does the rule of thirds suggest?",
+     "options": [
+      "Always putting the subject in the exact centre",
+      "Using only three colours",
+      "Placing the subject along lines that divide the frame into three equal parts",
+      "Taking three photos of each scene"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What does white balance do?",
+     "options": [
+      "Adjusts colours so white objects look white under different lighting",
+      "Makes the photo brighter",
+      "Freezes motion",
+      "Increases the depth of field"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Where can the subject be placed according to the rule of thirds?",
+     "options": [
+      "At the crossings of the dividing lines",
+      "Outside the frame",
+      "Only in the exact centre",
+      "Only at the very edge"
+     ],
+     "correct_index": 0
+    }
+   ]
+  }
+ ]
+}
