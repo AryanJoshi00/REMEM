@@ -157,7 +157,7 @@ def reset_dialog(server: Server) -> None:
     except ServerError as e:
         st.error(str(e))
         return
-    labels = {f"{a['username']} ({a['answers']} answers, {a['concepts']} concepts)": a["username"] for a in accts}
+    labels = {f"{a['username']} ({a['answers']} answers, {a['concepts']} concepts)": a["username"] for a in accts if a["role"] != "demo"}   # test accounts are never listed
     with st.form("reset_form", border=False):                              # one submit, so nothing depends on partial reruns
         scope = st.radio("Which accounts?", ["Choose accounts", "Every account"], horizontal=True)
         picked = st.multiselect("Accounts to reset (used when 'Choose accounts' is selected)", list(labels))
@@ -221,7 +221,7 @@ def page_pilot() -> None:
             note(f"{adh['overdue']} of {adh['tracked']} scheduled concepts are overdue right now; the median overdue concept is {adh['median_days_late']:.1f} days late.")
 
         st.header("People")
-        show_all = st.checkbox("Include admin and demo accounts", value=False)
+        show_all = st.checkbox("Include the admin account", value=False)
         people = (users if show_all else stu).copy()
         people["last_answer"] = people["days_since_last"].map(lambda d: "never" if pd.isna(d) else ("today" if d < 1 else ("1 day ago" if round(d) == 1 else f"{d:.0f} days ago")))
         st.dataframe(people[["user_id", "username", "consented", "notes", "concepts", "n_answers", "last_answer"]], hide_index=True, width="stretch",

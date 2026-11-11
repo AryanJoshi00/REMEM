@@ -81,3 +81,12 @@ def test_profiles_table_reads_the_signup_form_and_copes_with_old_databases(tmp_p
     old.execute("INSERT INTO profiles VALUES (1,'A B','a@b.c',22,?,0),(2,'Admin','x@y.z',40,'[]',0)", (json.dumps(["central_asia"]),))
     t = pilot.profiles_table(old)
     assert t["username"].tolist() == ["user01"] and t["known_topics"].tolist() == ["central_asia"]
+
+
+def test_test_accounts_are_invisible_to_the_dashboard(tmp_path):
+    import sqlite3
+    c = sqlite3.connect(":memory:")
+    c.executescript("""CREATE TABLE users(user_id INTEGER, username TEXT, role TEXT, active INTEGER, consent_at INTEGER, n_answers INTEGER, created_at INTEGER);
+                       CREATE TABLE notes(user_id INTEGER); CREATE TABLE concepts(user_id INTEGER); CREATE TABLE responses(user_id INTEGER, ts INTEGER);
+                       INSERT INTO users VALUES (1,'user01','student',1,1,0,0),(2,'guest','demo',1,1,5,0),(3,'boss','admin',1,1,0,0);""")
+    assert pilot.users_table(c, 10**12)["username"].tolist() == ["user01", "boss"]
