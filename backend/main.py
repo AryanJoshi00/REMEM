@@ -134,7 +134,7 @@ def login(body: LoginIn):
         db.audit(conn, "login", u["user_id"], ts=now_ms())
         consent = bool(u["consent_at"]) and u["consent_version"] == config.CONSENT_VERSION
         return {"token": token, "role": u["role"], "username": u["username"], "consent_ok": consent,
-                "profile_ok": u["role"] != "student" or _has_profile(conn, u["user_id"])}
+                "profile_ok": u["role"] == "admin" or _has_profile(conn, u["user_id"])}
 
 
 @api.post("/auth/logout")
@@ -170,7 +170,7 @@ def save_profile(body: ProfileIn, user=Depends(auth.current_user)):
 @api.post("/auth/consent")
 def consent(user=Depends(auth.current_user)):
     with db.session() as conn:
-        if user["role"] == "student" and not _has_profile(conn, user["user_id"]):
+        if user["role"] != "admin" and not _has_profile(conn, user["user_id"]):
             raise HTTPException(400, "Please fill in the short form first")
         conn.execute("UPDATE users SET consent_at=?, consent_version=? WHERE user_id=?", (now_ms(), config.CONSENT_VERSION, user["user_id"]))
         db.audit(conn, "consent", user["user_id"], config.CONSENT_VERSION, ts=now_ms())

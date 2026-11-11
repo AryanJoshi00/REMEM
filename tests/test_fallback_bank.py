@@ -91,7 +91,7 @@ def test_demo_seed_builds_an_offline_account_with_a_realistic_history(tmp_path, 
     assert r["concepts"] == 37 and r["password"] == "demo-pass-1"
     c = TestClient(main.app)
     tok = c.post("/api/auth/login", json={"username": "demo", "password": "demo-pass-1"}).json()
-    assert tok["role"] == "demo" and tok["consent_ok"] is True
+    assert tok["role"] == "demo" and tok["consent_ok"] is True and tok["profile_ok"] is True
     h = {"Authorization": "Bearer " + tok["token"]}
     due = c.get("/api/due", headers=h).json()
     assert len(due["new"]) >= 4 and len(due["due"]) + len(due["upcoming"]) >= 8        # a mix of new, due and upcoming concepts

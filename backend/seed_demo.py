@@ -71,6 +71,8 @@ def seed(conn, password: str | None = None, reset: bool = False, now_ms: int | N
     if conn.execute("SELECT COUNT(*) FROM concepts WHERE user_id=?", (uid,)).fetchone()[0]:
         return {"username": DEMO_USER, "password": shown_pw, "concepts": 0, "note": "demo data already present (use --reset to rebuild)"}
     conn.execute("UPDATE users SET consent_at=?, consent_version=? WHERE user_id=?", (now, config.CONSENT_VERSION, uid))
+    conn.execute("INSERT OR IGNORE INTO profiles(user_id,full_name,contact,age,known_topics,created_at) VALUES (?,?,?,?,?,?)",
+                 (uid, "Demo", "demo@example.com", 21, "[]", now))              # the offline demo skips the sign-up form
     models = engine.Models.load()
     ability = config.DEFAULT_ABILITY
     n_concepts, k = 0, 0
