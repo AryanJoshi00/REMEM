@@ -1,10 +1,25 @@
 [theme]
+# "Research ledger": white page, graphite ink, slate-teal for controls; colour only for meaning.
+# Deliberately unlike the student app (no indigo, no warm paper, no Avenir). System fonts only (works offline).
 base = "light"
-primaryColor = "#3a3fe0"
-backgroundColor = "#f4f6fb"
+primaryColor = "#1f4e5f"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f3f4f6"
+textColor = "#1b1f24"
+linkColor = "#1f4e5f"
+font = "'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif"
+headingFont = "'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif"
+headingFontWeights = [700, 700]
+baseRadius = "4px"
+borderColor = "#d9dde3"
+showWidgetBorder = true
+dataframeHeaderBackgroundColor = "#f3f4f6"
+# REMEM, SM-2, Fixed gap first (validated for colour-blind separation), then neutrals
+chartCategoricalColors = ["#00907a", "#c44e00", "#6b4fa0", "#1b1f24", "#9aa1ad"]
+
+[theme.sidebar]
+backgroundColor = "#f3f4f6"
 secondaryBackgroundColor = "#ffffff"
-textColor = "#12162f"
-font = "sans serif"
 
 [browser]
 gatherUsageStats = false
