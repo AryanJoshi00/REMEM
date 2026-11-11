@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT UNIQUE NOT NULL,
   pw_hash BLOB NOT NULL,
   salt BLOB NOT NULL,
-  role TEXT NOT NULL DEFAULT 'student',      -- student | demo | admin
+  role TEXT NOT NULL DEFAULT 'student',      -- student | demo (test account: kept out of every statistic and the dashboard) | admin
   active INTEGER NOT NULL DEFAULT 1,
   consent_at INTEGER,
   consent_version TEXT,

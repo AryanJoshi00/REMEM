@@ -37,7 +37,7 @@ def users_table(conn, now_ms: int) -> pd.DataFrame:
              (SELECT COUNT(*) FROM notes n WHERE n.user_id=u.user_id) AS notes,
              (SELECT COUNT(*) FROM concepts c WHERE c.user_id=u.user_id) AS concepts,
              (SELECT MAX(ts) FROM responses r WHERE r.user_id=u.user_id) AS last_ts
-      FROM users u ORDER BY u.user_id""")
+      FROM users u WHERE u.role != 'demo' ORDER BY u.user_id""")           # test accounts (role demo) are never shown
     df["consented"] = df["consent_at"].notna()
     df["days_since_last"] = ((now_ms - df["last_ts"]) / 86_400_000).round(1)
     return df.drop(columns=["consent_at", "created_at", "last_ts"])
