@@ -15,7 +15,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 
 from backend import admin, auth, config, db, engine, fallback, llm, topics
-from backend.schemas import FlagIn, LoginIn, NoteIn, PasswordIn, RespondIn, TopicIn
+from backend.schemas import FlagIn, LoginIn, NoteIn, PasswordIn, ProfileIn, RespondIn, TopicIn
 from models.stability import retrievability_power
 from scheduler.scheduler import t_review_days
 
@@ -133,7 +133,8 @@ def login(body: LoginIn):
         token = auth.create_session(conn, u["user_id"])
         db.audit(conn, "login", u["user_id"], ts=now_ms())
         consent = bool(u["consent_at"]) and u["consent_version"] == config.CONSENT_VERSION
-        return {"token": token, "role": u["role"], "username": u["username"], "consent_ok": consent}
+        return {"token": token, "role": u["role"], "username": u["username"], "consent_ok": consent,
+                "profile_ok": u["role"] != "student" or _has_profile(conn, u["user_id"])}
 
 
 @api.post("/auth/logout")
@@ -143,9 +144,34 @@ def logout(token: str = Depends(auth._bearer)):
     return {"ok": True}
 
 
+def _has_profile(conn, user_id: int) -> bool:
+    return conn.execute("SELECT 1 FROM profiles WHERE user_id=?", (user_id,)).fetchone() is not None
+
+
+@api.get("/auth/profile")
+def profile_form(user=Depends(auth.current_user)):
+    """What the sign-up form needs: whether it is done, and the ready-made topics to tick."""
+    with db.session() as conn:
+        done = _has_profile(conn, user["user_id"])
+    return {"done": done, "topics": [{"id": t["id"], "title": t["title"].split(":")[0], "subject": t["subject"]} for t in topics.all_topics()]}
+
+
+@api.post("/auth/profile")
+def save_profile(body: ProfileIn, user=Depends(auth.current_user)):
+    known = sorted({k for k in body.known_topics if topics.get_topic(k)})
+    with db.session() as conn:
+        conn.execute("""INSERT INTO profiles(user_id,full_name,contact,age,known_topics,created_at) VALUES (?,?,?,?,?,?)
+                        ON CONFLICT(user_id) DO UPDATE SET full_name=excluded.full_name, contact=excluded.contact, age=excluded.age, known_topics=excluded.known_topics""",
+                     (user["user_id"], body.full_name.strip(), body.contact.strip(), body.age, json.dumps(known), now_ms()))
+        db.audit(conn, "profile", user["user_id"], ts=now_ms())
+    return {"ok": True}
+
+
 @api.post("/auth/consent")
 def consent(user=Depends(auth.current_user)):
     with db.session() as conn:
+        if user["role"] == "student" and not _has_profile(conn, user["user_id"]):
+            raise HTTPException(400, "Please fill in the short form first")
         conn.execute("UPDATE users SET consent_at=?, consent_version=? WHERE user_id=?", (now_ms(), config.CONSENT_VERSION, user["user_id"]))
         db.audit(conn, "consent", user["user_id"], config.CONSENT_VERSION, ts=now_ms())
     return {"ok": True}
@@ -210,7 +236,9 @@ def topics_list(user=Depends(auth.consented_user)):
     with db.session() as conn:
         done = {r["topic_id"] for r in conn.execute("SELECT topic_id FROM notes WHERE user_id=? AND topic_id IS NOT NULL AND status!='failed'", (user["user_id"],))}
         sug = topics.suggest(conn, user["user_id"])
-    return {"suggested": sug, "topics": [{**{k: t[k] for k in ("id", "title", "subject", "blurb", "minutes", "words")}, "done": t["id"] in done}
+        row = conn.execute("SELECT known_topics FROM profiles WHERE user_id=?", (user["user_id"],)).fetchone()
+        known = set(json.loads(row["known_topics"])) if row else set()
+    return {"suggested": sug, "topics": [{**{k: t[k] for k in ("id", "title", "subject", "blurb", "minutes", "words")}, "done": t["id"] in done, "known": t["id"] in known}
                                          for t in topics.all_topics()]}
 
 

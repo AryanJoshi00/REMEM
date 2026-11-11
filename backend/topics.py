@@ -1,6 +1,7 @@
 """Ready-made study topics so pilot users can start without pasting notes, with a balanced suggestion (spec D19)."""
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 
 from backend import config
@@ -37,13 +38,16 @@ def get_topic(tid: str) -> dict | None:
 
 
 def suggest(conn, user_id: int) -> str | None:
-    """Least-chosen topic (distinct student users) that this user has not done; ties rotate by user_id so cohorts spread evenly."""
+    """Least-chosen topic (distinct student users) that this user has not done and did not say they already know; ties rotate by user_id so cohorts spread evenly."""
     counts = {t["id"]: 0 for t in _load()}
     for r in conn.execute("""SELECT n.topic_id, COUNT(DISTINCT n.user_id) AS k FROM notes n JOIN users u USING(user_id)
                              WHERE n.topic_id IS NOT NULL AND u.role='student' GROUP BY n.topic_id"""):
         if r["topic_id"] in counts:
             counts[r["topic_id"]] = r["k"]
     mine = {r["topic_id"] for r in conn.execute("SELECT topic_id FROM notes WHERE user_id=? AND topic_id IS NOT NULL", (user_id,))}
+    row = conn.execute("SELECT known_topics FROM profiles WHERE user_id=?", (user_id,)).fetchone()
+    if row:                                                  # never suggest a topic the person said they already know well
+        mine |= set(json.loads(row["known_topics"]))
     ids = [t["id"] for t in _load()]
     free = [(counts[i], (k - user_id) % len(ids), i) for k, i in enumerate(ids) if i not in mine]
     return min(free)[2] if free else None

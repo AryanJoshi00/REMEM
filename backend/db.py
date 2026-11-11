@@ -20,6 +20,14 @@ CREATE TABLE IF NOT EXISTS users (
   n_answers INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS profiles (               -- sign-up form answers; read only through the owner's admin account
+  user_id INTEGER PRIMARY KEY REFERENCES users(user_id),
+  full_name TEXT NOT NULL,
+  contact TEXT NOT NULL,
+  age INTEGER NOT NULL,
+  known_topics TEXT NOT NULL DEFAULT '[]',   -- JSON list of ready-made topic ids the person already knows well
+  created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(user_id),

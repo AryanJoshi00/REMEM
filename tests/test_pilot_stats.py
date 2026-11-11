@@ -68,3 +68,16 @@ def test_attention_list(tmp_path):
     text = " ".join(i["text"] for i in items)
     assert "did not become a quiz" in text and "timeout" in text            # the failed note and its error
     assert any(i["level"] == "warn" for i in items)
+
+
+def test_profiles_table_reads_the_signup_form_and_copes_with_old_databases(tmp_path):
+    import json
+    import sqlite3
+    old = sqlite3.connect(":memory:")
+    old.execute("CREATE TABLE users(user_id INTEGER, username TEXT, role TEXT)")
+    assert pilot.profiles_table(old).empty                                      # a database from before the form existed
+    old.execute("CREATE TABLE profiles(user_id INTEGER, full_name TEXT, contact TEXT, age INTEGER, known_topics TEXT, created_at INTEGER)")
+    old.execute("INSERT INTO users VALUES (1,'user01','student'),(2,'boss','admin')")
+    old.execute("INSERT INTO profiles VALUES (1,'A B','a@b.c',22,?,0),(2,'Admin','x@y.z',40,'[]',0)", (json.dumps(["central_asia"]),))
+    t = pilot.profiles_table(old)
+    assert t["username"].tolist() == ["user01"] and t["known_topics"].tolist() == ["central_asia"]

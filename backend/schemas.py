@@ -18,6 +18,13 @@ class NoteIn(BaseModel):
     text: str = Field(min_length=40, max_length=20000)
 
 
+class ProfileIn(BaseModel):
+    full_name: str = Field(min_length=1, max_length=80)
+    contact: str = Field(min_length=3, max_length=120)
+    age: int = Field(ge=10, le=100)
+    known_topics: list[str] = Field(default_factory=list, max_length=20)
+
+
 class TopicIn(BaseModel):
     topic_id: str = Field(min_length=1, max_length=40)
 

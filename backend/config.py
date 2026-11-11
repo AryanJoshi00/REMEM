@@ -41,4 +41,4 @@ MCQ_GUESS = 0.25            # four-option multiple choice
 MS_PER_DAY = 86_400_000
 SESSION_GAP_MS = 30 * 60 * 1000
 ABILITY_GAMMA = 0.9
-CONSENT_VERSION = "v1"
+CONSENT_VERSION = "v2"

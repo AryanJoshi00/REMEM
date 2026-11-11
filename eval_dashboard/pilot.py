@@ -1,6 +1,7 @@
 """Pilot-monitor statistics computed from a (copy of the) REMEM SQLite database. Pure functions, no Streamlit."""
 from __future__ import annotations
 
+import json
 import sqlite3
 
 import numpy as np
@@ -40,6 +41,18 @@ def users_table(conn, now_ms: int) -> pd.DataFrame:
     df["consented"] = df["consent_at"].notna()
     df["days_since_last"] = ((now_ms - df["last_ts"]) / 86_400_000).round(1)
     return df.drop(columns=["consent_at", "created_at", "last_ts"])
+
+
+def profiles_table(conn) -> pd.DataFrame:
+    """Sign-up form answers (name, contact, age, topics already known). Empty if the database predates the form."""
+    cols = ["username", "full_name", "contact", "age", "known_topics"]
+    try:
+        df = _df(conn, """SELECT u.username, p.full_name, p.contact, p.age, p.known_topics
+                          FROM profiles p JOIN users u USING(user_id) WHERE u.role='student' ORDER BY u.user_id""")
+    except Exception:
+        return pd.DataFrame(columns=cols)
+    df["known_topics"] = df["known_topics"].map(lambda s: ", ".join(json.loads(s)) or "none")
+    return df
 
 
 def daily_activity(conn) -> pd.DataFrame:
