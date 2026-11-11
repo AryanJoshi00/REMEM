@@ -172,10 +172,12 @@ function renderNav() {
   const nav = document.getElementById("nav"), who = document.getElementById("who");
   nav.replaceChildren(); who.textContent = S.token ? S.user : "";
   if (!S.token) return;
-  const cur = location.hash || "#/", n = dueCount();
-  [["#/", "Today", "today"], ["#/notes", "Notes", "notes"], ["#/concepts", "Concepts", "concepts"], ["#/me", "Me", "me"]].forEach(([href, label, ic]) =>
-    nav.append(h("a", { href, class: cur === href ? "on" : "", "aria-current": cur === href ? "page" : false },
-      icon(ic), label, href === "#/" && n ? h("span", { class: "badge", "aria-label": pl(n, "concept") + " due" }, String(n)) : null)));
+  const cur = (location.hash || "#/").split("?")[0], n = dueCount();
+  [["#/", "Today", "today"], ["#/notes", "Topics", "notes"], ["#/concepts", "Concepts", "concepts"], ["#/me", "Me", "me"]].forEach(([href, label, ic]) => {
+    const on = href === "#/" ? cur === "#/" : cur.startsWith(href);
+    nav.append(h("a", { href, class: on ? "on" : "", "aria-current": on ? "page" : false },
+      icon(ic), label, href === "#/" && n ? h("span", { class: "badge", "aria-label": pl(n, "concept") + " due" }, String(n)) : null));
+  });
 }
 
 // ---------------------------------------------------------------- views
@@ -237,7 +239,7 @@ async function viewAbout() {
 
 function viewConsent() {
   const ok = h("button", { class: "primary block", onclick: async () => {
-    try { await api("/auth/consent", { method: "POST" }); location.hash = "#/"; route(); } catch (e) { toast(e.message); }
+    try { await api("/auth/consent", { method: "POST" }); location.hash = "#/notes"; route(); } catch (e) { toast(e.message); }
   } }, "I agree");
   mount(h("h1", {}, "Before you start"), h("div", { class: "panel consent" }, CONSENT_TEXT), ok,
         h("p", {}, h("button", { class: "block", onclick: () => signOut() }, "No thanks, sign out")));
@@ -273,10 +275,11 @@ function renderHome(d) {
     section("New", d.new.slice(lead === d.new[0] && !d.due.length ? 1 : 0), "new");
   } else if (d.upcoming.length) {
     nodes.push(h("div", { class: "calm" }, h("b", {}, "You're all caught up"), h("p", { class: "muted" }, "Next review: " + d.upcoming[0].name + " " + daysText(d.upcoming[0].due_in_days) + ".")),
-      h("a", { class: "btn block", href: "#/notes" }, "Add a topic"));
+      h("a", { class: "btn block", href: "#/notes" }, "Pick another topic"));
   } else {
-    nodes.push(h("div", { class: "calm" }, h("b", {}, "Nothing to study yet"), h("p", { class: "muted" }, "Pick a topic or paste your notes. REMEM turns them into quiz questions.")),
-      h("a", { class: "btn primary block", href: "#/notes" }, "Add notes"));
+    nodes.push(h("div", { class: "calm" }, h("b", {}, "Welcome. Here is how it works"),
+      stepList(["Pick a topic and read the short text once.", "Answer a few quiz questions on it.", "REMEM tells you when to come back, just before you would forget."])),
+      h("a", { class: "btn primary block", href: "#/notes" }, "Pick a topic"));
   }
   section("Later", d.upcoming, "later");
   mount(nodes);
@@ -294,7 +297,9 @@ async function viewHome() {
   if (!same && (location.hash === "" || location.hash === "#/")) renderHome(d);     // no second render (and no second bar animation) when nothing changed
 }
 
+const sess = { cid: null, n: 0, ok: 0 };           // this sitting only: how many questions answered, and how many right
 async function viewPractice(cid) {
+  if (sess.cid !== cid) { sess.cid = cid; sess.n = 0; sess.ok = 0; }
   mount(h("h1", {}, "Practice"), skeleton(2));
   let q; try { q = await api("/question/next?concept=" + cid); } catch (e) { return mount(h("h1", {}, "Practice"), h("div", { class: "err" }, e.message), h("a", { class: "btn", href: "#/" }, "Back to today")); }
   const t0 = performance.now();
@@ -306,9 +311,10 @@ async function viewPractice(cid) {
     const body = { question_id: q.question_id, chosen_index: i, rt_ms: Math.round(performance.now() - t0), idem_key: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()) };
     try {
       const r = await api("/respond", { method: "POST", body });
+      sess.n++; if (r.correct) sess.ok++;
       const good = opts[r.correct_index]; good.classList.add("right"); good.querySelector(".key").replaceChildren(icon("M5 12.5l4.5 4.5L19 7.5")); good.querySelector(".txt").append(h("span", { class: "tag" }, "Correct answer"));
       if (!r.correct) { const bad = opts[i]; bad.classList.add("wrong"); bad.querySelector(".key").replaceChildren(icon("M6 6l12 12M18 6L6 18")); bad.querySelector(".txt").append(h("span", { class: "tag" }, "Your answer")); }
-      fb.replaceChildren(h("div", {}, h("div", { class: "verdict " + (r.correct ? "ok" : "err") }, r.correct ? "Correct" : "Not quite"), h("div", { class: "muted" }, r.message),
+      fb.replaceChildren(h("div", {}, h("div", { class: "verdict " + (r.correct ? "ok" : "err") }, r.correct ? "Correct" : "Not quite"), h("div", { class: "muted" }, r.message), h("div", { class: "muted small sess" }, sess.ok + " of " + sess.n + " right this sitting"),
           r.source ? h("div", { class: "src" }, h("span", { class: "small" }, "From your notes"), "“" + r.source + "”") : null),
         h("button", { class: "primary block", onclick: () => viewPractice(cid) }, "Next question"),
         h("div", { class: "grid2" }, h("a", { class: "btn", href: "#/curve/" + cid }, "Memory curve"), h("a", { class: "btn", href: "#/" }, "Finish")));
@@ -320,7 +326,7 @@ async function viewPractice(cid) {
     }
   } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[i]), h("span", { class: "txt" }, text)));
   mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today"), h("span", { class: "where" }, q.concept || "")), h("h1", { class: "q" }, q.stem), h("div", { class: "opts" }, opts), fb,
-        h("p", { class: "muted small" }, h("a", { class: "flag", href: "#/", onclick: async (e) => { e.preventDefault(); try { await api("/flag", { method: "POST", body: { question_id: q.question_id } }); toast("Thanks, question flagged"); } catch (x) { toast(x.message); } } }, "Report a bad question")));
+        h("p", { class: "muted small links" }, q.topic_id ? h("a", { class: "flag", href: "#/notes/" + q.topic_id + "?r=1" }, "Read the notes again") : null, h("a", { class: "flag", href: "#/", onclick: async (e) => { e.preventDefault(); try { await api("/flag", { method: "POST", body: { question_id: q.question_id } }); toast("Thanks, question flagged"); } catch (x) { toast(x.message); } } }, "Report a bad question")));
 }
 
 async function viewFinal() {
@@ -358,54 +364,100 @@ async function viewFinal() {
   }
 }
 
+// ---- making a quiz: used by the reading page (ready-made topics) and by the paste-your-own-notes form
+function quizReady(s) {
+  store.del("remem_due");
+  const first = s.concepts[0];
+  mount(h("h1", {}, "Your quiz is ready"),
+    h("p", { class: "muted" }, pl(s.concepts.length, "concept") + " to learn. Questions come one at a time. REMEM tells you when to come back."),
+    h("ul", { class: "ledger" }, s.concepts.map(c => h("li", {}, h("a", { class: "item", href: "#/practice/" + c.concept_id }, h("span", { class: "name" }, c.name), h("span", { class: "when" }, "start"))))),
+    h("p", {}, h("a", { class: "btn primary block", href: first ? "#/practice/" + first.concept_id : "#/" }, "Start the first quiz")),
+    h("p", {}, h("a", { class: "btn block", href: "#/" }, "Go to Today")));
+}
+async function pollNote(id, msg, onFail) {
+  const gen = routeGen;                                       // stop quietly if the student has gone to another page meanwhile
+  msg.className = "muted"; msg.textContent = "Writing your questions. This can take up to a minute. You can leave this page; the quiz will be on Today when it is ready.";
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    if (gen !== routeGen) return;
+    let s; try { s = await api("/notes/" + id); } catch (e) { continue; }
+    if (gen !== routeGen) return;
+    if (s.status === "done") return quizReady(s);
+    if (s.status === "failed") { msg.className = "err"; msg.textContent = s.error || "Could not create questions. Try again in a minute."; onFail(); return; }
+  }
+  msg.className = "err"; msg.textContent = "Still working. Check Today in a minute."; onFail();
+}
+async function startQuiz(path, body, msg, onFail) {
+  msg.className = "muted"; msg.textContent = "Sending...";
+  try { const r = await api(path, { method: "POST", body }); pollNote(r.note_id, msg, onFail); }
+  catch (e) { msg.className = "err"; msg.textContent = e.message; onFail(); }
+}
+
+// ---- the reading page: ready-made topics are read once before any question is asked
+function readingBlocks(text) {                                  // plain text -> headings, paragraphs and bullet lists (textContent only)
+  const lines = text.split("\n").slice(1), out = [];            // the first line is the title, shown as the page heading
+  let list = null, para = [];
+  const flush = () => { if (para.length) { out.push(h("p", {}, para.join(" "))); para = []; } list = null; };
+  lines.forEach((raw, i) => {
+    const l = raw.trim();
+    if (!l) { flush(); return; }
+    if (l.startsWith("- ")) { if (!list) { flush(); list = h("ul", { class: "reading-list" }); out.push(list); } list.append(h("li", {}, l.slice(2))); return; }
+    list = null;
+    const next = (lines[i + 1] || "").trim();
+    if (!para.length && next && l.length <= 60 && !/[.:;?!,]$/.test(l)) { out.push(h("h2", { class: "rh" }, l)); return; }
+    para.push(l);
+  });
+  flush(); return out;
+}
+async function viewTopic(tid, review) {
+  mount(h("h1", {}, "Reading"), skeleton(4));
+  let t; try { t = await api("/topics/" + tid); } catch (e) { return mount(h("h1", {}, "Reading"), h("div", { class: "err" }, e.message), h("a", { class: "btn block", href: "#/notes" }, "Back to topics")); }
+  const msg = h("div", { class: "muted", role: "status" });
+  const sentinel = h("div", { class: "end", "aria-hidden": "true" });
+  const hint = h("span", { class: "hint" }, "Read to the end");
+  const go = h("button", { class: "primary", disabled: true, onclick: () => {
+    if (review) { history.length > 1 ? history.back() : (location.hash = "#/"); return; }
+    go.disabled = true;
+    mount(h("h1", {}, "Making your quiz"), msg, skeleton(3), h("p", {}, h("a", { class: "btn block", href: "#/notes/" + tid }, "Back to the notes")));
+    startQuiz("/notes/topic", { topic_id: tid }, msg, () => {});
+  } }, review ? "Back to the quiz" : "I've read it. Make my quiz");
+  const unlock = () => { go.disabled = false; hint.textContent = review ? "" : "Ready when you are"; bar.classList.add("ready"); };
+  const bar = h("div", { class: "readbar" }, h("div", { class: "inner" }, hint, go));
+  const title = t.title.split(":")[0];
+  mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/notes", "aria-label": "Back to topics" }, icon("M15 5l-7 7 7 7", "chev"), "Topics")),
+    h("h1", {}, title), h("p", { class: "muted" }, t.subject + ", about " + t.minutes + " min read"),
+    review ? null : h("div", { class: "panel hint-panel" }, h("b", {}, "Read this once before the quiz."), h("p", { class: "muted" }, "The questions come next and are based on this text. Take your time; nothing is timed while you read.")),
+    h("article", { class: "reading" }, readingBlocks(t.text)), sentinel,
+    review ? null : h("p", { class: "muted small" }, "Already know this well? You can say so on your profile form, and REMEM will stop suggesting it."), bar);
+  const check = () => { if (sentinel.getBoundingClientRect().top < innerHeight) { unlock(); removeEventListener("scroll", check); removeEventListener("resize", check); } };    // the end of the text is on screen
+  addEventListener("scroll", check, { passive: true }); addEventListener("resize", check); setTimeout(check, 300);
+}
+
 async function viewNotes() {
   const msg = h("div", { class: "muted", role: "status" });
   const title = h("input", { id: "nt", placeholder: "e.g. Roman roads" });
   const text = h("textarea", { id: "nx", placeholder: "Paste your study notes here (at least a few sentences)" });
-  const busy = [];   // buttons to lock while a quiz is being made
-  const lock = (on) => busy.forEach(b => { b.disabled = on; if (on) b.setAttribute("aria-busy", "true"); else b.removeAttribute("aria-busy"); });
-
-  async function poll(id) {
-    msg.className = "muted"; msg.textContent = "Reading the notes and writing questions. This can take up to a minute.";
-    for (let i = 0; i < 60; i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      let s; try { s = await api("/notes/" + id); } catch (e) { continue; }
-      if (s.status === "done") { store.del("remem_due"); mount(h("h1", {}, "Quiz ready"), h("p", { class: "muted" }, pl(s.concepts.length, "concept") + " added."), h("ul", { class: "ledger" }, s.concepts.map(c => h("li", {}, h("div", { class: "item" }, h("span", { class: "name" }, c.name))))), h("p", {}, h("a", { class: "btn primary block", href: "#/" }, "Start practising"))); return; }
-      if (s.status === "failed") { msg.className = "err"; msg.textContent = s.error || "Could not create questions. Try again in a minute."; lock(false); return; }
-    }
-    msg.className = "err"; msg.textContent = "Still working. Check Today in a minute."; lock(false);
-  }
-  async function start(path, body) {
-    lock(true); msg.className = "muted"; msg.textContent = "Sending...";
-    try { const r = await api(path, { method: "POST", body }); poll(r.note_id); }
-    catch (e) { msg.className = "err"; msg.textContent = e.message; lock(false); }
-  }
-
-  const own = h("button", { class: "primary block", onclick: () => start("/notes", { title: title.value.trim(), text: text.value }) }, "Make my quiz");
-  busy.push(own);
+  const own = h("button", { class: "primary block", onclick: () => { own.disabled = true; own.setAttribute("aria-busy", "true"); startQuiz("/notes", { title: title.value.trim(), text: text.value }, msg, () => { own.disabled = false; own.removeAttribute("aria-busy"); }); } }, "Make my quiz");
   const form = h("div", { class: "ownform", hidden: true },
     h("label", { for: "nt" }, "Title"), title, h("label", { for: "nx" }, "Notes"), text,
-    h("p", { class: "muted small" }, "Your notes are sent to Google's Gemini AI, which writes the questions. Paste notes about one topic, and nothing personal or confidential."), h("p", {}, own));
+    h("p", { class: "muted small" }, "Your notes are sent to Google's Gemini AI, which writes the questions. Paste notes about one topic, and nothing personal or confidential."), h("p", {}, own), msg);
   const open = h("button", { class: "block", "aria-expanded": "false", onclick: () => { form.hidden = false; open.hidden = true; open.setAttribute("aria-expanded", "true"); title.focus(); } }, "Paste my own notes");
   const ownBox = h("div", { class: "panel own" }, h("h2", {}, "Or use your own notes"),
     h("p", { class: "muted" }, "Paste notes from your course and an AI (Google Gemini) turns them into quiz questions."), open, form);
 
   const slot = skeleton(3);
-  mount(h("h1", {}, "Add notes"), h("p", { class: "muted" }, "Pick a topic to start in one tap."), msg, slot, ownBox);
+  mount(h("h1", {}, "Pick a topic"), h("p", { class: "muted" }, "Read a short text first, then answer questions on it."), slot, ownBox);
   let d; try { d = await api("/topics"); } catch (e) { slot.replaceWith(h("div", { class: "err" }, "Could not load topics: " + e.message)); return; }
   d.topics.sort((a, b) => (b.id === d.suggested) - (a.id === d.suggested));       // suggested topic first
-  const mk = (t, label) => { const btn = h("button", { onclick: () => start("/notes/topic", { topic_id: t.id }), "aria-label": label + ": " + t.title }, label); busy.push(btn); return btn; };
+  const mk = (t, label) => h("a", { class: "btn", href: "#/notes/" + t.id, "aria-label": label + ": " + t.title }, label);
   const meta = t => t.subject + ", " + t.minutes + " min read" + (t.done ? ", done before" : "") + (t.known ? ", you know this one" : "");
   const tile = (t, cls) => h("span", { class: "tile " + (cls || ""), "aria-hidden": "true" }, icon(SUBJECT_ICONS[t.subject] || "M5 5h14v14H5z"));
   const sug = d.topics.find(t => t.id === d.suggested);
   const rest = d.topics.filter(t => t !== sug);
   const out = [];
-  if (sug) {
-    const btn = mk(sug, sug.done ? "Study again" : "Start");
-    out.push(h("h2", {}, "Suggested for you"), h("div", { class: "next" }, tile(sug, "on-hero"), h("h2", {}, sug.title), h("p", {}, sug.blurb + " (" + meta(sug) + ")"), btn));
-  }
-  if (rest.length) out.push(h("h2", {}, sug ? "Other topics" : "Topics"), h("ul", { class: "ledger" }, rest.map(t =>
-    h("li", {}, h("div", { class: "item row withtile" }, tile(t), h("div", {}, h("span", { class: "name" }, t.title), h("div", { class: "muted" }, t.blurb), h("div", { class: "muted small" }, meta(t))), mk(t, t.done ? "Study again" : "Start"))))));
+  if (sug) out.push(h("h2", {}, "Suggested for you"), h("div", { class: "next" }, tile(sug, "on-hero"), h("h2", {}, sug.title), h("p", {}, sug.blurb + " (" + meta(sug) + ")"), mk(sug, sug.done ? "Read again" : "Read and start")));
+  if (rest.length) out.push(h("h2", {}, sug ? "Other topics" : "Topics"), h("ul", { class: "ledger topics" }, rest.map(t =>
+    h("li", {}, h("div", { class: "item row withtile" }, tile(t), h("div", {}, h("span", { class: "name" }, t.title), h("div", { class: "muted" }, t.blurb), h("div", { class: "muted small" }, meta(t))), mk(t, t.done ? "Read again" : "Read"))))));
   slot.replaceWith(h("div", {}, out));
 }
 
@@ -413,7 +465,7 @@ async function viewConcepts() {
   mount(h("h1", {}, "Concepts"), skeleton(4));
   let d; try { d = await api("/concepts"); } catch (e) { return mount(h("h1", {}, "Concepts"), h("div", { class: "err" }, e.message)); }
   const nodes = [h("h1", {}, "Concepts")];
-  if (!d.concepts.length) nodes.push(h("div", { class: "calm" }, h("b", {}, "No concepts yet"), h("p", { class: "muted" }, "Add a topic and they will appear here."), h("a", { class: "btn primary block", href: "#/notes" }, "Add notes")));
+  if (!d.concepts.length) nodes.push(h("div", { class: "calm" }, h("b", {}, "No concepts yet"), h("p", { class: "muted" }, "Pick a topic and they will appear here."), h("a", { class: "btn primary block", href: "#/notes" }, "Pick a topic")));
   nodes.push(h("ul", { class: "ledger" }, d.concepts.map(c => h("li", {}, h("a", { class: "item", href: c.new ? "#/practice/" + c.concept_id : "#/curve/" + c.concept_id },
     h("span", { class: "name" }, c.name),
     h("span", { class: "when" }, c.new ? "not studied yet" : "remembered ~" + pl(Math.round(c.stability_days), "day")),
@@ -463,16 +515,19 @@ function viewMe() {
 }
 
 // ---------------------------------------------------------------- router
+let routeGen = 0;
 function route() {
+  routeGen++;
   const hash = location.hash || "#/";
   renderNav();
   if (hash.startsWith("#/install")) return viewInstall();
   if (!S.token) return viewLogin();
-  const [, a, b] = hash.split("/");
+  const [path, query] = hash.split("?"), [, a, b] = path.split("/");
+  if (a !== "practice") sess.cid = null;
   switch (a) {
     case "about": return viewAbout();
     case "consent": return viewConsent();
-    case "notes": return viewNotes();
+    case "notes": return b ? viewTopic(b, query === "r=1") : viewNotes();
     case "final": return viewFinal();
     case "concepts": return viewConcepts();
     case "practice": return viewPractice(Number(b));
