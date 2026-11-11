@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 import altair as alt
+import numpy as np
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -127,18 +128,31 @@ def separator() -> None:
 
 
 def calibration_chart(where, cal: pd.DataFrame) -> None:
-    long = cal.melt(id_vars="bin", value_vars=["predicted", "observed"], var_name="kind", value_name="value")
-    where.altair_chart(alt.Chart(long).mark_line(point=True).encode(
-        x=alt.X("bin:N", title=None, sort=None), y=alt.Y("value:Q", scale=alt.Scale(domain=[0, 1]), title=None),
-        color=alt.Color("kind:N", scale=alt.Scale(domain=["predicted", "observed"], range=[PREDICTED, OBSERVED]), legend=alt.Legend(title=None, orient="bottom"))).properties(height=230), width="stretch")
+    """Same numbers as the table beside it. A point on the dashed diagonal means predicted = observed; bigger points hold more answers."""
+    lo = min(0.5, float(np.floor(min(cal["predicted"].min(), cal["observed"].min()) * 10) / 10))
+    dom = alt.Scale(domain=[lo, 1], nice=False)
+    diag = alt.Chart(pd.DataFrame({"x": [lo, 1], "y": [lo, 1]})).mark_line(color=MUTED, strokeDash=[4, 4], strokeWidth=1.5).encode(x=alt.X("x:Q", scale=dom), y=alt.Y("y:Q", scale=dom))
+    pts = alt.Chart(cal).mark_circle(color=INK, opacity=.9).encode(
+        x=alt.X("predicted:Q", title=None, scale=dom, axis=alt.Axis(format=".0%", tickCount=5)),
+        y=alt.Y("observed:Q", title=None, scale=dom, axis=alt.Axis(format=".0%", tickCount=5)),
+        size=alt.Size("n:Q", legend=None, scale=alt.Scale(range=[60, 500])),
+        tooltip=[alt.Tooltip("bin:N", title="Predicted range"), alt.Tooltip("n:Q", title="Answers"),
+                 alt.Tooltip("predicted:Q", title="Predicted", format=".0%"), alt.Tooltip("observed:Q", title="Observed", format=".0%")])
+    where.altair_chart((diag + pts).properties(height=240), width="stretch", theme=None)
 
 
 def activity_charts(da: pd.DataFrame) -> None:
     a, b = st.columns(2)
+    d = da.assign(day=pd.to_datetime(da["day"]))
+    def bars(col: str):
+        return alt.Chart(d).mark_bar(color=INK, size=14).encode(
+            x=alt.X("day:T", title="day", axis=alt.Axis(format="%d %b", labelAngle=0, tickCount="day")),
+            y=alt.Y(f"{col}:Q", title=col, axis=alt.Axis(tickMinStep=1, format="d")),
+            tooltip=[alt.Tooltip("day:T", title="day", format="%d %b"), alt.Tooltip(f"{col}:Q", title=col)]).properties(height=240)
     a.markdown("**Answers per day**")
-    a.bar_chart(da.set_index("day")[["answers"]], color=INK, height=230)
+    a.altair_chart(bars("answers"), width="stretch", theme=None)
     b.markdown("**People who answered each day**")
-    b.bar_chart(da.set_index("day")[["active_users"]], color=INK, height=230)
+    b.altair_chart(bars("active_users"), width="stretch", theme=None)
 
 
 def ago(seconds: float) -> str:
@@ -411,16 +425,20 @@ def page_ednet() -> None:
         st.header("Calibration by time since last practice", anchor=False)
         note("Gap between predicted and observed correctness in each time bucket. Smaller bars are better.")
         cg["model"] = cg["model"].map(lambda x: MODEL_NAMES.get(x, x))
-        models = st.multiselect("Models to compare", sorted(cg["model"].unique()), default=sorted(cg["model"].unique())[:3])
+        all_models = sorted(cg["model"].unique())
+        pref = [MODEL_NAMES[k] for k in ("B_exp_global", "C_power_global", "D_power_features(REMEM)") if MODEL_NAMES[k] in all_models]
+        models = st.multiselect("Models to compare", all_models, default=pref or all_models[:3])
         order = ["<5m", "5m-1h", "1h-6h", "6h-1d", "1-3d", "3-7d", "7-14d", "14-30d", "30-90d", ">90d"]
         st.altair_chart(alt.Chart(cg[cg["model"].isin(models)]).mark_bar().encode(
-            x=alt.X("bin:N", sort=order, title="Time since last practice"), xOffset="model:N", y=alt.Y("abs_gap:Q", title="Gap between predicted and observed"),
-            color=alt.Color("model:N", legend=alt.Legend(title=None, orient="bottom"))).properties(height=300), width="stretch")
+            x=alt.X("bin:N", sort=order, title="Time since last practice", axis=alt.Axis(labelAngle=0)), xOffset="model:N",
+            y=alt.Y("abs_gap:Q", title="Gap between predicted and observed", axis=alt.Axis(format=".0%")),
+            color=alt.Color("model:N", scale=alt.Scale(range=[INK, "#00907a", "#c44e00", "#6b4fa0", PREDICTED]), legend=alt.Legend(title=None, orient="bottom", columns=1, labelLimit=420)),
+            tooltip=["model", "bin", alt.Tooltip("abs_gap:Q", format=".1%")]).properties(height=320), width="stretch", theme=None)
     g = csv("exp1_accuracy_by_gap.csv")
     if g is not None:
         st.header("Do people forget over time in this data?", anchor=False)
         note("Share correct by time since the last practice. It falls only slightly, which is why the app starts from a documented prior instead of the fitted curve.")
-        st.dataframe(g, hide_index=True, width="stretch", column_config={"bin": "Gap", "n": "Answers", "accuracy": st.column_config.NumberColumn("Share correct", format="%.3f"),
+        st.dataframe(g, hide_index=True, width="stretch", column_config={"bin": "Gap", "n": st.column_config.NumberColumn("Answers", format="localized"), "accuracy": st.column_config.NumberColumn("Share correct", format="percent"),
                                                                            "resid_vs_student_mean": st.column_config.NumberColumn("Versus the student's own average", format="%+.3f")})
     exp4_section()
     exp6_section()
@@ -451,7 +469,7 @@ def exp4_section() -> None:
     st.markdown("**Log loss by how many earlier answers the student-concept pair had in training**")
     piv = sp.pivot_table(index="stratum", columns="model", values="logloss").reindex(STRATA_ORDER)
     piv = piv[[c for c in OFFSET_NAMES if c in piv.columns]].rename(columns=OFFSET_NAMES).reset_index().rename(columns={"stratum": "Earlier answers on the pair"})
-    st.dataframe(piv, hide_index=True, width="stretch")
+    st.dataframe(piv, hide_index=True, width="stretch", column_config={c: st.column_config.NumberColumn(c, format="%.4f") for c in piv.columns[1:]})
     summ = csv("exp4_offset_summary.csv")
     note("The gains are small. Offsets help a little at every level, and shrinkage matters little here because the fitted forgetting curve on EdNet is almost flat, "
          "so large changes in memory strength move the predictions only slightly." + (" Offset widths (prior sd) were chosen on validation data; the best student and pair width sat at the largest value tried." if summ is not None else ""))
@@ -471,15 +489,19 @@ def exp6_section() -> None:
              "Reviews within half to double the recommendation": v["n_near_reviews"], "Calibration error there (ECE)": v["near_ece"], "Verdict": v["verdict"]} for k, v in summ.items()]
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch", column_config={
         "Curve shape": st.column_config.NumberColumn(format="%.3f"), "Median recommended gap (days)": st.column_config.NumberColumn(format="%.1f"),
-        "Recommendations at the 180-day limit": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
+        "Recommendations at the 180-day limit": st.column_config.NumberColumn(format="percent"), "Reviews within half to double the recommendation": st.column_config.NumberColumn(format="localized"),
         "Calibration error there (ECE)": st.column_config.NumberColumn(format="%.3f")})
     tc = tc.assign(model=tc["model"].map(names))
     long = tc.melt(id_vars=["model", "bucket", "n"], value_vars=["predicted", "observed"], var_name="kind", value_name="value")
     order = list(tc["bucket"].drop_duplicates())
-    st.altair_chart(alt.Chart(long).mark_bar().encode(
-        x=alt.X("bucket:N", sort=order, title="Real gap compared with the recommended gap"), xOffset="kind:N", y=alt.Y("value:Q", scale=alt.Scale(domain=[0, 1]), title="Chance of a correct answer"),
+    enc = dict(x=alt.X("bucket:N", sort=order, title="Real gap compared with the recommended gap", axis=alt.Axis(labelAngle=0, labelLimit=160)),
+               y=alt.Y("value:Q", scale=alt.Scale(domain=[0, 1]), title="Chance of a correct answer", axis=alt.Axis(format=".0%", tickCount=5)))
+    barl = alt.Chart().mark_bar().encode(xOffset="kind:N", **enc,
         color=alt.Color("kind:N", scale=alt.Scale(domain=["predicted", "observed"], range=[PREDICTED, OBSERVED]), legend=alt.Legend(title=None, orient="bottom")),
-        row=alt.Row("model:N", title=None), tooltip=["model", "bucket", "n", "kind", "value"]).properties(height=200, width=620), width="content")
+        tooltip=["model", "bucket", alt.Tooltip("n:Q", format=","), "kind", alt.Tooltip("value:Q", format=".1%")])
+    nlab = alt.Chart().transform_filter(alt.datum.kind == "observed").mark_text(dy=-6, fontSize=11, color=MUTED).encode(xOffset="kind:N", **enc, text=alt.Text("n:Q", format=","))
+    st.altair_chart(alt.layer(barl, nlab, data=long).properties(height=180, width=600).facet(row=alt.Row("model:N", title=None, header=alt.Header(labelAngle=0, labelAlign="left", labelAnchor="start"))),
+                    width="content", theme=None)
     st.markdown("**Target retention (θ) sweep**")
     note("A higher target means earlier reviews and more of them. 'Near' counts real reviews within a quarter of the recommended gap.")
     s2 = sw.assign(model=sw["model"].map(names))
@@ -577,7 +599,7 @@ def page_simlab() -> None:
     t["baseline"] = t["baseline"].map({"fixed": "Best fixed gap", "sm2": "SM-2"})
     st.dataframe(t, hide_index=True, width="stretch", column_config={
         "gen": "True forgetting curve", "phi": st.column_config.NumberColumn("Strength of spacing effect", format="%.1f"), "baseline": "Compared with",
-        "mean": st.column_config.NumberColumn("Reviews saved, average %", format="%.1f"), "lowest": st.column_config.NumberColumn("Lowest run %", format="%.1f"), "highest": st.column_config.NumberColumn("Highest run %", format="%.1f")})
+        "mean": st.column_config.NumberColumn("Reviews saved, average %", format="%+.1f"), "lowest": st.column_config.NumberColumn("Lowest run %", format="%+.1f"), "highest": st.column_config.NumberColumn("Highest run %", format="%+.1f")})
     st.header("Reviews against coverage", anchor=False)
     note("Further left and lower is better: fewer reviews and less time below the 85% recall target.")
     c = st.columns(2)
@@ -585,16 +607,24 @@ def page_simlab() -> None:
     phi = c[1].radio("Spacing effect", sorted(fr["phi"].unique()), index=1, horizontal=True)
     f = fr[(fr["gen"] == gen) & (fr["phi"] == phi)].groupby(["policy", "knob"], as_index=False).mean(numeric_only=True)
     f["policy"] = f["policy"].map({"remem": "REMEM", "remem_global": "REMEM, one shared curve", "remem_prior": "REMEM, starter prior", "fixed": "Fixed gap", "sm2": "SM-2"})
-    st.altair_chart(alt.Chart(f).mark_line(point=True).encode(
-        x=alt.X("reviews_per_concept:Q", title="Reviews per concept in 60 days"), y=alt.Y("frac_below_target:Q", title="Share of time below 85% recall"),
-        color=alt.Color("policy:N", legend=alt.Legend(title=None, orient="bottom")), tooltip=["policy", "knob", "reviews_per_concept", "frac_below_target", "final_recall"]).properties(height=340), width="stretch")
+    pol = ["REMEM", "REMEM, one shared curve", "REMEM, starter prior", "SM-2", "Fixed gap"]
+    st.altair_chart(alt.Chart(f).mark_line(point=alt.OverlayMarkDef(filled=True, size=40), strokeWidth=2).encode(
+        x=alt.X("reviews_per_concept:Q", title="Reviews per concept in 60 days", axis=alt.Axis(tickMinStep=1)),
+        y=alt.Y("frac_below_target:Q", title="Share of time below 85% recall", axis=alt.Axis(format=".0%")),
+        color=alt.Color("policy:N", scale=alt.Scale(domain=pol, range=[METHOD["REMEM"], METHOD["REMEM"], METHOD["REMEM"], METHOD["SM-2"], METHOD["Fixed gap"]]),
+                        legend=alt.Legend(title=None, orient="bottom", symbolType="stroke")),
+        strokeDash=alt.StrokeDash("policy:N", scale=alt.Scale(domain=pol, range=[[1, 0], [6, 3], [2, 3], [1, 0], [1, 0]]), legend=None),
+        order=alt.Order("knob:Q"),
+        tooltip=["policy", "knob", alt.Tooltip("reviews_per_concept:Q", format=".1f"), alt.Tooltip("frac_below_target:Q", format=".1%"), alt.Tooltip("final_recall:Q", format=".1%")]).properties(height=320),
+        width="stretch", theme=None)
     rc = csv("exp10_recovery.csv")
     if rc is not None:
         st.header("Can the model recover each student's true memory strength?", anchor=False)
         note("A rank correlation near 1 would mean yes. Values near zero mean the personalised estimates did not track the truth here.")
         r = rc.groupby(["gen", "phi"])[["spearman_S", "beta_fit"]].mean().round(2).reset_index()
         r["gen"] = r["gen"].map({"gen1": "Power-law", "gen2": "Exponential", "gen3": "Mixture"})
-        st.dataframe(r, hide_index=True, width="stretch", column_config={"gen": "True curve", "phi": "Spacing effect", "spearman_S": "Rank correlation", "beta_fit": "Fitted curve shape"})
+        st.dataframe(r, hide_index=True, width="stretch", column_config={"gen": "True curve", "phi": st.column_config.NumberColumn("Spacing effect", format="%.1f"),
+                                                                         "spearman_S": st.column_config.NumberColumn("Rank correlation", format="%.2f"), "beta_fit": st.column_config.NumberColumn("Fitted curve shape", format="%.2f")})
 
 
 # ------------------------------------------------------------------ deployed model
@@ -611,8 +641,10 @@ def page_model() -> None:
     S = st.slider("Memory strength (days until recall drops to 90%)", 1.0, 60.0, 8.0)
     days = list(range(0, 61))
     df = pd.DataFrame({"day": days, "recall": [(1 + k * d / S) ** (-beta) for d in days]})
-    st.altair_chart(alt.Chart(df).mark_area(opacity=0.12, color=INK, line={"color": INK, "strokeWidth": 3}).encode(
-        x=alt.X("day:Q", title="Days since last practice"), y=alt.Y("recall:Q", scale=alt.Scale(domain=[0, 1]), title="Chance of recalling")).properties(height=320), width="stretch")
+    st.altair_chart(alt.Chart(df).mark_line(color=INK, strokeWidth=2.5).encode(
+        x=alt.X("day:Q", title="Days since last practice", scale=alt.Scale(domain=[0, 60], nice=False), axis=alt.Axis(tickCount=7)),
+        y=alt.Y("recall:Q", scale=alt.Scale(domain=[0, 1]), title="Chance of recalling", axis=alt.Axis(format=".0%", tickCount=5)),
+        tooltip=[alt.Tooltip("day:Q", title="Day"), alt.Tooltip("recall:Q", title="Recall", format=".1%")]).properties(height=320), width="stretch", theme=None)
     st.markdown("Recall after *t* days is")
     st.latex(r"R(t) = \left(1 + \frac{k\,t}{S}\right)^{-\beta}")
     st.markdown("with k chosen so that recall equals 90% when *t* = S.")
