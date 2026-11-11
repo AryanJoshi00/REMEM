@@ -230,7 +230,7 @@ def test_topics_balanced_suggestions_and_creation(client, monkeypatch):
     ha = login(client, "p01", "pw-for-p01!")
     hb = login(client, "p02", "pw-for-p02!")
     ta = client.get("/api/topics", headers=ha).json()
-    assert len(ta["topics"]) == 3 and "text" not in ta["topics"][0]
+    assert len(ta["topics"]) == 6 and "text" not in ta["topics"][0]
     sug_a = ta["suggested"]
     r = client.post("/api/notes/topic", json={"topic_id": sug_a}, headers=ha)
     assert r.status_code == 200

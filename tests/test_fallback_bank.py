@@ -62,7 +62,7 @@ def _down(prompt):
 def test_topic_note_falls_back_when_the_model_fails(client, monkeypatch):
     monkeypatch.setattr(llm, "_call_gemini", _down)
     h = _login(client)
-    r = client.post("/api/notes/topic", json={"topic_id": "photosynthesis"}, headers=h)
+    r = client.post("/api/notes/topic", json={"topic_id": "korean_hangul"}, headers=h)
     s = client.get(f"/api/notes/{r.json()['note_id']}", headers=h).json()
     assert s["status"] == "done" and len(s["concepts"]) == 6
     q = client.get(f"/api/question/next?concept={s['concepts'][0]['concept_id']}", headers=h).json()
@@ -77,7 +77,7 @@ def test_pasted_notes_still_fail_normally_and_flag_can_turn_fallback_off(client,
     r = client.post("/api/notes", json={"title": "Mine", "text": "Some pasted study notes about a topic that the bank does not cover at all."}, headers=h)
     assert client.get(f"/api/notes/{r.json()['note_id']}", headers=h).json()["status"] == "failed"
     monkeypatch.setattr(config, "USE_FALLBACK_BANK", False)
-    r = client.post("/api/notes/topic", json={"topic_id": "newtons_laws"}, headers=h)
+    r = client.post("/api/notes/topic", json={"topic_id": "photography_basics"}, headers=h)
     assert client.get(f"/api/notes/{r.json()['note_id']}", headers=h).json()["status"] == "failed"
 
 
@@ -87,7 +87,7 @@ def test_demo_seed_builds_an_offline_account_with_a_realistic_history(tmp_path, 
     db.init_db()
     with db.session() as conn:
         r = seed_demo.seed(conn, "demo-pass-1", now_ms=1_800_000_000_000)
-    assert r["concepts"] == 18 and r["password"] == "demo-pass-1"
+    assert r["concepts"] == 37 and r["password"] == "demo-pass-1"
     c = TestClient(main.app)
     tok = c.post("/api/auth/login", json={"username": "demo", "password": "demo-pass-1"}).json()
     assert tok["role"] == "demo" and tok["consent_ok"] is True
@@ -100,6 +100,6 @@ def test_demo_seed_builds_an_offline_account_with_a_realistic_history(tmp_path, 
     assert curve["theta"] == 0.9 and len(curve["points"]) > 10
     with db.session() as conn:
         again = seed_demo.seed(conn, None, now_ms=1_800_000_000_000)                  # idempotent
-        assert again["concepts"] == 0 and conn.execute("SELECT COUNT(*) FROM concepts").fetchone()[0] == 18
+        assert again["concepts"] == 0 and conn.execute("SELECT COUNT(*) FROM concepts").fetchone()[0] == 37
         seed_demo.seed(conn, None, reset=True, now_ms=1_800_000_000_000)
-        assert conn.execute("SELECT COUNT(*) FROM concepts").fetchone()[0] == 18 and conn.execute("SELECT COUNT(*) FROM users WHERE username='demo'").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM concepts").fetchone()[0] == 37 and conn.execute("SELECT COUNT(*) FROM users WHERE username='demo'").fetchone()[0] == 1

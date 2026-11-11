@@ -88,6 +88,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .item .note { grid-column: 1 / -1; font-size: .9rem; color: var(--muted); margin-top: -2px; }
 .item .meta { grid-column: 1 / -1; font-size: .9rem; color: var(--muted); margin-top: -2px; }
 .item.row { align-items: center; }
+.item.withtile { grid-template-columns: auto 1fr auto; }
+.tile { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: var(--tint); color: var(--accent); flex: none; }
+.tile svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tile.on-hero { background: rgba(255,255,255,.18); color: #fff; margin-bottom: 12px; }
 .item.row .btn, .item.row button { min-height: 48px; padding: 8px 20px; }
 .meter { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; }
 .meter i { display: block; height: 100%; width: 100%; background: var(--green-fill); transform-origin: left; transform: scaleX(var(--v, 1)); animation: fill .7s cubic-bezier(.2, .7, .2, 1) both; }

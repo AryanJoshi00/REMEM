@@ -1,0 +1,340 @@
+{
+ "concepts": [
+  {
+   "name": "What Hangul is",
+   "source_span": "Hangul has 14 basic consonants and 10 basic vowels, so 24 letters in all.",
+   "questions": [
+    {
+     "stem": "Who created Hangul?",
+     "options": [
+      "King Sejong the Great",
+      "A group of Portuguese traders",
+      "A Chinese emperor",
+      "Buddhist monks in Japan"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "In which year was Hangul created?",
+     "options": [
+      "1843",
+      "1243",
+      "1643",
+      "1443"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "How many basic consonants does Hangul have?",
+     "options": [
+      "14",
+      "12",
+      "24",
+      "10"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "How many letters does Hangul have in all?",
+     "options": [
+      "52",
+      "24",
+      "14",
+      "40"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "How are Hangul letters arranged when written?",
+     "options": [
+      "In a single line like English",
+      "Stacked into square syllable blocks",
+      "Only in long vertical columns",
+      "In a circle"
+     ],
+     "correct_index": 1
+    }
+   ]
+  },
+  {
+   "name": "Basic consonant sounds",
+   "source_span": "ㄱ sounds like g, as in go.",
+   "questions": [
+    {
+     "stem": "Which sound does ㄱ make?",
+     "options": [
+      "g, as in go",
+      "m",
+      "s",
+      "n"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which letter is silent at the start of a syllable?",
+     "options": [
+      "ㅅ",
+      "ㅁ",
+      "ㅎ",
+      "ㅇ"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which sound does ㅁ make?",
+     "options": [
+      "b",
+      "n",
+      "m",
+      "h"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which of these is an aspirated consonant, said with a puff of breath?",
+     "options": [
+      "ㅋ",
+      "ㅅ",
+      "ㄴ",
+      "ㅂ"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which sound does ㅅ make?",
+     "options": [
+      "j",
+      "h",
+      "d",
+      "s"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Basic vowel sounds",
+   "source_span": "ㅏ sounds like a, as in father.",
+   "questions": [
+    {
+     "stem": "Which vowel sounds like a in father?",
+     "options": [
+      "ㅏ",
+      "ㅣ",
+      "ㅗ",
+      "ㅜ"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which vowel sounds like i in see?",
+     "options": [
+      "ㅡ",
+      "ㅜ",
+      "ㅓ",
+      "ㅣ"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which vowel sounds like o?",
+     "options": [
+      "ㅏ",
+      "ㅗ",
+      "ㅡ",
+      "ㅜ"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "How does ㅜ sound?",
+     "options": [
+      "i, as in see",
+      "o",
+      "u, as in moon",
+      "a, as in father"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What do ㅑ, ㅕ, ㅛ and ㅠ add to a vowel?",
+     "options": [
+      "A longer silence",
+      "A rising tone",
+      "A final n sound",
+      "A y sound"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Building syllable blocks",
+   "source_span": "A vertical vowel such as ㅏ or ㅣ goes to the right of the consonant.",
+   "questions": [
+    {
+     "stem": "What does a syllable block start with?",
+     "options": [
+      "Two vowels",
+      "A number",
+      "A vowel followed by a consonant",
+      "A consonant followed by a vowel"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Where does a vertical vowel such as ㅏ go?",
+     "options": [
+      "Before the consonant",
+      "Below the consonant",
+      "Above the consonant",
+      "To the right of the consonant"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Where does a horizontal vowel such as ㅗ go?",
+     "options": [
+      "To the right of the consonant",
+      "Below the consonant",
+      "To the left of the consonant",
+      "Inside the consonant"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which letters make the syllable 가?",
+     "options": [
+      "ㄱ plus ㅏ",
+      "ㄱ plus ㅗ",
+      "ㄴ plus ㅗ",
+      "ㄴ plus ㅏ"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What does the syllable 구 sound like?",
+     "options": [
+      "go",
+      "ga",
+      "gu",
+      "na"
+     ],
+     "correct_index": 2
+    }
+   ]
+  },
+  {
+   "name": "The silent ㅇ and double consonants",
+   "source_span": "When a syllable begins with a vowel sound, the silent ㅇ is written first",
+   "questions": [
+    {
+     "stem": "Which letter is written first when a syllable begins with a vowel sound?",
+     "options": [
+      "ㅎ",
+      "The silent ㅇ",
+      "ㅍ",
+      "ㄱ"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "How does ㅇ sound at the end of a syllable?",
+     "options": [
+      "m",
+      "ng",
+      "t",
+      "h"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What does the syllable 아 sound like?",
+     "options": [
+      "a",
+      "na",
+      "ga",
+      "o"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "How are double consonants such as ㄲ and ㅃ pronounced?",
+     "options": [
+      "Softer and silent",
+      "Exactly like the single consonant",
+      "Tighter and stronger",
+      "Longer and nasal"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What does the syllable 오 sound like?",
+     "options": [
+      "o",
+      "u",
+      "i",
+      "a"
+     ],
+     "correct_index": 0
+    }
+   ]
+  },
+  {
+   "name": "Reading simple words",
+   "source_span": "나무 (namu) means tree.",
+   "questions": [
+    {
+     "stem": "What does 나무 (namu) mean?",
+     "options": [
+      "Baby",
+      "Love",
+      "Sea",
+      "Tree"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What does 바다 (bada) mean?",
+     "options": [
+      "Hello",
+      "Tree",
+      "Meat",
+      "Sea"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which word means baby?",
+     "options": [
+      "아기 (agi)",
+      "고기 (gogi)",
+      "나무 (namu)",
+      "사랑 (sarang)"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What does 안녕 (annyeong) mean?",
+     "options": [
+      "Water",
+      "Thank you",
+      "Hello",
+      "Goodbye forever"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which word means love?",
+     "options": [
+      "아기 (agi)",
+      "사랑 (sarang)",
+      "바다 (bada)",
+      "고기 (gogi)"
+     ],
+     "correct_index": 1
+    }
+   ]
+  }
+ ]
+}

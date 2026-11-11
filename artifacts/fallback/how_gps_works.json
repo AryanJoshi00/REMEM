@@ -1,0 +1,396 @@
+{
+ "concepts": [
+  {
+   "name": "What GPS is",
+   "source_span": "GPS stands for Global Positioning System.",
+   "questions": [
+    {
+     "stem": "What does GPS stand for?",
+     "options": [
+      "General Position Signal",
+      "Global Planet Sensor",
+      "Ground Path Scanner",
+      "Global Positioning System"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which country built and runs GPS?",
+     "options": [
+      "Russia",
+      "China",
+      "The United States",
+      "India"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Does a GPS receiver send signals to the satellites?",
+     "options": [
+      "Yes, but only at night",
+      "No, it only listens",
+      "Yes, it sends its position",
+      "Only when indoors"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "How does a phone work out where it is with GPS?",
+     "options": [
+      "By asking nearby phones",
+      "By scanning street signs",
+      "By using mobile towers only",
+      "By listening to radio signals from satellites"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What does a GPS satellite broadcast?",
+     "options": [
+      "Live video of the Earth",
+      "Its position and the exact time the signal was sent",
+      "The weather forecast",
+      "The receiver's name"
+     ],
+     "correct_index": 1
+    }
+   ]
+  },
+  {
+   "name": "The satellites",
+   "source_span": "The satellites orbit about 20,200 kilometres above the Earth.",
+   "questions": [
+    {
+     "stem": "At about what height do GPS satellites orbit?",
+     "options": [
+      "20,200 kilometres",
+      "2,000 kilometres",
+      "400,000 kilometres",
+      "200 kilometres"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "How many orbital planes does the GPS constellation have?",
+     "options": [
+      "Six",
+      "Two",
+      "One",
+      "Twelve"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "About how often does a GPS satellite circle the Earth?",
+     "options": [
+      "Once an hour",
+      "Twice a day",
+      "Once a year",
+      "Once a week"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What do GPS satellites carry for accurate timing?",
+     "options": [
+      "Sundials",
+      "Pendulum clocks",
+      "Quartz watches only",
+      "Atomic clocks"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What is the minimum size of the GPS constellation?",
+     "options": [
+      "At least 3 satellites",
+      "At least 24 satellites",
+      "Exactly 100 satellites",
+      "Only 1 satellite"
+     ],
+     "correct_index": 1
+    }
+   ]
+  },
+  {
+   "name": "Measuring distance with time",
+   "source_span": "Distance equals the speed of light multiplied by the travel time.",
+   "questions": [
+    {
+     "stem": "How is the distance to a satellite calculated?",
+     "options": [
+      "Speed of light multiplied by the travel time",
+      "Height of the satellite divided by 2",
+      "Time divided by the speed of light",
+      "Speed of sound divided by time"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "At what speed do radio signals travel?",
+     "options": [
+      "The speed of the satellite only",
+      "The speed of sound",
+      "The speed of light",
+      "The speed of a jet"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "About how long does a GPS signal take to reach the ground?",
+     "options": [
+      "Roughly 0.07 seconds",
+      "About 7 seconds",
+      "About 3 minutes",
+      "About 1 hour"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What does the receiver compare to find the travel time?",
+     "options": [
+      "The satellite's colour",
+      "The number of signals",
+      "The arrival time and the time the signal was sent",
+      "The phone battery level"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Why does accurate timing matter so much for GPS?",
+     "options": [
+      "Light travels so fast that tiny time errors become big distance errors",
+      "Satellites are very heavy",
+      "Radio signals are loud",
+      "Phones need to know the date"
+     ],
+     "correct_index": 0
+    }
+   ]
+  },
+  {
+   "name": "Trilateration",
+   "source_span": "Trilateration finds a position from its distances to several known points.",
+   "questions": [
+    {
+     "stem": "What does trilateration find?",
+     "options": [
+      "A route between two cities",
+      "A position from distances to several known points",
+      "The weather at a point",
+      "The speed of a satellite"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "The distance to one satellite places the receiver on:",
+     "options": [
+      "A straight line to the Earth",
+      "A single point",
+      "A sphere around that satellite",
+      "A circle on the ground"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Two satellites narrow the position down to:",
+     "options": [
+      "A circle where two spheres meet",
+      "A single point",
+      "Three points",
+      "A line on the ground"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Three satellites narrow the position down to:",
+     "options": [
+      "A single point on the ground every time",
+      "A circle",
+      "A sphere",
+      "Two points, one usually far out in space"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which method does GPS use to find a position?",
+     "options": [
+      "Reading a compass",
+      "Trilateration",
+      "Echo location",
+      "Guessing from a map"
+     ],
+     "correct_index": 1
+    }
+   ]
+  },
+  {
+   "name": "Why four satellites are needed",
+   "source_span": "A fourth satellite lets the receiver solve for its own clock error as well as its three position coordinates.",
+   "questions": [
+    {
+     "stem": "Why is a fourth satellite needed?",
+     "options": [
+      "To avoid sunlight",
+      "To solve for the receiver's own clock error",
+      "To measure altitude only",
+      "To make the signal stronger"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Why is the receiver's clock a problem?",
+     "options": [
+      "It is cheaper and less accurate than an atomic clock",
+      "It is too fast to read",
+      "It runs on solar power",
+      "It belongs to the satellite"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What does a small clock error turn into?",
+     "options": [
+      "A weaker signal",
+      "No error at all",
+      "A louder signal",
+      "A large distance error"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "How many satellite signals does a receiver need at least?",
+     "options": [
+      "One",
+      "Twelve",
+      "Four",
+      "Two"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Besides the clock error, what does the receiver solve for?",
+     "options": [
+      "The weather",
+      "The satellite's colour",
+      "Its three position coordinates",
+      "The phone's battery level"
+     ],
+     "correct_index": 2
+    }
+   ]
+  },
+  {
+   "name": "Relativity and corrections",
+   "source_span": "The net effect of their speed and weaker gravity is that the satellite clocks run faster by about 38 microseconds per day compared with clocks on the ground.",
+   "questions": [
+    {
+     "stem": "Which theory affects the satellite clocks?",
+     "options": [
+      "The Big Bang theory",
+      "Newton's cradle",
+      "Darwin's theory of evolution",
+      "Einstein's theory of relativity"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "By about how much do the satellite clocks run faster each day?",
+     "options": [
+      "38 microseconds",
+      "38 seconds",
+      "38 hours",
+      "38 minutes"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What would happen to GPS positions without the correction?",
+     "options": [
+      "They would flip sideways",
+      "They would stay exact",
+      "They would drift by several kilometres each day",
+      "They would be wrong only at night"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "How is the relativity effect handled?",
+     "options": [
+      "The satellites are replaced daily",
+      "The satellite clocks are adjusted so the correction is built in",
+      "Users correct it by hand",
+      "It is ignored"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Compared with clocks on the ground, satellite clocks run:",
+     "options": [
+      "Backwards",
+      "Exactly the same",
+      "Slower",
+      "Faster"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Other systems and accuracy",
+   "source_span": "Other global systems are GLONASS from Russia, Galileo from the European Union and BeiDou from China.",
+   "questions": [
+    {
+     "stem": "Which system is Russia's global navigation system?",
+     "options": [
+      "GLONASS",
+      "Galileo",
+      "BeiDou",
+      "NavIC"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which system belongs to the European Union?",
+     "options": [
+      "NavIC",
+      "Galileo",
+      "BeiDou",
+      "GLONASS"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which system belongs to China?",
+     "options": [
+      "GLONASS",
+      "BeiDou",
+      "Galileo",
+      "NavIC"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "What is NavIC?",
+     "options": [
+      "India's regional navigation system",
+      "A weather satellite",
+      "A global system from Japan",
+      "A phone app"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What can reduce GPS accuracy?",
+     "options": [
+      "Daylight",
+      "Tall buildings and tunnels",
+      "A charged battery",
+      "Clear open sky"
+     ],
+     "correct_index": 1
+    }
+   ]
+  }
+ ]
+}

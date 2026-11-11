@@ -58,7 +58,7 @@ The Pilot page loads live data from the server with your admin account. Put `REM
 python -m backend.seed_demo --password demo-pass
 python -m uvicorn backend.main:app --port 8000
 ```
-Sign in as `demo`. The account comes with the three ready-made topics, taken from the pre-written question bank in `artifacts/fallback/`, and a short study history, so the Today screen shows concepts that are due, coming up and new. The same bank is used automatically if the language model fails while a ready-made topic is being turned into a quiz (set `REMEM_FALLBACK=0` to turn that off).
+Sign in as `demo`. The account comes with the six ready-made topics, taken from the pre-written question bank in `artifacts/fallback/`, and a short study history, so the Today screen shows concepts that are due, coming up and new. The same bank is used automatically if the language model fails while a ready-made topic is being turned into a quiz (set `REMEM_FALLBACK=0` to turn that off).
 
 ## Tests
 

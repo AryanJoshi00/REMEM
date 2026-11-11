@@ -147,6 +147,14 @@ function viewInstall() {
 }
 
 // ---------------------------------------------------------------- nav
+const SUBJECT_ICONS = {       // one glyph per ready-made topic subject
+  Language: "M4 5h16v11H9l-5 4zM8 10h8",
+  Photography: "M4 8h4l2-3h4l2 3h4v11H4zM12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+  Geography: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18",
+  Psychology: "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.5.4.5 1 .5 1.6h6c0-.6 0-1.2.5-1.6A6 6 0 0 0 12 3z",
+  Technology: "M12 21s6-5.5 6-11a6 6 0 1 0-12 0c0 5.5 6 11 6 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+  Health: "M12 20s-8-4.6-8-10.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5C20 15.4 12 20 12 20z",
+};
 const ICONS = {       // one drawn set: 24px grid, 1.8 stroke, round caps
   today: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12.5l3 3 5-6",
   notes: "M6 3h8l4 4v14H6zM14 3v4h4M12 11v6M9 14h6",
@@ -323,7 +331,7 @@ async function viewFinal() {
 
 async function viewNotes() {
   const msg = h("div", { class: "muted", role: "status" });
-  const title = h("input", { id: "nt", placeholder: "e.g. Photosynthesis" });
+  const title = h("input", { id: "nt", placeholder: "e.g. Roman roads" });
   const text = h("textarea", { id: "nx", placeholder: "Paste your study notes here (at least a few sentences)" });
   const busy = [];   // buttons to lock while a quiz is being made
   const lock = (on) => busy.forEach(b => { b.disabled = on; if (on) b.setAttribute("aria-busy", "true"); else b.removeAttribute("aria-busy"); });
@@ -356,15 +364,16 @@ async function viewNotes() {
   d.topics.sort((a, b) => (b.id === d.suggested) - (a.id === d.suggested));       // suggested topic first
   const mk = (t, label) => { const btn = h("button", { onclick: () => start("/notes/topic", { topic_id: t.id }), "aria-label": label + ": " + t.title }, label); busy.push(btn); return btn; };
   const meta = t => t.subject + ", " + t.minutes + " min read" + (t.done ? ", done before" : "");
+  const tile = (t, cls) => h("span", { class: "tile " + (cls || ""), "aria-hidden": "true" }, icon(SUBJECT_ICONS[t.subject] || "M5 5h14v14H5z"));
   const sug = d.topics.find(t => t.id === d.suggested);
   const rest = d.topics.filter(t => t !== sug);
   const out = [];
   if (sug) {
     const btn = mk(sug, sug.done ? "Study again" : "Start");
-    out.push(h("h2", {}, "Suggested for you"), h("div", { class: "next" }, h("h2", {}, sug.title), h("p", {}, sug.blurb + " (" + meta(sug) + ")"), btn));
+    out.push(h("h2", {}, "Suggested for you"), h("div", { class: "next" }, tile(sug, "on-hero"), h("h2", {}, sug.title), h("p", {}, sug.blurb + " (" + meta(sug) + ")"), btn));
   }
   if (rest.length) out.push(h("h2", {}, sug ? "Other topics" : "Topics"), h("ul", { class: "ledger" }, rest.map(t =>
-    h("li", {}, h("div", { class: "item row" }, h("div", {}, h("span", { class: "name" }, t.title), h("div", { class: "muted" }, t.blurb), h("div", { class: "muted small" }, meta(t))), mk(t, t.done ? "Study again" : "Start"))))));
+    h("li", {}, h("div", { class: "item row withtile" }, tile(t), h("div", {}, h("span", { class: "name" }, t.title), h("div", { class: "muted" }, t.blurb), h("div", { class: "muted small" }, meta(t))), mk(t, t.done ? "Study again" : "Start"))))));
   slot.replaceWith(h("div", {}, out));
 }
 

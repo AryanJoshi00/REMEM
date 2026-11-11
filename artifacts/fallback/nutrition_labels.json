@@ -1,0 +1,340 @@
+{
+ "concepts": [
+  {
+   "name": "Serving size",
+   "source_span": "A pack often contains more than one serving, so eating the whole pack means multiplying the numbers.",
+   "questions": [
+    {
+     "stem": "A pack contains 3 servings and one serving has 200 kcal. How many kcal are in the whole pack?",
+     "options": [
+      "600 kcal",
+      "66 kcal",
+      "200 kcal",
+      "203 kcal"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What should you check before comparing two products?",
+     "options": [
+      "The shop's name",
+      "The brand name",
+      "The serving size and servings per pack",
+      "The colour of the packet"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "The numbers on a label are usually given for:",
+     "options": [
+      "One ingredient only",
+      "One day of the week",
+      "One serving or a fixed amount such as 100 grams",
+      "The whole shop"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Why can the whole pack have more calories than the main numbers suggest?",
+     "options": [
+      "Calories grow over time",
+      "The pack may hold more than one serving",
+      "Labels are always wrong",
+      "The numbers are for the packaging"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "If you eat two servings, you should:",
+     "options": [
+      "Ignore the numbers",
+      "Double the numbers on the label",
+      "Halve the numbers",
+      "Add 2 to each number"
+     ],
+     "correct_index": 1
+    }
+   ]
+  },
+  {
+   "name": "Calories and energy",
+   "source_span": "One kilocalorie equals about 4.2 kilojoules.",
+   "questions": [
+    {
+     "stem": "How are calories written on a label?",
+     "options": [
+      "kcal",
+      "km",
+      "kg",
+      "kPa"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What is another unit of energy on labels?",
+     "options": [
+      "Kilometres",
+      "Kilograms",
+      "Kilopascals",
+      "Kilojoules (kJ)"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "About how many kilojoules equal one kilocalorie?",
+     "options": [
+      "4.2",
+      "0.42",
+      "42",
+      "1"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "What do calories tell you?",
+     "options": [
+      "How much salt it has",
+      "How much it costs",
+      "How healthy the food is",
+      "How much energy the food gives you"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Do calories show whether a food is healthy?",
+     "options": [
+      "Only when below 100",
+      "Yes, always",
+      "Yes, but only for fruit",
+      "No, they only show the amount of energy"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Macronutrients",
+   "source_span": "Fat gives 9 kcal per gram, more than double the other two.",
+   "questions": [
+    {
+     "stem": "Which macronutrient gives 9 kcal per gram?",
+     "options": [
+      "Carbohydrates",
+      "Protein",
+      "Fat",
+      "Fibre"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "How much energy does protein give per gram?",
+     "options": [
+      "0 kcal",
+      "9 kcal",
+      "2 kcal",
+      "4 kcal"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "How much energy do carbohydrates give per gram?",
+     "options": [
+      "4 kcal",
+      "1 kcal",
+      "9 kcal",
+      "7 kcal"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which are the three macronutrients?",
+     "options": [
+      "Vitamins, minerals and water",
+      "Fibre, sodium and iron",
+      "Carbohydrates, protein and fat",
+      "Sugar, salt and water"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What is fibre?",
+     "options": [
+      "A carbohydrate the body cannot fully digest",
+      "A protein",
+      "A mineral",
+      "A type of fat"
+     ],
+     "correct_index": 0
+    }
+   ]
+  },
+  {
+   "name": "Sugars",
+   "source_span": "Added sugars are sugars put in during making, such as in biscuits and soft drinks.",
+   "questions": [
+    {
+     "stem": "What are added sugars?",
+     "options": [
+      "Sugars put in during making, such as in biscuits and soft drinks",
+      "Sugars that have no calories",
+      "Sugars found naturally in fruit",
+      "Sugars found only in milk"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which sugars occur naturally?",
+     "options": [
+      "Those in soft drinks only",
+      "Those in sweets only",
+      "Those in fruit and milk",
+      "Those in biscuits"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "What do many health guidelines advise about added sugars?",
+     "options": [
+      "Limiting them",
+      "Eating them daily",
+      "Ignoring them",
+      "Increasing them"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Total sugars on a label include:",
+     "options": [
+      "Only natural sugars",
+      "No sugars",
+      "Only added sugars",
+      "Both natural and added sugars"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which is a likely source of added sugar?",
+     "options": [
+      "Plain water",
+      "A plain apple",
+      "A fresh carrot",
+      "A soft drink"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Sodium and salt",
+   "source_span": "To convert sodium to salt, multiply the sodium amount by 2.5.",
+   "questions": [
+    {
+     "stem": "How do you convert sodium to salt?",
+     "options": [
+      "Divide the sodium amount by 2.5",
+      "Add 40",
+      "Multiply by 40",
+      "Multiply the sodium amount by 2.5"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "About what share of salt is sodium?",
+     "options": [
+      "90 percent",
+      "40 percent",
+      "10 percent",
+      "4 percent"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "A label shows 400 mg of sodium. About how much salt is that?",
+     "options": [
+      "160 mg",
+      "40 mg",
+      "400 mg",
+      "1000 mg"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What can large amounts of sodium affect?",
+     "options": [
+      "Blood pressure",
+      "Height",
+      "Hair colour",
+      "Eyesight"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "For the same food, which amount is bigger?",
+     "options": [
+      "The sodium amount",
+      "They are equal",
+      "It depends on the colour",
+      "The salt amount"
+     ],
+     "correct_index": 3
+    }
+   ]
+  },
+  {
+   "name": "Ingredients and daily value",
+   "source_span": "Ingredients are listed in order of weight, with the heaviest ingredient first.",
+   "questions": [
+    {
+     "stem": "In what order are ingredients listed?",
+     "options": [
+      "By price",
+      "By colour",
+      "By weight, heaviest first",
+      "Alphabetically"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "If sugar is near the top of the ingredients list, the food:",
+     "options": [
+      "Contains no sugar",
+      "Contains a lot of sugar",
+      "Is low in calories",
+      "Is fat-free"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "How is a percent daily value of 20 percent or more described?",
+     "options": [
+      "High",
+      "Illegal",
+      "Low",
+      "Zero"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "How is a percent daily value of 5 percent or less described?",
+     "options": [
+      "High",
+      "Very high",
+      "Dangerous",
+      "Low"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "What does percent daily value tell you?",
+     "options": [
+      "The price per day",
+      "How much water to drink",
+      "How much one serving adds to a typical day's needs",
+      "How many days the food lasts"
+     ],
+     "correct_index": 2
+    }
+   ]
+  }
+ ]
+}
