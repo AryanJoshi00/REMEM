@@ -242,6 +242,17 @@ def topics_list(user=Depends(auth.consented_user)):
                                          for t in topics.all_topics()]}
 
 
+@api.get("/topics/{topic_id}")
+def topic_read(topic_id: str, user=Depends(auth.consented_user)):
+    """The full text of a ready-made topic, so the student reads it before any question is asked."""
+    t = topics.get_topic(topic_id)
+    if t is None:
+        raise HTTPException(404, "Unknown topic")
+    with db.session() as conn:
+        done = conn.execute("SELECT 1 FROM notes WHERE user_id=? AND topic_id=? AND status!='failed' LIMIT 1", (user["user_id"], topic_id)).fetchone() is not None
+    return {**{k: t[k] for k in ("id", "title", "subject", "blurb", "minutes", "words", "text")}, "done": done}
+
+
 @api.post("/notes/topic")
 def add_topic_note(body: TopicIn, bg: BackgroundTasks, user=Depends(auth.consented_user)):
     t = topics.get_topic(body.topic_id)
@@ -315,7 +326,10 @@ def concepts_list(user=Depends(auth.consented_user)):
 @api.get("/question/next")
 def next_question(concept: int, final: int = 0, user=Depends(auth.consented_user)):
     with db.session() as conn:
-        cname = get_concept(conn, user, concept)["name"]
+        crow = get_concept(conn, user, concept)
+        cname = crow["name"]
+        trow = conn.execute("SELECT topic_id FROM notes WHERE note_id=?", (crow["note_id"],)).fetchone()
+        topic_id = trow["topic_id"] if trow else None                 # lets the practice page link back to the notes for ready-made topics
         if final:
             on = conn.execute("SELECT value FROM settings WHERE key='final_test_open'").fetchone()
             if not on or on["value"] != "1":
@@ -333,7 +347,7 @@ def next_question(concept: int, final: int = 0, user=Depends(auth.consented_user
             if not qs:
                 raise HTTPException(404, "No questions available for this concept")
             q = sorted(qs, key=lambda r: (r["used"], r["last_used"] or 0, r["variant_no"]))[0]
-    return {"question_id": q["question_id"], "concept_id": concept, "concept": cname, "stem": q["stem"], "options": json.loads(q["options_json"])}
+    return {"question_id": q["question_id"], "concept_id": concept, "concept": cname, "topic_id": topic_id, "stem": q["stem"], "options": json.loads(q["options_json"])}
 
 
 @api.post("/respond")

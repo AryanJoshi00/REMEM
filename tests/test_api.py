@@ -247,6 +247,13 @@ def test_topics_balanced_suggestions_and_creation(client, monkeypatch):
     ta2 = client.get("/api/topics", headers=ha).json()
     assert [t["done"] for t in ta2["topics"] if t["id"] == sug_a] == [True] and ta2["suggested"] != sug_a
     assert client.post("/api/notes/topic", json={"topic_id": "nope"}, headers=ha).status_code == 404
+    # the reading page gets the full text before any quiz exists; the practice page learns which topic a concept came from
+    full = client.get(f"/api/topics/{sug_a}", headers=ha).json()
+    assert full["id"] == sug_a and len(full["text"]) > 500 and full["done"] is True
+    assert client.get("/api/topics/nope", headers=ha).status_code == 404
+    assert client.get(f"/api/topics/{sug_a}").status_code in (401, 403)
+    cid = client.get(f"/api/notes/{r.json()['note_id']}", headers=ha).json()["concepts"][0]["concept_id"]
+    assert client.get(f"/api/question/next?concept={cid}", headers=ha).json()["topic_id"] == sug_a
 
 
 def test_signup_form_comes_before_consent_and_steers_suggestions(client):

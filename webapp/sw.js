@@ -1,7 +1,7 @@
 /* REMEM service worker: cache the app shell; cache-fallback for the due list and concept list. */
-const SHELL = "remem-shell-v8";
+const SHELL = "remem-shell-v9";
 const API = "remem-api";
-const FILES = ["./", "index.html", "app.js", "styles.css", "manifest.json", "icon-192.png", "icon-512.png"];
+const FILES = ["./", "index.html", "app.js", "styles.css", "manifest.json", "icon-192.png", "icon-512.png", "icon.svg", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-32.png"];
 
 self.addEventListener("install", e => { e.waitUntil(caches.open(SHELL).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
