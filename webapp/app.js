@@ -45,6 +45,11 @@ function mount(...nodes) {
   document.title = (h1 ? h1.textContent + " - " : "") + "REMEM";
   if (h1) { h1.tabIndex = -1; h1.focus({ preventScroll: true }); }          // a route change moves the reading position to the new heading
 }
+function remount(nodes, focusSel) {           // same screen redrawn in place (the demo's what-if slider): keep the scroll position and the focus
+  const y = window.scrollY, app = document.getElementById("app");
+  app.replaceChildren(...nodes.flat()); window.scrollTo(0, y);
+  const el = focusSel && app.querySelector(focusSel); if (el) el.focus({ preventScroll: true });
+}
 
 // ---------------------------------------------------------------- API
 async function api(path, opts = {}) {
@@ -101,8 +106,8 @@ function installBanner() {
   if (e.standalone || installBannerHidden()) return null;
   return h("div", { class: "calm install" }, h("b", {}, "Keep REMEM one tap away"),
     h("p", { class: "muted" }, "Add it to your home screen. It opens like an app and the icon shows how many concepts are due."),
-    h("div", { class: "grid2" }, h("a", { class: "btn primary chunky", href: "#/install" }, "Show how"),
-      h("button", { class: "chunky", onclick: () => { store.set("remem_install_hide", String(Date.now())); route(); } }, "Not now")));
+    h("div", { class: "actions" }, h("a", { class: "btn", href: "#/install" }, "Show how"),
+      h("button", { class: "link", type: "button", onclick: () => { store.set("remem_install_hide", String(Date.now())); route(); } }, "Not now")));
 }
 function phoneArt() {
   const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
@@ -124,11 +129,11 @@ function viewInstall() {
   if (e.standalone) return mount(h("h1", {}, "Already on your home screen"), phoneArt(), h("p", { class: "muted" }, "You're using REMEM as an app. Nothing more to do."), back);
   const nodes = [h("h1", {}, "Keep REMEM one tap away"), phoneArt(), h("p", {}, "Put REMEM on your home screen. It opens full screen like an app, and the icon shows how many concepts are due.")];
   if (e.inApp) {
-    const copy = h("button", { class: "chunky block", onclick: async () => { try { await navigator.clipboard.writeText(location.origin + "/"); toast("Link copied. Paste it in Chrome or Safari."); } catch (x) { toast("Copy the address from the menu instead."); } } }, "Copy the link");
+    const copy = h("button", { class: "block", onclick: async () => { try { await navigator.clipboard.writeText(location.origin + "/"); toast("Link copied. Paste it in Chrome or Safari."); } catch (x) { toast("Copy the address from the menu instead."); } } }, "Copy the link");
     nodes.push(h("div", { class: "panel" }, h("b", {}, "First, open it in your browser"), h("p", { class: "muted" }, "This page is open inside another app (such as WhatsApp or Instagram), and those can't add to the home screen. Tap the menu or the compass icon and choose Open in browser (Chrome or Safari), or copy the link and paste it there."), copy));
   }
   if (deferredInstall) {
-    nodes.push(h("button", { class: "primary chunky block", onclick: async () => { deferredInstall.prompt(); try { await deferredInstall.userChoice; } catch (x) { /* dismissed */ } deferredInstall = null; route(); } }, "Add to home screen"));
+    nodes.push(h("button", { class: "primary block", onclick: async () => { deferredInstall.prompt(); try { await deferredInstall.userChoice; } catch (x) { /* dismissed */ } deferredInstall = null; route(); } }, "Add to home screen"));
     nodes.push(h("p", { class: "muted small" }, "Prefer to do it yourself? The steps are below."));
   }
   let steps, title;
@@ -157,8 +162,8 @@ const SUBJECT_ICONS = {       // one glyph per ready-made topic subject
   Health: "M12 20s-8-4.6-8-10.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5C20 15.4 12 20 12 20z",
 };
 const ICONS = {       // one drawn set: 24px grid, 1.8 stroke, round caps
-  today: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12.5l3 3 5-6",
-  notes: "M6 3h8l4 4v14H6zM14 3v4h4M12 11v6M9 14h6",
+  today: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8 14h3",
+  notes: "M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3zM21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z",
   concepts: "M4 6h16M4 12h16M4 18h10",
   me: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c0-4 3.6-6 8-6s8 2 8 6",
 };
@@ -171,12 +176,13 @@ function dueCount() { try { const d = JSON.parse(store.get("remem_due") || "null
 function renderNav() {
   const nav = document.getElementById("nav"), who = document.getElementById("who");
   nav.replaceChildren(); who.textContent = S.token ? S.user : "";
-  if (!S.token) return;
   const cur = (location.hash || "#/").split("?")[0], n = dueCount();
+  if (!S.token || /^#\/(about|consent)$/.test(cur)) return;                   // no browsing before the intro form and consent
   [["#/", "Today", "today"], ["#/notes", "Topics", "notes"], ["#/concepts", "Concepts", "concepts"], ["#/me", "Me", "me"]].forEach(([href, label, ic]) => {
     const on = href === "#/" ? cur === "#/" : cur.startsWith(href);
-    nav.append(h("a", { href, class: on ? "on" : "", "aria-current": on ? "page" : false },
-      icon(ic), label, href === "#/" && n ? h("span", { class: "badge", "aria-label": pl(n, "concept") + " due" }, String(n)) : null));
+    const badge = href === "#/" && n;
+    nav.append(h("a", { href, class: on ? "on" : "", "aria-current": on ? "page" : false, "aria-label": badge ? label + ", " + pl(n, "concept") + " due" : false },
+      icon(ic), label, badge ? h("span", { class: "badge", "aria-hidden": "true" }, String(n)) : null));
   });
 }
 
@@ -187,7 +193,8 @@ function meter(R, fading) {            // the freshness bar: how much you still 
   const pct = Math.round(R * 100);
   return h("div", { class: "meter" + (fading ? " fading" : ""), role: "meter", "aria-label": "Recall", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": pct, "aria-valuetext": pct + "% recall" }, h("i", { style: "--v:" + R }));
 }
-function daysText(d) { d = Number(d.toFixed(1)); return d < 0.05 ? "today" : "in " + pl(d, "day"); }
+function aboutDays(d) { return d <= 0.5 ? "today" : "in about " + pl(Math.max(1, Math.round(d)), "day"); }      // Today and the memory curve round the same way
+const daysText = aboutDays;
 
 function viewLogin() {
   const err = h("div", { class: "err", role: "alert" });
@@ -250,16 +257,14 @@ function renderHome(d) {
   const nodes = [h("h1", {}, "Today")];
   const counts = [d.due.length ? d.due.length + " due" : "", d.new.length ? d.new.length + " new" : ""].filter(Boolean).join(", ");
   if (counts) nodes.push(h("p", { class: "muted" }, counts));
-  const ib = installBanner(); if (ib) nodes.push(ib);
-  if (d.final && d.final.open && d.final.remaining) {
-    nodes.push(h("div", { class: "calm" }, h("b", {}, "Final check is open"),
-      h("p", { class: "muted" }, pl(d.final.remaining, "question") + ", one per concept. It takes a few minutes and doesn't change your schedule."),
-      h("a", { class: "btn primary block", href: "#/final" }, "Start the final check")));
-  }
+  if (S.offline) nodes.push(h("p", { class: "muted small offline", role: "status" }, "Offline. Showing what was saved on this phone."));
+  const finalCard = d.final && d.final.open && d.final.remaining ? h("div", { class: "calm" }, h("b", {}, "Final check is open"),
+    h("p", { class: "muted" }, pl(d.final.remaining, "question") + ", one per concept. It takes a few minutes and doesn't change your schedule."),
+    h("a", { class: "btn primary block", href: "#/final" }, "Start the final check")) : null;
   const lead = d.due[0] || d.new[0];
   const row = (c, kind) => {
     const href = kind === "later" ? "#/curve/" + c.concept_id : "#/practice/" + c.concept_id;
-    const kids = [h("span", { class: "name" }, c.name)];
+    const kids = [h("span", { class: "name", dir: "auto" }, c.name)];
     if (c.new) kids.push(h("span", { class: "when" }, "not studied yet"), h("div", { class: "meter empty", "aria-hidden": "true" }));
     else {
       const late = kind === "due";
@@ -268,20 +273,25 @@ function renderHome(d) {
     return h("li", {}, h("a", { class: "item", href }, kids));
   };
   const section = (title, items, kind) => { if (items.length) nodes.push(h("h2", {}, title), h("ul", { class: "ledger" }, items.map(c => row(c, kind)))); };
+  // order: the one thing to do next, then the final check, then the lists; the install banner (lowest value, dismissible) last
   if (lead) {
-    nodes.push(h("div", { class: "next" }, h("h2", {}, lead.name), h("p", {}, lead.new ? "New concept. Take the first quiz." : "Your recall has dropped to about " + Math.round(lead.R_now * 100) + "%. A quick review brings it back."),
+    nodes.push(h("div", { class: "next" }, h("h2", { dir: "auto" }, lead.name), h("p", {}, lead.new ? "New concept. Take the first quiz." : "Your recall has dropped to about " + Math.round(lead.R_now * 100) + "%. A quick review brings it back."),
       h("a", { class: "btn", href: "#/practice/" + lead.concept_id }, lead.new ? "Start the quiz" : "Review now")));
+    if (finalCard) nodes.push(finalCard);
     section("Also due", d.due.slice(lead === d.due[0] ? 1 : 0), "due");
     section("New", d.new.slice(lead === d.new[0] && !d.due.length ? 1 : 0), "new");
   } else if (d.upcoming.length) {
     nodes.push(h("div", { class: "calm" }, h("b", {}, "You're all caught up"), h("p", { class: "muted" }, "Next review: " + d.upcoming[0].name + " " + daysText(d.upcoming[0].due_in_days) + ".")),
       h("a", { class: "btn block", href: "#/notes" }, "Pick another topic"));
+    if (finalCard) nodes.push(finalCard);
   } else {
     nodes.push(h("div", { class: "calm" }, h("b", {}, "Welcome. Here is how it works"),
       stepList(["Pick a topic and read the short text once.", "Answer a few quiz questions on it.", "REMEM tells you when to come back, just before you would forget."])),
       h("a", { class: "btn primary block", href: "#/notes" }, "Pick a topic"));
+    if (finalCard) nodes.push(finalCard);
   }
   section("Later", d.upcoming, "later");
+  const ib = installBanner(); if (ib) nodes.push(ib);
   mount(nodes);
 }
 
@@ -309,24 +319,30 @@ async function viewPractice(cid) {
     if (answered) return; answered = true;
     opts.forEach(b => b.disabled = true);
     const body = { question_id: q.question_id, chosen_index: i, rt_ms: Math.round(performance.now() - t0), idem_key: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()) };
+    opts[i].classList.add("picked");                                         // after rt_ms is taken: shows the tap registered while the answer is checked
     try {
       const r = await api("/respond", { method: "POST", body });
       sess.n++; if (r.correct) sess.ok++;
       const good = opts[r.correct_index]; good.classList.add("right"); good.querySelector(".key").replaceChildren(icon("M5 12.5l4.5 4.5L19 7.5")); good.querySelector(".txt").append(h("span", { class: "tag" }, "Correct answer"));
       if (!r.correct) { const bad = opts[i]; bad.classList.add("wrong"); bad.querySelector(".key").replaceChildren(icon("M6 6l12 12M18 6L6 18")); bad.querySelector(".txt").append(h("span", { class: "tag" }, "Your answer")); }
       fb.replaceChildren(h("div", {}, h("div", { class: "verdict " + (r.correct ? "ok" : "err") }, r.correct ? "Correct" : "Not quite"), h("div", { class: "muted" }, r.message), h("div", { class: "muted small sess" }, sess.ok + " of " + sess.n + " right this sitting"),
-          r.source ? h("div", { class: "src" }, h("span", { class: "small" }, "From your notes"), "“" + r.source + "”") : null),
+          r.source ? h("div", { class: "src" }, h("span", { class: "small" }, "From your notes"), h("q", { dir: "auto" }, r.source)) : null),
         h("button", { class: "primary block", onclick: () => viewPractice(cid) }, "Next question"),
         h("div", { class: "grid2" }, h("a", { class: "btn", href: "#/curve/" + cid }, "Memory curve"), h("a", { class: "btn", href: "#/" }, "Finish")));
       store.del("remem_due");
+      opts[i].classList.remove("picked");
       fb.scrollIntoView({ block: "end", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      const next = fb.querySelector("button.primary"); if (next) next.focus({ preventScroll: true });
     } catch (e) {
       if (e instanceof TypeError) { const qd = queue(); qd.push(body); saveQueue(qd); fb.replaceChildren(h("div", { class: "panel" }, "You're offline. Your answer is saved and will sync when you reconnect."), h("a", { class: "btn block", href: "#/" }, "Back to today")); }
-      else { answered = false; opts.forEach(b => b.disabled = false); toast(e.message); }
+      else { answered = false; opts[i].classList.remove("picked"); opts.forEach(b => b.disabled = false); toast(e.message); }
     }
-  } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[i]), h("span", { class: "txt" }, text)));
-  mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today"), h("span", { class: "where" }, q.concept || "")), h("h1", { class: "q" }, q.stem), h("div", { class: "opts" }, opts), fb,
-        h("p", { class: "muted small links" }, q.topic_id ? h("a", { class: "flag", href: "#/notes/" + q.topic_id + "?r=1" }, "Read the notes again") : null, h("a", { class: "flag", href: "#/", onclick: async (e) => { e.preventDefault(); try { await api("/flag", { method: "POST", body: { question_id: q.question_id } }); toast("Thanks, question flagged"); } catch (x) { toast(x.message); } } }, "Report a bad question")));
+  } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[i]), h("span", { class: "txt", dir: "auto" }, text)));
+  const flag = h("button", { class: "link flag", type: "button", onclick: async () => {
+    try { await api("/flag", { method: "POST", body: { question_id: q.question_id } }); toast("Thanks, question flagged"); flag.textContent = "Reported, thank you"; flag.disabled = true; } catch (x) { toast(x.message); }
+  } }, "Report a bad question");
+  mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today"), h("span", { class: "where", dir: "auto" }, q.concept || "")), h("h1", { class: "q", dir: "auto" }, q.stem), h("div", { class: "opts" }, opts), fb,
+        h("p", { class: "links" }, q.topic_id ? h("a", { class: "flag", href: "#/notes/" + q.topic_id + "?r=1" }, "Read the notes again") : null, flag));
 }
 
 async function viewFinal() {
@@ -414,13 +430,13 @@ async function viewTopic(tid, review) {
   let t; try { t = await api("/topics/" + tid); } catch (e) { return mount(h("h1", {}, "Reading"), h("div", { class: "err" }, e.message), h("a", { class: "btn block", href: "#/notes" }, "Back to topics")); }
   const msg = h("div", { class: "muted", role: "status" });
   const sentinel = h("div", { class: "end", "aria-hidden": "true" });
-  const hint = h("span", { class: "hint" }, "Read to the end");
+  const hint = h("span", { class: "hint", id: "readhint", "aria-live": "polite" }, "Read to the end");
   const go = h("button", { class: "primary", disabled: true, onclick: () => {
     if (review) { history.length > 1 ? history.back() : (location.hash = "#/"); return; }
     go.disabled = true;
     mount(h("h1", {}, "Making your quiz"), msg, skeleton(3), h("p", {}, h("a", { class: "btn block", href: "#/notes/" + tid }, "Back to the notes")));
     startQuiz("/notes/topic", { topic_id: tid }, msg, () => {});
-  } }, review ? "Back to the quiz" : "I've read it. Make my quiz");
+  }, "aria-describedby": "readhint" }, review ? "Back to the quiz" : "I've read it. Make my quiz");
   const unlock = () => { go.disabled = false; hint.textContent = review ? "" : "Ready when you are"; bar.classList.add("ready"); };
   const bar = h("div", { class: "readbar" }, h("div", { class: "inner" }, hint, go));
   const title = t.title.split(":")[0];
@@ -449,15 +465,19 @@ async function viewNotes() {
   mount(h("h1", {}, "Pick a topic"), h("p", { class: "muted" }, "Read a short text first, then answer questions on it."), slot, ownBox);
   let d; try { d = await api("/topics"); } catch (e) { slot.replaceWith(h("div", { class: "err" }, "Could not load topics: " + e.message)); return; }
   d.topics.sort((a, b) => (b.id === d.suggested) - (a.id === d.suggested));       // suggested topic first
-  const mk = (t, label) => h("a", { class: "btn", href: "#/notes/" + t.id, "aria-label": label + ": " + t.title }, label);
+  const mk = (t, label) => h("a", { class: "btn primary", href: "#/notes/" + t.id, "aria-label": label + ": " + t.title }, label);
   const meta = t => t.subject + ", " + t.minutes + " min read" + (t.done ? ", done before" : "") + (t.known ? ", you know this one" : "");
   const tile = (t, cls) => h("span", { class: "tile " + (cls || ""), "aria-hidden": "true" }, icon(SUBJECT_ICONS[t.subject] || "M5 5h14v14H5z"));
   const sug = d.topics.find(t => t.id === d.suggested);
   const rest = d.topics.filter(t => t !== sug);
   const out = [];
-  if (sug) out.push(h("h2", {}, "Suggested for you"), h("div", { class: "next" }, tile(sug, "on-hero"), h("h2", {}, sug.title), h("p", {}, sug.blurb + " (" + meta(sug) + ")"), mk(sug, sug.done ? "Read again" : "Read and start")));
-  if (rest.length) out.push(h("h2", {}, sug ? "Other topics" : "Topics"), h("ul", { class: "ledger topics" }, rest.map(t =>
-    h("li", {}, h("div", { class: "item row withtile" }, tile(t), h("div", {}, h("span", { class: "name" }, t.title), h("div", { class: "muted" }, t.blurb), h("div", { class: "muted small" }, meta(t))), mk(t, t.done ? "Read again" : "Read"))))));
+  if (sug) out.push(h("h2", {}, "Suggested for you"), h("div", { class: "panel sug" }, h("div", { class: "sug-head" }, tile(sug), h("h3", {}, sug.title)), h("p", { class: "muted" }, sug.blurb + " (" + meta(sug) + ")"), mk(sug, sug.done ? "Read again" : "Read and start")));
+  if (rest.length) out.push(h("h2", {}, sug ? "Other topics" : "Topics"), h("ul", { class: "ledger topics" }, rest.map(t => {
+    const label = t.done ? "Read again" : "Read";
+    return h("li", {}, h("a", { class: "item row withtile", href: "#/notes/" + t.id, "aria-label": label + ": " + t.title }, tile(t),
+      h("div", {}, h("span", { class: "name" }, t.title), h("div", { class: "muted" }, t.blurb), h("div", { class: "muted small" }, meta(t))),
+      h("span", { class: "go", "aria-hidden": "true" }, label, icon("M9 5l7 7-7 7", "chev"))));
+  })));
   slot.replaceWith(h("div", {}, out));
 }
 
@@ -473,34 +493,46 @@ async function viewConcepts() {
   mount(nodes);
 }
 
-async function viewCurve(cid, theta) {
+async function viewCurve(cid, theta, keep) {
   let r, ex;
   try { r = await api("/retention/" + cid + (theta ? "?theta=" + theta : "")); ex = await api("/explain/" + cid); }
   catch (e) { return mount(h("h1", {}, "Memory curve"), h("div", { class: "err" }, e.message), h("a", { class: "btn", href: "#/" }, "Back")); }
-  const W = 640, H = 340, L = 74, B = 44, T = 18, Rr = 16;
+  // drawn in device pixels (1 unit = 1 px) so labels are the same size on a phone and a laptop
+  const app = document.getElementById("app"), acs = getComputedStyle(app);
+  const W = Math.round(Math.min(680, Math.max(280, app.clientWidth - parseFloat(acs.paddingLeft) - parseFloat(acs.paddingRight)))) || 328;
+  const H = Math.round(Math.min(300, Math.max(200, W * 0.62))), L = 42, B = 28, T = 14, Rr = 12, FS = W >= 500 ? 14 : 13;
   const maxD = r.points[r.points.length - 1].day;
   const x = d => L + (d / maxD) * (W - L - Rr), y = v => T + (1 - v) * (H - T - B);
+  const left = r.next_review_day - r.elapsed_days;                        // days from now, the same quantity as Today's rows
+  const when = left <= 0 ? "review now" : "review " + aboutDays(left);
   const NS = "http://www.w3.org/2000/svg";
   const se = (t, a, txt) => { const e = document.createElementNS(NS, t); for (const [k, v] of Object.entries(a || {})) e.setAttribute(k, v); if (txt != null) e.textContent = txt; return e; };
-  const svg = se("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": "Predicted recall over the next " + maxD + " days. Recall now " + Math.round(r.R_now * 100) + "%, next review in " + pl(Number(r.next_review_day.toFixed(1)), "day") + "." });
-  [0, 0.25, 0.5, 0.75, 1].forEach(v => { svg.append(se("line", { class: "grid", x1: L, x2: W - Rr, y1: y(v), y2: y(v) })); svg.append(se("text", { x: 4, y: y(v) + 7 }, Math.round(v * 100) + "%")); });
-  for (let i = 0; i <= 4; i++) { const d = (maxD * i) / 4; svg.append(se("text", { x: Math.min(x(d) - 10, W - 40), y: H - 12 }, d.toFixed(0) + "d")); }
-  const pts = r.points.map(p => x(p.day) + "," + y(p.R));
+  const svg = se("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: "chart", style: "--fs:" + FS + "px", role: "img",
+    "aria-label": "Predicted recall over the next " + maxD + " days. Recall now " + Math.round(r.R_now * 100) + "%, next review " + (left <= 0 ? "now" : aboutDays(left)) + "." });
+  [0, 0.5, 1].forEach(v => { svg.append(se("line", { class: "grid", x1: L, x2: W - Rr, y1: y(v), y2: y(v) })); svg.append(se("text", { x: L - 6, y: y(v) + FS * 0.35, "text-anchor": "end" }, Math.round(v * 100) + "%")); });
+  for (let i = 0; i <= 4; i++) { const d = (maxD * i) / 4; svg.append(se("text", { x: x(d), y: H - 8, "text-anchor": i === 0 ? "start" : i === 4 ? "end" : "middle" }, d.toFixed(0) + "d")); }
+  const pts = r.points.map(p => x(p.day).toFixed(1) + "," + y(p.R).toFixed(1));
   svg.append(se("polygon", { class: "area", points: pts.join(" ") + " " + x(maxD) + "," + y(0) + " " + x(0) + "," + y(0) }));
   svg.append(se("line", { class: "target", x1: L, x2: W - Rr, y1: y(r.theta), y2: y(r.theta) }));
-  svg.append(se("text", { x: W - Rr - 150, y: y(r.theta) - 8 }, "target " + Math.round(r.theta * 100) + "%"));
   svg.append(se("polyline", { class: "curve", points: pts.join(" ") }));
-  if (r.next_review_day <= maxD) { svg.append(se("line", { class: "review", x1: x(r.next_review_day), x2: x(r.next_review_day), y1: T, y2: H - B })); svg.append(se("text", { class: "lab", x: Math.min(x(r.next_review_day) + 6, W - 170), y: T + 22 }, "review day " + r.next_review_day.toFixed(1))); }
-  if (r.elapsed_days <= maxD) svg.append(se("circle", { class: "now", cx: x(r.elapsed_days), cy: y(r.R_now), r: 8 }));
-  const nodes = [h("h1", {}, r.concept), svg,
+  svg.append(se("text", { class: "halo", x: L + 6, y: y(r.theta) + FS + 4, "text-anchor": "start" }, "target " + Math.round(r.theta * 100) + "%"));
+  if (r.next_review_day <= maxD) {
+    const rx = x(r.next_review_day), flip = rx > W - 140;
+    svg.append(se("line", { class: "review", x1: rx, x2: rx, y1: T, y2: H - B }));
+    svg.append(se("text", { class: "lab halo", x: flip ? rx - 6 : rx + 6, y: T + FS, "text-anchor": flip ? "end" : "start" }, when));
+  }
+  if (r.elapsed_days <= maxD) svg.append(se("circle", { class: "now", cx: x(r.elapsed_days), cy: y(r.R_now), r: 6 }));
+  const nodes = [h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today")),
+    h("h1", { dir: "auto" }, r.concept), svg,
     h("p", { class: "muted" }, "The dot is you now, at " + Math.round(r.R_now * 100) + "% recall. REMEM asks you to review at the vertical line. Recall falls to about 90% after " + pl(Math.round(r.stability_days), "day") + ".")];
   if (S.role === "demo" || S.role === "admin") {
     const lab = h("b", {}, "target " + Math.round(r.theta * 100) + "%");
-    const sl = h("input", { type: "range", min: 60, max: 97, value: Math.round(r.theta * 100), "aria-label": "What-if target retention", oninput: () => { lab.textContent = "target " + sl.value + "%"; }, onchange: () => viewCurve(cid, sl.value / 100) });
+    const sl = h("input", { type: "range", min: 60, max: 97, value: Math.round(r.theta * 100), "aria-label": "What-if target retention", "aria-valuetext": Math.round(r.theta * 100) + "%",
+      oninput: () => { lab.textContent = "target " + sl.value + "%"; sl.setAttribute("aria-valuetext", sl.value + "%"); }, onchange: () => viewCurve(cid, sl.value / 100, true) });
     nodes.push(h("div", { class: "panel" }, h("div", {}, "What-if target (demo only) ", lab), sl));
   }
   nodes.push(h("p", {}, rich(ex.explanation)), h("div", { class: "grid2" }, h("a", { class: "btn primary", href: "#/practice/" + cid }, "Practise now"), h("a", { class: "btn", href: "#/" }, "Back")));
-  mount(nodes);
+  if (keep) remount(nodes, 'input[type="range"]'); else mount(nodes);
 }
 
 function viewMe() {
@@ -508,8 +540,10 @@ function viewMe() {
   const msg = h("div", { class: "muted", role: "status" });
   mount(h("h1", {}, S.user || "Me"), S.role !== "student" ? h("p", { class: "muted" }, "Role: " + S.role) : null,
     h("h2", {}, "Change password"),
-    h("div", { class: "stack" }, h("div", {}, h("label", { for: "op" }, "Current password"), old), h("div", {}, h("label", { for: "np" }, "New password (8 or more characters)"), nw), msg,
-      h("button", { onclick: async () => { try { await api("/auth/password", { method: "POST", body: { old_password: old.value, new_password: nw.value } }); msg.className = "ok"; msg.textContent = "Password changed."; old.value = nw.value = ""; } catch (e) { msg.className = "err"; msg.textContent = e.message; } } }, "Update password")),
+    h("form", { class: "stack", onsubmit: async (e) => { e.preventDefault(); try { await api("/auth/password", { method: "POST", body: { old_password: old.value, new_password: nw.value } }); msg.className = "ok"; msg.textContent = "Password changed."; old.value = nw.value = ""; } catch (ex) { msg.className = "err"; msg.textContent = ex.message; } } },
+      h("input", { type: "text", autocomplete: "username", value: S.user || "", hidden: true, "aria-hidden": "true", tabindex: "-1" }),
+      h("div", {}, h("label", { for: "op" }, "Current password"), old), h("div", {}, h("label", { for: "np" }, "New password (8 or more characters)"), nw), msg,
+      h("button", { type: "submit" }, "Update password")),
     env().standalone ? null : h("p", {}, h("a", { class: "btn block", href: "#/install" }, "Add to home screen")),
     h("p", {}, h("button", { class: "block", onclick: () => signOut() }, "Sign out")));
 }
