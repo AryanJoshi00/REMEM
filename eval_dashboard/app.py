@@ -55,6 +55,10 @@ st.markdown(f"""
   .conn span:not(.dot) {{ font-weight: 400; color: #545c7c; word-break: break-all; }}
   .dot {{ display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: {GREEN}; margin-right: .5rem; }}
   .dot.off {{ background: #a8aecd; }}
+  .finding {{ border-top: 1px solid #d3d8ea; padding: 1rem 0 .3rem; }}
+  .finding .fq {{ font-weight: 700; font-size: 1.05rem; }}
+  .finding .fv {{ font-weight: 700; font-size: .95rem; margin: .1rem 0 .4rem; }}
+  .finding p {{ margin: .2rem 0; }}
   .note {{ color: #545c7c; font-size: .95rem; margin: -.2rem 0 .8rem; }}
   .flag {{ padding: .65rem .9rem; border-radius: 10px; margin: .35rem 0; background: #fff; border: 1px solid #d3d8ea; font-size: .97rem; }}
   .flag.warn {{ border-color: {AMBER}; }}
@@ -545,8 +549,90 @@ def page_model() -> None:
     note(f"Curve shape β = {beta:g}. Memory strength is exp(baseline + the weighted factors).")
 
 
+def findings_rows() -> list[dict]:
+    """One row per research question, built from the logged result files so the numbers cannot drift from the experiments."""
+    rows = []
+    g = csv("exp1_accuracy_by_gap.csv")
+    if g is not None:
+        rows.append({"Question": "Does time since the last practice carry a forgetting signal in the data?",
+                     "What we found": f"Accuracy falls from {g['accuracy'].iloc[0]:.1%} (under 5 minutes) to {g['accuracy'].iloc[-2]:.1%} (30 to 90 days); relative to each student's own average the drop is about {abs(g['resid_vs_student_mean'].iloc[0] - g['resid_vs_student_mean'].iloc[-2]) * 100:.0f} points.",
+                     "Verdict": "Partly supported", "Why not stronger": "Real but small, and students choose when to revisit, so the data cannot prove cause.", "Details": "EdNet results"})
+    b = csv("exp2_baselines.csv")
+    if b is not None:
+        t = b[(b["split"] == "test") & (b["subset"] == "all")].set_index("model")
+        rows.append({"Question": "Does the knowledge-tracing layer work?",
+                     "What we found": f"AUC {t.loc['bkt_no_forgetting', 'auc']:.3f} against {t.loc['majority', 'auc']:.3f} for always guessing the common answer and {t.loc['student_accuracy', 'auc']:.3f} for each student's average; best log loss of the four.",
+                     "Verdict": "Supported", "Why not stronger": "A modest absolute level of prediction, as expected for one-skill models.", "Details": "EdNet results"})
+    a = csv("exp7_ablations.csv")
+    if a is not None:
+        a = a.set_index("model")
+        rows.append({"Question": "H1: Does modelling forgetting, and a student-aware stability, help?",
+                     "What we found": f"Removing the forgetting term costs {a.loc['A', 'delta_logloss']:.4f} log loss, using an exponential instead of a power-law curve costs {a.loc['B', 'delta_logloss']:.4f}; the student and concept features add only {a.loc['C', 'delta_logloss']:.4f} together.",
+                     "Verdict": "Supported (small)", "Why not stronger": "The curve shape matters; the individual features are negligible on EdNet.", "Details": "EdNet results"})
+    o, sp = csv("exp4_overall.csv"), csv("exp4_by_sparsity.csv")
+    if o is not None and sp is not None:
+        t = o[(o["split"] == "test") & (o["subset"] == "repeats")].set_index("model")
+        sparse = sp[sp["stratum"].isin(["1-2", "3-5", "6-10"])].pivot_table(index="stratum", columns="model", values="logloss")
+        better = int((sparse["full"] < sparse["full_raw"]).sum())
+        rows.append({"Question": "H2: Do per-concept and per-student offsets help, especially for pairs with few answers?",
+                     "What we found": f"Log loss improves by {t.loc['G', 'logloss'] - t.loc['full', 'logloss']:.4f} overall; shrinking beats unshrunk pair fitting in {better} of 3 sparse groups, by tiny margins.",
+                     "Verdict": "Weakly supported", "Why not stronger": "Gains are small and validation preferred almost no shrinkage; not deployed.", "Details": "EdNet results"})
+    sj = RESULTS / "exp9_summary.json"
+    if sj.exists():
+        s9 = json.loads(sj.read_text())
+        rows.append({"Question": "H4: Does a recent failure on a related concept predict forgetting?",
+                     "What we found": f"Log loss improves by {s9['logloss_gain_overall']['mean_diff']:.4f} (95% interval {s9['logloss_gain_overall']['lo']:.4f} to {s9['logloss_gain_overall']['hi']:.4f}); shuffled-link controls gain about half as much.",
+                     "Verdict": "Supported (small)" if s9["logloss_gain_overall"]["lo"] > 0 else "Not demonstrated",
+                     "Why not stronger": "About half the gain is a general recent-failure signal; concepts are numbered tags, so it cannot be explained to a student.", "Details": "EdNet results"})
+    if a is not None and "D+F+offsets" in a.index:
+        rows.append({"Question": "Does combining the validated extensions give the best offline model?",
+                     "What we found": f"Link feature plus offsets together improve log loss by {-a.loc['D+F+offsets', 'delta_logloss']:.4f} over the full model and cut calibration error from {a.loc['D', 'ece']:.3f} to {a.loc['D+F+offsets', 'ece']:.3f}.",
+                     "Verdict": "Supported (moderate)" if a.loc["D+F+offsets", "ci_high"] < 0 else "Not demonstrated",
+                     "Why not stronger": "Still a small absolute gain on EdNet; not deployed because the app's concepts have no co-error data.", "Details": "EdNet results"})
+    m = csv("exp10_matched.csv")
+    if m is not None:
+        mm = m[(m["matched_on"] == "below_target") & (m["phi"] == 1.5)].groupby("baseline")["reviews_saved_pct"].mean()
+        rec = csv("exp10_recovery.csv")
+        rows.append({"Question": "H3 / RQ4: Does threshold scheduling need fewer reviews than SM-2 or a fixed interval at the same coverage?",
+                     "What we found": f"In simulated students with known memory it needs {mm['sm2']:.0f}% fewer reviews than SM-2 and {abs(mm['fixed']):.0f}% {'fewer' if mm['fixed'] > 0 else 'more'} than the best fixed interval (tuned with the truth); this holds when the true curve differs from the model's.",
+                     "Verdict": "Partly supported", "Why not stronger": "It matches a tuned fixed interval rather than beating it, and personalised estimates did not track the true memory strength (rank correlation near zero).", "Details": "SimLab"})
+    s6 = RESULTS / "exp6_summary.json"
+    if s6.exists():
+        j = json.loads(s6.read_text())["prior"]
+        rows.append({"Question": "Are the recommended review times trustworthy on real logs?",
+                     "What we found": f"The deployed starter curve recommends a median gap of {j['median_recommended_gap_at_0.85']:.0f} days; near those gaps its predicted chance of a correct answer is off by {j['near_ece']:.2f} (limit 0.05).",
+                     "Verdict": "Not supported on EdNet" if j["verdict"] == "unreliable" else "Supported", "Why not stronger": "EdNet is English test practice, not study notes; the pilot measures this on real study material.", "Details": "EdNet results"})
+    rows.append({"Question": "Pilot: is predicted recall calibrated on real study material, and how do the three schedulers compare?",
+                 "What we found": "Collecting data now (about 14 days, up to 10 people). Calibration comes first; the arm comparison and the delayed test are descriptive only.",
+                 "Verdict": "Pending", "Why not stronger": "Too few people for significance tests by design.", "Details": "Pilot"})
+    return rows
+
+
+def page_findings() -> None:
+    st.title("Findings")
+    note("What the project set out to answer, what the evidence shows so far, and how strong it is. Every number is read from the logged result files.")
+    rows = findings_rows()
+    if not rows:
+        st.info("No results found. Run the experiments first (see the README).")
+        return
+    def tone(v: str) -> str:
+        return GREEN if v.startswith("Supported") else RED if v.startswith("Not supported") else "#545c7c" if v == "Pending" else AMBER
+    for r in rows:
+        st.markdown(f'<div class="finding"><div class="fq">{html.escape(r["Question"])}</div>'
+                    f'<div class="fv" style="color:{tone(r["Verdict"])}">{html.escape(r["Verdict"])}</div>'
+                    f'<p>{html.escape(r["What we found"])}</p>'
+                    f'<p class="note">{html.escape(r["Why not stronger"])} Details: {html.escape(r["Details"])}.</p></div>', unsafe_allow_html=True)
+    st.header("In one paragraph")
+    st.markdown("REMEM is a working, deployed revision scheduler whose parts are interpretable and tested. On public data the knowledge-tracing layer and a power-law forgetting term help, "
+                "but the gains from personalising per student or concept are small, and the data is too flat to learn a usable forgetting curve, so the app starts from a documented prior. "
+                "In simulation, threshold scheduling matches the best tuned fixed interval and needs far fewer reviews than SM-2. Whether it helps real students is what the pilot is for; "
+                "nothing here claims that it improves learning.")
+
+
+
 pages = [
     st.Page(page_pilot, title="Pilot", icon=":material/groups:", url_path="pilot", default=True),
+    st.Page(page_findings, title="Findings", icon=":material/fact_check:", url_path="findings"),
     st.Page(page_ednet, title="EdNet results", icon=":material/science:", url_path="ednet"),
     st.Page(page_simlab, title="SimLab", icon=":material/model_training:", url_path="simlab"),
     st.Page(page_model, title="Model", icon=":material/show_chart:", url_path="model"),

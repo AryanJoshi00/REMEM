@@ -44,6 +44,7 @@ LABELS = {
     "D-rt_z": ("Full model without response time", "Features"),
     "D+offsets": ("Full model plus concept, student and pair offsets (Experiment 4)", "Extensions"),
     "D+F": ("Full model plus recent failure on related concepts (Experiment 9)", "Extensions"),
+    "D+F+offsets": ("Full model plus related-concept failures and offsets together", "Extensions"),
 }
 
 
@@ -84,6 +85,10 @@ def main() -> None:
         te_F = te.assign(link_F=pd.Series(F, index=df.index).loc[rep[rep["split"] == "test"].index].to_numpy())
         preds["D+F"] = predict_variant(linkm, te_F)
         print(f"  scored D+F ({time.time()-t0:.0f}s)", flush=True)
+        if off_path.exists():                                                  # everything together: link feature plus offsets on top of it
+            tr_F = tr.assign(link_F=pd.Series(F, index=df.index).loc[rep[rep["split"] == "train"].index].to_numpy())
+            preds["D+F+offsets"] = OffsetModel(linkm).fit(tr_F, taus).predict(te_F)
+            print(f"  fitted D+F+offsets ({time.time()-t0:.0f}s)", flush=True)
 
     y = te["correct"].to_numpy()
     students = te["student_id"].to_numpy()
