@@ -51,6 +51,7 @@ def client(tmp_path, monkeypatch):
 def _login(c):
     r = c.post("/api/auth/login", json={"username": "p01", "password": "pw-for-p01!"})
     h = {"Authorization": "Bearer " + r.json()["token"]}
+    c.post("/api/auth/profile", json={"full_name": "T", "contact": "t@example.com", "age": 20, "known_topics": []}, headers=h)
     c.post("/api/auth/consent", headers=h)
     return h
 

@@ -228,6 +228,16 @@ def page_pilot() -> None:
                      column_config={"user_id": "ID", "username": "Account", "consented": st.column_config.CheckboxColumn("Consent"),
                                     "notes": "Notes", "concepts": "Concepts", "n_answers": "Answers", "last_answer": "Last answer"})
 
+        st.header("Participants")
+        prof = pilot.profiles_table(conn)
+        note("From the sign-up form. Private: only visible here, never shared. Names stay out of every result and write-up.")
+        if prof.empty:
+            note("Nobody has filled in the form yet.")
+        else:
+            st.dataframe(prof, hide_index=True, width="stretch",
+                         column_config={"username": "Account", "full_name": "Name", "contact": "Contact", "age": "Age", "known_topics": "Already know well"})
+            st.download_button("Download as CSV", prof.to_csv(index=False).encode("utf-8"), "participants.csv", "text/csv")
+
         st.header("Activity")
         da = pilot.daily_activity(conn)
         if da.empty:

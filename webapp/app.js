@@ -4,7 +4,8 @@
 const CONSENT_TEXT =
 `REMEM pilot - what you agree to
 
-- This is a university project. You are using an anonymous account; no name or email is stored.
+- This is a university project (Aryan Joshi, final year). In all results you appear only as an account number such as user01.
+- The name, contact, age and topic answers from the first form are private to the project owner, never shared, and used only for this project and a follow-up survey if needed.
 - Your answers, response times and review history are recorded to evaluate the scheduling model.
 - Notes you paste are sent to an external AI service (Google Gemini) to create quiz questions. Free-tier AI services may allow the provider to use submitted content. Do NOT paste personal, confidential or exam-restricted material.
 - Participation is voluntary. You may stop at any time and ask the project owner to delete your data.
@@ -198,12 +199,40 @@ function viewLogin() {
       const r = await api("/auth/login", { method: "POST", body: { username: u.value.trim(), password: p.value } });
       S.token = r.token; S.role = r.role; S.user = r.username;
       store.set("remem_token", r.token); store.set("remem_role", r.role); store.set("remem_user", r.username);
-      location.hash = r.consent_ok ? "#/" : "#/consent"; route();
+      location.hash = !r.profile_ok ? "#/about" : (r.consent_ok ? "#/" : "#/consent"); route();
     } catch (ex) { err.textContent = ex.message; go.disabled = false; }
   } }, h("div", {}, h("label", { for: "u" }, "Username"), u), h("div", {}, h("label", { for: "p" }, "Password"), h("div", { class: "pw" }, p, showBtn)), err, go);
   u.id = "u"; p.id = "p";
   mount(h("h1", {}, "Remember what you study"), h("p", { class: "muted" }, "REMEM tells you what to revise, and when. Your project owner gives you a username and password."), form,
     env().standalone ? null : h("p", {}, h("a", { href: "#/install" }, "Add REMEM to your home screen")));
+}
+
+async function viewAbout() {
+  mount(h("h1", {}, "A quick intro"), skeleton(3));
+  let f; try { f = await api("/auth/profile"); } catch (e) { return mount(h("h1", {}, "A quick intro"), h("div", { class: "err" }, e.message), h("p", {}, h("button", { class: "block", onclick: () => route() }, "Try again"))); }
+  if (f.done) { location.hash = "#/consent"; return; }
+  const name = h("input", { id: "pn", autocomplete: "name", maxlength: 80 });
+  const contact = h("input", { id: "pc", autocomplete: "email", autocapitalize: "none", spellcheck: "false", maxlength: 120, placeholder: "Email or phone number" });
+  const age = h("input", { id: "pa", type: "number", inputmode: "numeric", min: 10, max: 100 });
+  const err = h("div", { class: "err", role: "alert" });
+  const boxes = f.topics.map(t => ({ t, box: h("input", { type: "checkbox", value: t.id }) }));
+  const go = h("button", { class: "primary block", type: "submit" }, "Continue");
+  const form = h("form", { class: "stack", onsubmit: async (e) => {
+    e.preventDefault(); err.textContent = "";
+    if (!name.value.trim() || contact.value.trim().length < 3 || !(Number(age.value) >= 10)) { err.textContent = "Please fill in your name, contact and age."; return; }
+    go.disabled = true;
+    try {
+      await api("/auth/profile", { method: "POST", body: { full_name: name.value.trim(), contact: contact.value.trim(), age: Number(age.value), known_topics: boxes.filter(b => b.box.checked).map(b => b.t.id) } });
+      location.hash = "#/consent"; route();
+    } catch (ex) { err.textContent = ex.message; go.disabled = false; }
+  } },
+    h("div", { class: "panel" }, "Your details stay with me, Aryan Joshi. They are not shared with anyone and are only for my final-year project (and a follow-up survey if I need one). In results you are just a number, never a name."),
+    h("div", {}, h("label", { for: "pn" }, "Name"), name), h("div", {}, h("label", { for: "pc" }, "Email or phone"), contact), h("div", {}, h("label", { for: "pa" }, "Age"), age),
+    h("h2", {}, "What do you already know well?"),
+    h("p", { class: "muted" }, "Tick any topic you could already explain in detail. Please be honest: this is not a test, and it keeps my data fair. Tick nothing if none apply."),
+    h("div", { class: "checks" }, boxes.map(b => h("label", { class: "check" }, b.box, h("span", {}, h("b", {}, b.t.title), h("span", { class: "muted small" }, " " + b.t.subject))))),
+    err, go);
+  mount(h("h1", {}, "A quick intro"), h("p", { class: "muted" }, "One short form before you start. It takes about a minute."), form);
 }
 
 function viewConsent() {
@@ -354,16 +383,19 @@ async function viewNotes() {
 
   const own = h("button", { class: "primary block", onclick: () => start("/notes", { title: title.value.trim(), text: text.value }) }, "Make my quiz");
   busy.push(own);
-  const ownBox = h("details", { class: "own" }, h("summary", {}, "Use your own notes instead"),
-    h("p", { class: "muted" }, "Notes about one topic. Don't paste personal or confidential text."),
-    h("label", { for: "nt" }, "Title"), title, h("label", { for: "nx" }, "Notes"), text, h("p", {}, own));
+  const form = h("div", { class: "ownform", hidden: true },
+    h("label", { for: "nt" }, "Title"), title, h("label", { for: "nx" }, "Notes"), text,
+    h("p", { class: "muted small" }, "Your notes are sent to Google's Gemini AI, which writes the questions. Paste notes about one topic, and nothing personal or confidential."), h("p", {}, own));
+  const open = h("button", { class: "block", "aria-expanded": "false", onclick: () => { form.hidden = false; open.hidden = true; open.setAttribute("aria-expanded", "true"); title.focus(); } }, "Paste my own notes");
+  const ownBox = h("div", { class: "panel own" }, h("h2", {}, "Or use your own notes"),
+    h("p", { class: "muted" }, "Paste notes from your course and an AI (Google Gemini) turns them into quiz questions."), open, form);
 
   const slot = skeleton(3);
   mount(h("h1", {}, "Add notes"), h("p", { class: "muted" }, "Pick a topic to start in one tap."), msg, slot, ownBox);
   let d; try { d = await api("/topics"); } catch (e) { slot.replaceWith(h("div", { class: "err" }, "Could not load topics: " + e.message)); return; }
   d.topics.sort((a, b) => (b.id === d.suggested) - (a.id === d.suggested));       // suggested topic first
   const mk = (t, label) => { const btn = h("button", { onclick: () => start("/notes/topic", { topic_id: t.id }), "aria-label": label + ": " + t.title }, label); busy.push(btn); return btn; };
-  const meta = t => t.subject + ", " + t.minutes + " min read" + (t.done ? ", done before" : "");
+  const meta = t => t.subject + ", " + t.minutes + " min read" + (t.done ? ", done before" : "") + (t.known ? ", you know this one" : "");
   const tile = (t, cls) => h("span", { class: "tile " + (cls || ""), "aria-hidden": "true" }, icon(SUBJECT_ICONS[t.subject] || "M5 5h14v14H5z"));
   const sug = d.topics.find(t => t.id === d.suggested);
   const rest = d.topics.filter(t => t !== sug);
@@ -438,6 +470,7 @@ function route() {
   if (!S.token) return viewLogin();
   const [, a, b] = hash.split("/");
   switch (a) {
+    case "about": return viewAbout();
     case "consent": return viewConsent();
     case "notes": return viewNotes();
     case "final": return viewFinal();

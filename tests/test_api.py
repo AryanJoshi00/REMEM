@@ -10,6 +10,9 @@ NOTE = ("Photosynthesis is the process by which plants convert light energy into
         "Chlorophyll is the green pigment in chloroplasts that absorbs light, mainly in the red and blue wavelengths.")
 
 
+PROFILE = {"full_name": "Test Person", "contact": "test@example.com", "age": 21, "known_topics": []}
+
+
 def fake_llm(prompt):
     qs = [{"stem": f"Question number {i} about the concept?", "options": ["alpha", "beta", "gamma", "delta"], "correct_index": i % 4} for i in range(5)]
     return json.dumps({"concepts": [
@@ -39,6 +42,7 @@ def login(c, user, pw, consent=True):
     assert r.status_code == 200, r.text
     h = {"Authorization": "Bearer " + r.json()["token"]}
     if consent:
+        c.post("/api/auth/profile", json=PROFILE, headers=h)                 # students fill in the sign-up form before consent
         assert c.post("/api/auth/consent", headers=h).status_code == 200
     return h
 
@@ -243,6 +247,28 @@ def test_topics_balanced_suggestions_and_creation(client, monkeypatch):
     ta2 = client.get("/api/topics", headers=ha).json()
     assert [t["done"] for t in ta2["topics"] if t["id"] == sug_a] == [True] and ta2["suggested"] != sug_a
     assert client.post("/api/notes/topic", json={"topic_id": "nope"}, headers=ha).status_code == 404
+
+
+def test_signup_form_comes_before_consent_and_steers_suggestions(client):
+    h = login(client, "p01", "pw-for-p01!", consent=False)
+    assert client.post("/api/auth/login", json={"username": "p01", "password": "pw-for-p01!"}).json()["profile_ok"] is False
+    assert client.post("/api/auth/consent", headers=h).status_code == 400                      # form first
+    form = client.get("/api/auth/profile", headers=h).json()
+    assert form["done"] is False and len(form["topics"]) == 6 and form["topics"][0]["title"] == "Korean Hangul"
+    bad = dict(PROFILE, age=3)
+    assert client.post("/api/auth/profile", json=bad, headers=h).status_code == 422
+    assert client.post("/api/auth/profile", json=dict(PROFILE, known_topics=["how_gps_works", "nope"]), headers=h).status_code == 200
+    assert client.post("/api/auth/login", json={"username": "p01", "password": "pw-for-p01!"}).json()["profile_ok"] is True
+    assert client.post("/api/auth/consent", headers=h).status_code == 200
+    with db.session() as conn:
+        row = conn.execute("SELECT full_name, age, known_topics FROM profiles").fetchone()
+    assert row["full_name"] == "Test Person" and json.loads(row["known_topics"]) == ["how_gps_works"]   # unknown ids are dropped
+    t = client.get("/api/topics", headers=h).json()
+    assert [x["known"] for x in t["topics"] if x["id"] == "how_gps_works"] == [True]
+    for _ in range(6):                                                                         # a known topic is never the suggestion
+        assert t["suggested"] != "how_gps_works"
+    with db.session() as conn:                                                                 # admin and demo accounts skip the form
+        assert client.post("/api/auth/login", json={"username": "demo", "password": "demo-pass-1"}).json()["profile_ok"] is True
 
 
 def test_old_database_gets_topic_column(tmp_path):
