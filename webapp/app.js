@@ -150,7 +150,7 @@ function viewInstall() {
   const e = env();
   const back = h("a", { class: "btn block", href: S.token ? "#/" : "#/login" }, S.token ? "Back to today" : "Back to sign in");
   if (e.standalone) return mount(h("h1", {}, "Already on your home screen"), phoneArt(), h("p", { class: "muted" }, "You're using REMEM as an app. Nothing more to do."), back);
-  const nodes = [h("h1", {}, "Keep REMEM one tap away"), phoneArt(), h("p", {}, "Put REMEM on your home screen. It opens full screen like an app, and the icon shows how many concepts are due.")];
+  const nodes = [h("h1", {}, "Add REMEM to your home screen"), phoneArt(), h("p", {}, "Put REMEM on your home screen. It opens full screen like an app, and the icon shows how many concepts are due.")];
   if (e.inApp) {
     const copy = h("button", { class: "block", onclick: async () => { try { await navigator.clipboard.writeText(location.origin + "/"); toast("Link copied. Paste it in Chrome or Safari."); } catch (x) { toast("Copy the address from the menu instead."); } } }, "Copy the link");
     nodes.push(h("div", { class: "panel" }, h("b", {}, "First, open it in your browser"), h("p", { class: "muted" }, "This page is open inside another app (such as WhatsApp or Instagram), and those can't add to the home screen. Tap the menu or the compass icon and choose Open in browser (Chrome or Safari), or copy the link and paste it there."), copy));
