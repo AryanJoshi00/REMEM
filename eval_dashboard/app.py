@@ -102,7 +102,7 @@ def _chart_theme():
     """One quiet look for every Altair chart: system font, readable axis text, light grid, no frame."""
     return {"config": {"font": FONT, "background": "transparent",
                        "axis": {"labelColor": MUTED, "titleColor": INK, "titleFontWeight": 600, "labelFontSize": 12, "titleFontSize": 12,
-                                "gridColor": "#e5e7eb", "domainColor": RULE, "tickColor": RULE},
+                                "gridColor": "#e5e7eb", "domainColor": "#6b7280", "tickColor": "#6b7280"},
                        "legend": {"labelColor": INK, "labelFontSize": 12, "titleFontSize": 12, "labelLimit": 380},
                        "header": {"labelFontSize": 13, "labelFontWeight": 600, "labelColor": INK, "titleFontSize": 13},
                        "view": {"stroke": None}}}
@@ -141,7 +141,7 @@ def calibration_chart(where, cal: pd.DataFrame) -> None:
         size=alt.Size("n:Q", legend=None, scale=alt.Scale(range=[60, 500])),
         tooltip=[alt.Tooltip("bin:N", title="Predicted range"), alt.Tooltip("n:Q", title="Answers"),
                  alt.Tooltip("predicted:Q", title="Predicted", format=".0%"), alt.Tooltip("observed:Q", title="Observed", format=".0%")])
-    where.altair_chart((diag + pts).properties(height=240), width="stretch", theme=None)
+    where.altair_chart((diag + pts).properties(height=240, description="Predicted chance of a correct answer against the observed share correct, one point per range. Points on the diagonal are perfectly calibrated; bigger points hold more answers."), width="stretch", theme=None)
 
 
 def activity_charts(da: pd.DataFrame) -> None:
@@ -152,7 +152,7 @@ def activity_charts(da: pd.DataFrame) -> None:
         return alt.Chart(d).mark_bar(color=INK, size=14).encode(
             x=alt.X("day:T", title="Day", axis=alt.Axis(format="%d %b", labelAngle=0, tickCount="day")),
             y=alt.Y(f"{col}:Q", title=titles[col], axis=alt.Axis(tickMinStep=1, format="d")),
-            tooltip=[alt.Tooltip("day:T", title="Day", format="%d %b"), alt.Tooltip(f"{col}:Q", title=titles[col])]).properties(height=240)
+            tooltip=[alt.Tooltip("day:T", title="Day", format="%d %b"), alt.Tooltip(f"{col}:Q", title=titles[col])]).properties(height=240, description=f"{titles[col]}, one bar per day.")
     a.markdown("**Answers per day**")
     a.altair_chart(bars("answers"), width="stretch", theme=None)
     b.markdown("**People who answered each day**")
@@ -318,7 +318,7 @@ def page_pilot() -> None:
             "mean_gap_days": st.column_config.NumberColumn("Average days since last review", format="%.1f")})
 
         st.header("Are the predictions honest?", anchor=False)
-        note("REMEM predicts the chance of a correct answer before each review. If the predicted and the observed values match, the predictions can be trusted. Points on the dashed line are perfectly calibrated.")
+        note("REMEM predicts the chance of a correct answer before each review. If the predicted and the observed values match, the predictions can be trusted. Points on the dashed line are perfectly calibrated. Bigger points hold more answers.")
         cal = pilot.calibration(conn)
         if cal.empty:
             note("No review answers yet.")
@@ -439,11 +439,15 @@ def page_ednet() -> None:
         pref = [MODEL_NAMES[k] for k in ("B_exp_global", "C_power_global", "D_power_features(REMEM)") if MODEL_NAMES[k] in all_models]
         models = st.multiselect("Models to compare", all_models, default=pref or all_models[:3])
         order = ["<5m", "5m-1h", "1h-6h", "6h-1d", "1-3d", "3-7d", "7-14d", "14-30d", "30-90d", ">90d"]
-        st.altair_chart(alt.Chart(cg[cg["model"].isin(models)]).mark_bar().encode(
+        sel = cg[cg["model"].isin(models)]
+        others = iter([INK, PRIMARY, PREDICTED, MUTED] * 3)                    # neutral colours: orange and purple mean SM-2 and fixed gap elsewhere
+        mdom = sorted(sel["model"].unique())
+        mrange = [METHOD["REMEM"] if m == MODEL_NAMES["D_power_features(REMEM)"] else next(others) for m in mdom]
+        st.altair_chart(alt.Chart(sel).mark_bar().encode(
             x=alt.X("bin:N", sort=order, title="Time since last practice", axis=alt.Axis(labelAngle=0)), xOffset="model:N",
             y=alt.Y("abs_gap:Q", title="Gap, predicted vs observed (percentage points)", axis=alt.Axis(format=".0%")),
-            color=alt.Color("model:N", scale=alt.Scale(range=[INK, "#00907a", "#c44e00", "#6b4fa0", PREDICTED]), legend=alt.Legend(title=None, orient="bottom", columns=1, labelLimit=420)),
-            tooltip=["model", "bin", alt.Tooltip("abs_gap:Q", format=".1%")]).properties(height=320), width="stretch", theme=None)
+            color=alt.Color("model:N", scale=alt.Scale(domain=mdom, range=mrange), legend=alt.Legend(title=None, orient="bottom", columns=1, labelLimit=420)),
+            tooltip=["model", "bin", alt.Tooltip("abs_gap:Q", format=".1%")]).properties(height=320, description="Gap between predicted and observed correctness for each model, by time since last practice. Smaller bars are better."), width="stretch", theme=None)
     g = csv("exp1_accuracy_by_gap.csv")
     if g is not None:
         st.header("Do people forget over time in this data?", anchor=False)
@@ -510,7 +514,9 @@ def exp6_section() -> None:
         color=alt.Color("kind:N", scale=alt.Scale(domain=["predicted", "observed"], range=[PREDICTED, OBSERVED]), legend=alt.Legend(title=None, orient="bottom")),
         tooltip=["model", "bucket", alt.Tooltip("n:Q", format=","), "kind", alt.Tooltip("value:Q", format=".1%")])
     nlab = alt.Chart().transform_filter(alt.datum.kind == "observed").mark_text(dy=-6, fontSize=11, color=MUTED).encode(xOffset="kind:N", **enc, text=alt.Text("n:Q", format=","))
-    st.altair_chart(alt.layer(barl, nlab, data=long).properties(height=180, width=600).facet(row=alt.Row("model:N", title=None, header=alt.Header(labelAngle=0, labelAlign="left", labelAnchor="start"))),
+    note("Numbers above the bars are the number of answers in each group.")
+    st.altair_chart(alt.layer(barl, nlab, data=long).properties(height=180, width=600).facet(row=alt.Row("model:N", title=None, header=alt.Header(labelAngle=0, labelAlign="left", labelAnchor="start")))
+                    .properties(description="Predicted and observed chance of a correct answer for each model, grouped by how the real gap compared with the recommended gap."),
                     width="content", theme=None)
     st.markdown("**Target retention (θ) sweep**")
     note("A higher target means earlier reviews and more of them. 'Near' counts real reviews within a quarter of the recommended gap.")
@@ -620,14 +626,18 @@ def page_simlab() -> None:
     f = fr[(fr["gen"] == gen) & (fr["phi"] == phi)].groupby(["policy", "knob"], as_index=False).mean(numeric_only=True)
     f["policy"] = f["policy"].map({"remem": "REMEM", "remem_global": "REMEM, one shared curve", "remem_prior": "REMEM, starter prior", "fixed": "Fixed gap", "sm2": "SM-2"})
     pol = ["REMEM", "REMEM, one shared curve", "REMEM, starter prior", "SM-2", "Fixed gap"]
-    st.altair_chart(alt.Chart(f).mark_line(point=alt.OverlayMarkDef(filled=True, size=40), strokeWidth=2).encode(
+    if f.empty:
+        st.info("There are no simulation results for this combination.")
+    else:
+        st.altair_chart(alt.Chart(f).mark_line(point=alt.OverlayMarkDef(filled=True, size=40), strokeWidth=2).encode(
         x=alt.X("reviews_per_concept:Q", title="Reviews per concept in 60 days", axis=alt.Axis(tickMinStep=1)),
         y=alt.Y("frac_below_target:Q", title="Time below 85% recall", axis=alt.Axis(format=".0%")),
         color=alt.Color("policy:N", scale=alt.Scale(domain=pol, range=[METHOD["REMEM"], METHOD["REMEM"], METHOD["REMEM"], METHOD["SM-2"], METHOD["Fixed gap"]]),
                         legend=alt.Legend(title=None, orient="bottom", symbolType="stroke")),
         strokeDash=alt.StrokeDash("policy:N", scale=alt.Scale(domain=pol, range=[[1, 0], [6, 3], [2, 3], [1, 0], [1, 0]]), legend=None),
         order=alt.Order("knob:Q"),
-        tooltip=["policy", "knob", alt.Tooltip("reviews_per_concept:Q", format=".1f"), alt.Tooltip("frac_below_target:Q", format=".1%"), alt.Tooltip("final_recall:Q", format=".1%")]).properties(height=320),
+        tooltip=["policy", "knob", alt.Tooltip("reviews_per_concept:Q", format=".1f"), alt.Tooltip("frac_below_target:Q", format=".1%"), alt.Tooltip("final_recall:Q", format=".1%")])
+        .properties(height=320, description="Reviews per concept against time below 85% recall for each scheduling method. Further left and lower is better."),
         width="stretch", theme=None)
     with st.expander("Show the numbers"):
         st.dataframe(f[["policy", "knob", "reviews_per_concept", "frac_below_target", "final_recall"]], hide_index=True, width="stretch", column_config={
@@ -664,7 +674,7 @@ def page_model() -> None:
     tgt = pd.DataFrame({"x": [60], "y": [0.85], "t": ["85% review target"]})
     rule = alt.Chart(tgt).mark_rule(color=MUTED, strokeDash=[4, 4]).encode(y="y:Q")
     rlab = alt.Chart(tgt).mark_text(align="right", baseline="bottom", dx=-4, dy=-4, fontSize=12, color=INK).encode(x="x:Q", y="y:Q", text="t:N")
-    st.altair_chart((curve + rule + rlab).properties(height=320), width="stretch", theme=None)
+    st.altair_chart((curve + rule + rlab).properties(height=320, description="Chance of recalling over 60 days for the chosen memory strength, with the 85% review target."), width="stretch", theme=None)
     st.markdown("Recall after *t* days is")
     st.latex(r"R(t) = \left(1 + \frac{k\,t}{S}\right)^{-\beta}")
     st.markdown("with k chosen so that recall equals 90% when *t* = S.")
@@ -736,8 +746,6 @@ def findings_rows() -> list[dict]:
 def page_findings() -> None:
     st.title("Findings", anchor=False)
     note("What the project set out to answer, what the evidence shows so far, and how strong it is. Every number is read from the logged result files.")
-    note("Log loss and Brier score measure how far the predicted chances are from what happened (lower is better). AUC measures how well the predictions rank correct answers above incorrect ones (higher is better). "
-         "ECE sorts the predictions into ten equal bands, takes the gap between the average prediction and the share actually correct in each band, and averages those gaps weighted by the number of answers (lower is better).")
     rows = findings_rows()
     if not rows:
         st.info("No results found. Run the experiments first (see the README).")
@@ -749,6 +757,8 @@ def page_findings() -> None:
                 "but the gains from personalising per student or concept are small, and the data is too flat to learn a usable forgetting curve, so the app starts from a documented prior. "
                 "In simulation, threshold scheduling matches the best tuned fixed interval and needs far fewer reviews than SM-2. Whether it helps real students is what the pilot is for; "
                 "nothing here claims that it improves learning.")
+    note("Log loss and Brier score measure how far the predicted chances are from what happened (lower is better). AUC measures how well the predictions rank correct answers above incorrect ones (higher is better). "
+         "ECE sorts the predictions into ten equal bands, takes the gap between the average prediction and the share actually correct in each band, and averages those gaps weighted by the number of answers (lower is better).")
     st.header("Question by question", anchor=False)
     for r in rows:
         solid = " solid" if r["Verdict"] == "Supported" else ""                          # only a plain Supported is filled; qualified ones stay outlined
@@ -756,7 +766,12 @@ def page_findings() -> None:
                     f'<div class="fv{solid}" style="color:{tone(r["Verdict"])}">{html.escape(r["Verdict"])}</div>'
                     f'<p>{html.escape(r["What we found"])}</p>'
                     f'<p class="limit"><b>Why not stronger:</b> {html.escape(r["Why not stronger"])}</p>'
-                    f'<p class="details">Details: {html.escape(r["Details"])}.</p></div>', unsafe_allow_html=True)
+                    '</div>', unsafe_allow_html=True)
+        page = {p.title: p for p in pages}.get(r["Details"])
+        if page is not None:
+            st.page_link(page, label="Details: " + r["Details"])
+        else:
+            st.markdown(f'<p class="details">Details: {html.escape(r["Details"])}.</p>', unsafe_allow_html=True)
 
 
 
