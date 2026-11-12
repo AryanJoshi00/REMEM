@@ -123,6 +123,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .sug h3 { margin: 0; font-size: var(--fs-h2); line-height: 1.25; font-weight: 700; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .sug p { margin: 10px 0 16px; }
 .sug .btn { width: 100%; }
+.sug .meta-line { margin: -8px 0 16px; }
+.axis-cap { text-align: right; margin: -4px 0 12px; }
 .meter { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
 .meter i { display: block; height: 100%; width: 100%; background: var(--green-fill); transform-origin: left; transform: scaleX(var(--v, 1)); animation: fill 400ms var(--ease-out) backwards; }
 .ledger li:nth-child(n+13) .meter i { animation: none; }             /* only the rows a phone shows at once fill in */

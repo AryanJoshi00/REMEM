@@ -54,7 +54,7 @@ st.markdown(f"""
   [data-testid="stSidebar"] {{ border-right: 1px solid var(--rule); }}
   [data-testid="stSidebar"] > div:first-child {{ padding-top: .4rem; }}
   [data-testid="stSidebarNav"] {{ padding-top: 0; }}
-  [data-testid="stSidebarNav"]::before {{ content: "remem admin"; display: block; padding: 1.1rem 1.1rem .8rem; font-size: 1.15rem; font-weight: 700; letter-spacing: 0; color: var(--ink); }}
+  [data-testid="stSidebarNav"]::before {{ content: "REMEM admin"; display: block; padding: 1.1rem 1.1rem .8rem; font-size: 1.15rem; font-weight: 700; letter-spacing: 0; color: var(--ink); }}
   [data-testid="stSidebarNavLink"] {{ margin: 1px .6rem; padding: .45rem .8rem; border-radius: 4px; font-weight: 600; color: var(--ink); min-height: 40px; border-left: 3px solid transparent; }}
   [data-testid="stSidebarNavLink"]:hover {{ background: #e8eaee; }}
   [data-testid="stSidebarNavLink"][aria-current="page"] {{ background: #ffffff; border-left-color: var(--ink); }}
@@ -78,6 +78,9 @@ st.markdown(f"""
   .flag {{ padding: .55rem .8rem; margin: .3rem 0; background: #ffffff; border: 1px solid var(--rule); border-radius: 4px; font-size: .97rem; color: var(--ink); }}
   .flag.warn {{ background: #fdf3e1; border-color: #e7c98f; border-left: 3px solid var(--amber); }}
   .flag b {{ color: var(--amber); }}
+  .flag b.info {{ color: var(--muted); }}
+  .flag.ok b {{ color: var(--green); }}
+  .bandlabel {{ font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: .5rem 0 -1.6rem; }}
   .pill {{ display: inline-block; padding: .05rem .55rem; border-radius: 4px; font-weight: 700; font-size: .9rem; border: 1.5px solid currentColor; }}
   .pill.open {{ color: var(--green); background: #e6f4ed; }}
   .pill.closed {{ color: var(--muted); background: var(--band); }}
@@ -123,8 +126,8 @@ def band(text: str) -> None:
     st.markdown(f'<p class="band">{text}</p>', unsafe_allow_html=True)
 
 
-def separator() -> None:
-    st.markdown('<hr class="sep">', unsafe_allow_html=True)
+def separator(label: str | None = None) -> None:
+    st.markdown(('<hr class="sep">' if label != "Status" else "") + (f'<p class="bandlabel">{html.escape(label)}</p>' if label else ""), unsafe_allow_html=True)
 
 
 def calibration_chart(where, cal: pd.DataFrame) -> None:
@@ -133,8 +136,8 @@ def calibration_chart(where, cal: pd.DataFrame) -> None:
     dom = alt.Scale(domain=[lo, 1], nice=False)
     diag = alt.Chart(pd.DataFrame({"x": [lo, 1], "y": [lo, 1]})).mark_line(color=MUTED, strokeDash=[4, 4], strokeWidth=1.5).encode(x=alt.X("x:Q", scale=dom), y=alt.Y("y:Q", scale=dom))
     pts = alt.Chart(cal).mark_circle(color=INK, opacity=.9).encode(
-        x=alt.X("predicted:Q", title=None, scale=dom, axis=alt.Axis(format=".0%", tickCount=5)),
-        y=alt.Y("observed:Q", title=None, scale=dom, axis=alt.Axis(format=".0%", tickCount=5)),
+        x=alt.X("predicted:Q", title="Predicted chance of a correct answer", scale=dom, axis=alt.Axis(format=".0%", tickCount=5)),
+        y=alt.Y("observed:Q", title="Observed share correct", scale=dom, axis=alt.Axis(format=".0%", tickCount=5)),
         size=alt.Size("n:Q", legend=None, scale=alt.Scale(range=[60, 500])),
         tooltip=[alt.Tooltip("bin:N", title="Predicted range"), alt.Tooltip("n:Q", title="Answers"),
                  alt.Tooltip("predicted:Q", title="Predicted", format=".0%"), alt.Tooltip("observed:Q", title="Observed", format=".0%")])
@@ -144,11 +147,12 @@ def calibration_chart(where, cal: pd.DataFrame) -> None:
 def activity_charts(da: pd.DataFrame) -> None:
     a, b = st.columns(2)
     d = da.assign(day=pd.to_datetime(da["day"]))
+    titles = {"answers": "Answers", "active_users": "People who answered"}
     def bars(col: str):
         return alt.Chart(d).mark_bar(color=INK, size=14).encode(
-            x=alt.X("day:T", title="day", axis=alt.Axis(format="%d %b", labelAngle=0, tickCount="day")),
-            y=alt.Y(f"{col}:Q", title=col, axis=alt.Axis(tickMinStep=1, format="d")),
-            tooltip=[alt.Tooltip("day:T", title="day", format="%d %b"), alt.Tooltip(f"{col}:Q", title=col)]).properties(height=240)
+            x=alt.X("day:T", title="Day", axis=alt.Axis(format="%d %b", labelAngle=0, tickCount="day")),
+            y=alt.Y(f"{col}:Q", title=titles[col], axis=alt.Axis(tickMinStep=1, format="d")),
+            tooltip=[alt.Tooltip("day:T", title="Day", format="%d %b"), alt.Tooltip(f"{col}:Q", title=titles[col])]).properties(height=240)
     a.markdown("**Answers per day**")
     a.altair_chart(bars("answers"), width="stretch", theme=None)
     b.markdown("**People who answered each day**")
@@ -235,10 +239,12 @@ def reset_dialog(server: Server) -> None:
     labels = {f"{a['username']} ({a['answers']} answers, {a['concepts']} concepts)": a["username"] for a in accts if a["role"] != "demo"}   # test accounts are never listed
     with st.form("reset_form", border=False):                              # one submit, so nothing depends on partial reruns
         scope = st.radio("Which accounts?", ["Choose accounts", "Every account"], horizontal=True)
-        picked = st.multiselect("Accounts to reset (used when 'Choose accounts' is selected)", list(labels))
+        picked = st.multiselect("Accounts", list(labels), help="Accounts to reset (used when 'Choose accounts' is selected)")
         clear_consent = st.checkbox("Also ask them to accept the consent notice again")
         typed = st.text_input("Type RESET to confirm")
-        go = st.form_submit_button("Delete the data", type="primary", use_container_width=True)
+        go = st.form_submit_button("Delete the data permanently", type="primary", use_container_width=True)
+    if st.button("Cancel", key="cancel_reset", use_container_width=True):              # closes the dialog without changing anything
+        st.rerun()
     if go:
         chosen = list(labels) if scope == "Every account" else picked
         if not chosen:
@@ -269,7 +275,7 @@ def page_pilot() -> None:
     if msg:
         (st.success if msg[0] == "ok" else st.error)(msg[1])
     if not LIVE_DB.exists():
-        st.info("No data yet.")
+        st.info("No data yet. Connect to the server to load the first copy.")
         return
     conn = pilot.open_ro(LIVE_DB)
     try:
@@ -279,25 +285,28 @@ def page_pilot() -> None:
         band(("Live data, loaded " if srv is not None else "Not connected. Showing the copy from ") + ago(time.time() - LIVE_DB.stat().st_mtime) + ". Ten people are too few for significance tests, so everything here is descriptive.")
 
         # ---- status: what needs the owner now
+        separator("Status")
         st.header("Needs attention", anchor=False)
         items = sorted(pilot.attention(conn, now_ms), key=lambda it: it["level"] != "warn")       # warnings first (display order only)
         if not items:
-            st.markdown('<div class="flag">Nothing needs attention right now.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="flag ok"><b>All clear:</b> nothing needs attention right now.</div>', unsafe_allow_html=True)
         for it in items:
-            st.markdown(f'<div class="flag {"warn" if it["level"] == "warn" else ""}">{"<b>Check</b> " if it["level"] == "warn" else ""}{html.escape(it["text"])}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="flag {"warn" if it["level"] == "warn" else ""}">{"<b>Warning:</b> " if it["level"] == "warn" else '<b class="info">Note:</b> '}{html.escape(it["text"])}</div>', unsafe_allow_html=True)
 
         st.header("Overview", anchor=False)
         adh = pilot.adherence(conn, now_ms)
-        c = st.columns(4)
-        c[0].metric("Accounts", len(stu))
-        c[1].metric("Accepted consent", int(stu["consented"].sum()))
-        c[2].metric("Have answered", int((stu["n_answers"] > 0).sum()))
+        c = st.columns(5)
+        n_acc, n_ok = len(stu), int(stu["consented"].sum())
+        c[0].metric("Accounts", n_acc)
+        c[1].metric("Accepted consent", f"{n_ok} of {n_acc}")
+        c[2].metric("Have answered", f"{int((stu['n_answers'] > 0).sum())} of {n_ok}")
         c[3].metric("Answers in total", f"{int(stu['n_answers'].sum()):,}")
+        c[4].metric("Overdue now", f"{adh['overdue']} of {adh['tracked']}" if adh["tracked"] else "0")
         if adh["tracked"]:
             note(f"{adh['overdue']} of {adh['tracked']} scheduled concepts are overdue right now; the median overdue concept is {adh['median_days_late']:.1f} days late.")
 
         # ---- results: what an examiner reads
-        separator()
+        separator("Results")
         st.header("How the three scheduling methods compare", anchor=False)
         note("Each concept is given one method at random: REMEM (the model), SM-2 (a classic flashcard rule) or a fixed 3-day gap. Students never see which. "
              "This counts review answers only, and with this few people the differences are not meaningful yet.")
@@ -309,7 +318,7 @@ def page_pilot() -> None:
             "mean_gap_days": st.column_config.NumberColumn("Average days since last review", format="%.1f")})
 
         st.header("Are the predictions honest?", anchor=False)
-        note("REMEM predicts the chance of a correct answer before each review. If the predicted and the observed values match, the predictions can be trusted.")
+        note("REMEM predicts the chance of a correct answer before each review. If the predicted and the observed values match, the predictions can be trusted. Points on the dashed line are perfectly calibrated.")
         cal = pilot.calibration(conn)
         if cal.empty:
             note("No review answers yet.")
@@ -317,6 +326,7 @@ def page_pilot() -> None:
             a, b = st.columns([1, 1])
             a.dataframe(cal, hide_index=True, width="stretch", column_config={"bin": "Predicted range", "n": "Answers", "predicted": st.column_config.NumberColumn("Predicted", format="percent"),
                                                                                "observed": st.column_config.NumberColumn("Observed", format="percent")})
+            a.markdown('<p class="note">Brackets: the lower end is included, the upper end is not.</p>', unsafe_allow_html=True)
             calibration_chart(b, cal)
 
         st.header("Activity", anchor=False)
@@ -327,7 +337,7 @@ def page_pilot() -> None:
             activity_charts(da)
 
         # ---- operations: the owner's controls
-        separator()
+        separator("Operations")
         st.header("Quiz generation", anchor=False)
         h = pilot.llm_health(conn)
         c = st.columns(4)
@@ -372,13 +382,12 @@ def page_pilot() -> None:
                 cols = st.columns([3, 1.4], vertical_alignment="center")
                 state = "open" if is_open else "closed"
                 cols[0].markdown(f'The final check is <span class="pill {state}">{state}</span>.', unsafe_allow_html=True)
-                if cols[1].button("Close it" if is_open else "Open it", use_container_width=True):
+                if cols[1].button("Close the final check" if is_open else "Open the final check", use_container_width=True):
                     srv.set_final(not is_open)
                     st.rerun()
 
         st.header("Reset test data", anchor=False)                                     # shown whether or not the dashboard is connected
         with st.container(border=True, key="danger"):
-            st.subheader("Danger zone", anchor=False)
             note("Use this after you have tried the app with an account and want a clean start. It deletes learning data only; accounts and passwords stay.")
             if srv is None:
                 note("Connect to the server to use this.")
@@ -432,7 +441,7 @@ def page_ednet() -> None:
         order = ["<5m", "5m-1h", "1h-6h", "6h-1d", "1-3d", "3-7d", "7-14d", "14-30d", "30-90d", ">90d"]
         st.altair_chart(alt.Chart(cg[cg["model"].isin(models)]).mark_bar().encode(
             x=alt.X("bin:N", sort=order, title="Time since last practice", axis=alt.Axis(labelAngle=0)), xOffset="model:N",
-            y=alt.Y("abs_gap:Q", title="Gap between predicted and observed", axis=alt.Axis(format=".0%")),
+            y=alt.Y("abs_gap:Q", title="Gap, predicted vs observed (percentage points)", axis=alt.Axis(format=".0%")),
             color=alt.Color("model:N", scale=alt.Scale(range=[INK, "#00907a", "#c44e00", "#6b4fa0", PREDICTED]), legend=alt.Legend(title=None, orient="bottom", columns=1, labelLimit=420)),
             tooltip=["model", "bin", alt.Tooltip("abs_gap:Q", format=".1%")]).properties(height=320), width="stretch", theme=None)
     g = csv("exp1_accuracy_by_gap.csv")
@@ -563,8 +572,8 @@ def exp9_section() -> None:
     note("A related concept is one that students who struggle with this concept also tend to struggle with (a correlation measured on the training period only). "
          "The feature adds up a student's recent failures on related concepts, fading over time, and the model learns whether that shortens or lengthens memory strength.")
     c = st.columns(3)
-    c[0].metric("Gain, all repeats", f"{g['mean_diff']:.4f}", help=f"95% interval {g['lo']:.4f} to {g['hi']:.4f}")
-    c[1].metric("Gain, gaps of 1+ day", f"{gs['mean_diff']:.4f}", help=f"95% interval {gs['lo']:.4f} to {gs['hi']:.4f}")
+    c[0].metric("Log-loss gain, all repeats", f"{g['mean_diff']:.4f}", help=f"95% interval {g['lo']:.4f} to {g['hi']:.4f}")
+    c[1].metric("Log-loss gain, gaps of 1+ day", f"{gs['mean_diff']:.4f}", help=f"95% interval {gs['lo']:.4f} to {gs['hi']:.4f}")
     c[2].metric("With a related failure", f"{s9['share_rows_F_above_0.1']:.0%}")
     note(f"Verdict: <b>{html.escape(s9['verdict'])}</b>. About half of the gain also appears with shuffled links (see the controls below). Settings chosen on validation data: {s9['k']} neighbours per concept, fading over {s9['tau_days']:g} day.")
     names = {"repeats": "All repeat answers", "spaced>=1d": "Gap of a day or more", "recent failure elsewhere (F>0.1)": "Recent related failure", "no recent related failure (F<=0.1)": "No recent related failure"}
@@ -613,13 +622,17 @@ def page_simlab() -> None:
     pol = ["REMEM", "REMEM, one shared curve", "REMEM, starter prior", "SM-2", "Fixed gap"]
     st.altair_chart(alt.Chart(f).mark_line(point=alt.OverlayMarkDef(filled=True, size=40), strokeWidth=2).encode(
         x=alt.X("reviews_per_concept:Q", title="Reviews per concept in 60 days", axis=alt.Axis(tickMinStep=1)),
-        y=alt.Y("frac_below_target:Q", title="Share of time below 85% recall", axis=alt.Axis(format=".0%")),
+        y=alt.Y("frac_below_target:Q", title="Time below 85% recall", axis=alt.Axis(format=".0%")),
         color=alt.Color("policy:N", scale=alt.Scale(domain=pol, range=[METHOD["REMEM"], METHOD["REMEM"], METHOD["REMEM"], METHOD["SM-2"], METHOD["Fixed gap"]]),
                         legend=alt.Legend(title=None, orient="bottom", symbolType="stroke")),
         strokeDash=alt.StrokeDash("policy:N", scale=alt.Scale(domain=pol, range=[[1, 0], [6, 3], [2, 3], [1, 0], [1, 0]]), legend=None),
         order=alt.Order("knob:Q"),
         tooltip=["policy", "knob", alt.Tooltip("reviews_per_concept:Q", format=".1f"), alt.Tooltip("frac_below_target:Q", format=".1%"), alt.Tooltip("final_recall:Q", format=".1%")]).properties(height=320),
         width="stretch", theme=None)
+    with st.expander("Show the numbers"):
+        st.dataframe(f[["policy", "knob", "reviews_per_concept", "frac_below_target", "final_recall"]], hide_index=True, width="stretch", column_config={
+            "policy": "Policy", "knob": st.column_config.NumberColumn("Setting", format="%.2f"), "reviews_per_concept": st.column_config.NumberColumn("Reviews per concept", format="%.1f"),
+            "frac_below_target": st.column_config.NumberColumn("Time below 85% recall", format="percent"), "final_recall": st.column_config.NumberColumn("Final recall", format="percent")})
     rc = csv("exp10_recovery.csv")
     if rc is not None:
         st.header("Can the model recover each student's true memory strength?", anchor=False)
@@ -641,13 +654,17 @@ def page_model() -> None:
     sm = json.loads(p.read_text())
     beta = float(sm.get("beta", 0.5))
     k = 0.9 ** (-1 / beta) - 1
-    S = st.slider("Memory strength (days until recall drops to 90%)", 1.0, 60.0, 8.0)
+    S = st.slider("Memory strength (days until recall drops to 90%)", 1.0, 60.0, 8.0, format="%.1f days")
     days = list(range(0, 61))
     df = pd.DataFrame({"day": days, "recall": [(1 + k * d / S) ** (-beta) for d in days]})
-    st.altair_chart(alt.Chart(df).mark_line(color=INK, strokeWidth=2.5).encode(
+    curve = alt.Chart(df).mark_line(color=INK, strokeWidth=2.5).encode(
         x=alt.X("day:Q", title="Days since last practice", scale=alt.Scale(domain=[0, 60], nice=False), axis=alt.Axis(tickCount=7)),
         y=alt.Y("recall:Q", scale=alt.Scale(domain=[0, 1]), title="Chance of recalling", axis=alt.Axis(format=".0%", tickCount=5)),
-        tooltip=[alt.Tooltip("day:Q", title="Day"), alt.Tooltip("recall:Q", title="Recall", format=".1%")]).properties(height=320), width="stretch", theme=None)
+        tooltip=[alt.Tooltip("day:Q", title="Day"), alt.Tooltip("recall:Q", title="Recall", format=".1%")])
+    tgt = pd.DataFrame({"x": [60], "y": [0.85], "t": ["85% review target"]})
+    rule = alt.Chart(tgt).mark_rule(color=MUTED, strokeDash=[4, 4]).encode(y="y:Q")
+    rlab = alt.Chart(tgt).mark_text(align="right", baseline="bottom", dx=-4, dy=-4, fontSize=12, color=INK).encode(x="x:Q", y="y:Q", text="t:N")
+    st.altair_chart((curve + rule + rlab).properties(height=320), width="stretch", theme=None)
     st.markdown("Recall after *t* days is")
     st.latex(r"R(t) = \left(1 + \frac{k\,t}{S}\right)^{-\beta}")
     st.markdown("with k chosen so that recall equals 90% when *t* = S.")
@@ -719,24 +736,28 @@ def findings_rows() -> list[dict]:
 def page_findings() -> None:
     st.title("Findings", anchor=False)
     note("What the project set out to answer, what the evidence shows so far, and how strong it is. Every number is read from the logged result files.")
+    note("Log loss and Brier score measure how far the predicted chances are from what happened (lower is better). AUC measures how well the predictions rank correct answers above incorrect ones (higher is better). "
+         "ECE sorts the predictions into ten equal bands, takes the gap between the average prediction and the share actually correct in each band, and averages those gaps weighted by the number of answers (lower is better).")
     rows = findings_rows()
     if not rows:
         st.info("No results found. Run the experiments first (see the README).")
         return
     def tone(v: str) -> str:
         return GREEN if v.startswith("Supported") else RED if v.startswith("Not supported") else MUTED if v == "Pending" else AMBER
-    for r in rows:
-        solid = " solid" if r["Verdict"] == "Supported" else ""                          # only a plain Supported is filled; qualified ones stay outlined
-        st.markdown(f'<div class="finding"><div class="fq" role="heading" aria-level="3">{html.escape(r["Question"])}</div>'
-                    f'<div class="fv{solid}" style="color:{tone(r["Verdict"])}">{html.escape(r["Verdict"])}</div>'
-                    f'<p>{html.escape(r["What we found"])}</p>'
-                    f'<p class="limit">{html.escape(r["Why not stronger"])}</p>'
-                    f'<p class="details">Details: {html.escape(r["Details"])}.</p></div>', unsafe_allow_html=True)
     st.header("In one paragraph", anchor=False)
     st.markdown("REMEM is a working, deployed revision scheduler whose parts are interpretable and tested. On public data the knowledge-tracing layer and a power-law forgetting term help, "
                 "but the gains from personalising per student or concept are small, and the data is too flat to learn a usable forgetting curve, so the app starts from a documented prior. "
                 "In simulation, threshold scheduling matches the best tuned fixed interval and needs far fewer reviews than SM-2. Whether it helps real students is what the pilot is for; "
                 "nothing here claims that it improves learning.")
+    st.header("Question by question", anchor=False)
+    for r in rows:
+        solid = " solid" if r["Verdict"] == "Supported" else ""                          # only a plain Supported is filled; qualified ones stay outlined
+        st.markdown(f'<div class="finding"><div class="fq" role="heading" aria-level="3">{html.escape(r["Question"])}</div>'
+                    f'<div class="fv{solid}" style="color:{tone(r["Verdict"])}">{html.escape(r["Verdict"])}</div>'
+                    f'<p>{html.escape(r["What we found"])}</p>'
+                    f'<p class="limit"><b>Why not stronger:</b> {html.escape(r["Why not stronger"])}</p>'
+                    f'<p class="details">Details: {html.escape(r["Details"])}.</p></div>', unsafe_allow_html=True)
+
 
 
 
@@ -747,7 +768,7 @@ pages = [
     st.Page(page_simlab, title="SimLab", icon=":material/model_training:", url_path="simlab"),
     st.Page(page_model, title="Model", icon=":material/show_chart:", url_path="model"),
 ]
-nav = st.navigation(pages, position="sidebar")
+nav = st.navigation({"Live": pages[:1], "Research": pages[1:]}, position="sidebar")
 st.set_page_config(page_title=f"{nav.title} - REMEM admin")            # each page has its own browser-tab title
 with st.sidebar:
     if srv is not None:

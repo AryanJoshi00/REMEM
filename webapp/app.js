@@ -127,8 +127,8 @@ function setBadge(n) {                              // the number of concepts du
 function installBanner() {
   const e = env();
   if (e.standalone || installBannerHidden()) return null;
-  return h("div", { class: "calm install" }, h("b", {}, "Keep REMEM one tap away"),
-    h("p", { class: "muted" }, "Add it to your home screen. It opens like an app and the icon shows how many concepts are due."),
+  return h("div", { class: "calm install" }, h("b", {}, "Add REMEM to your home screen"),
+    h("p", { class: "muted" }, "It opens like an app, and the icon shows how many concepts are due."),
     h("div", { class: "actions" }, h("a", { class: "btn", href: "#/install" }, "Show how"),
       h("button", { class: "link", type: "button", onclick: () => { store.set("remem_install_hide", String(Date.now())); route(); } }, "Not now")));
 }
@@ -357,7 +357,7 @@ async function viewPractice(cid) {
     try {
       const r = await api("/respond", { method: "POST", body });
       sess.n++; if (r.correct) sess.ok++;
-      const good = opts[r.correct_index]; good.classList.add("right"); good.querySelector(".key").replaceChildren(icon("M5 12.5l4.5 4.5L19 7.5")); good.querySelector(".txt").append(h("span", { class: "tag" }, "Correct answer"));
+      const good = opts[r.correct_index]; good.classList.add("right"); good.querySelector(".key").replaceChildren(icon("M5 12.5l4.5 4.5L19 7.5")); if (!r.correct) good.querySelector(".txt").append(h("span", { class: "tag" }, "Correct answer"));      // only needed when the pick was wrong
       if (!r.correct) { const bad = opts[i]; bad.classList.add("wrong"); bad.querySelector(".key").replaceChildren(icon("M6 6l12 12M18 6L6 18")); bad.querySelector(".txt").append(h("span", { class: "tag" }, "Your answer")); }
       fb.replaceChildren(h("div", {}, h("div", { class: "verdict " + (r.correct ? "ok" : "err") }, r.correct ? "Correct" : "Not quite"), h("div", { class: "muted" }, r.message), h("div", { class: "muted small sess" }, sess.ok + " of " + sess.n + " right this sitting"),
           r.source ? h("div", { class: "src" }, h("span", { class: "small" }, "From your notes"), h("q", { dir: "auto" }, r.source)) : null),
@@ -419,8 +419,8 @@ function quizReady(s) {
   store.del("remem_due");
   const first = s.concepts[0];
   mount(h("h1", {}, "Your quiz is ready"),
-    h("p", { class: "muted" }, pl(s.concepts.length, "concept") + " to learn. Questions come one at a time. REMEM tells you when to come back."),
-    h("ul", { class: "ledger" }, s.concepts.map(c => h("li", {}, h("a", { class: "item", href: "#/practice/" + c.concept_id }, h("span", { class: "name" }, c.name), h("span", { class: "when" }, "start"))))),
+    h("p", { class: "muted" }, pl(s.concepts.length, "concept") + " to learn. Questions come one at a time."),
+    h("ul", { class: "ledger" }, s.concepts.map(c => h("li", {}, h("a", { class: "item", href: "#/practice/" + c.concept_id }, h("span", { class: "name", dir: "auto" }, c.name), h("span", { class: "go", "aria-hidden": "true" }, icon("M9 5l7 7-7 7", "chev")))))),
     h("p", {}, h("a", { class: "btn primary block", href: first ? "#/practice/" + first.concept_id : "#/" }, "Start the first quiz")),
     h("p", {}, h("a", { class: "btn block", href: "#/" }, "Go to Today")));
 }
@@ -476,7 +476,7 @@ async function viewTopic(tid, review) {
   const title = t.title.split(":")[0];
   mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/notes", "aria-label": "Back to topics" }, icon("M15 5l-7 7 7 7", "chev"), "Topics")),
     h("h1", {}, title), h("p", { class: "muted" }, t.subject + ", about " + t.minutes + " min read"),
-    review ? null : h("div", { class: "panel hint-panel" }, h("b", {}, "Read this once before the quiz."), h("p", { class: "muted" }, "The questions come next and are based on this text. Take your time; nothing is timed while you read.")),
+    review ? null : h("div", { class: "panel hint-panel" }, h("b", {}, "Read this once before the quiz."), h("p", { class: "muted" }, "The questions come next and are based on this text. Nothing is timed while you read.")),
     h("article", { class: "reading" }, readingBlocks(t.text)), sentinel, bar);
   const check = () => { if (sentinel.getBoundingClientRect().top < innerHeight) { unlock(); removeEventListener("scroll", check); removeEventListener("resize", check); } };    // the end of the text is on screen
   addEventListener("scroll", check, { passive: true }); addEventListener("resize", check); setTimeout(check, 300);
@@ -485,12 +485,12 @@ async function viewTopic(tid, review) {
 async function viewNotes() {
   const msg = h("div", { class: "muted", role: "status" });
   const title = h("input", { id: "nt", placeholder: "e.g. Roman roads" });
-  const text = h("textarea", { id: "nx", placeholder: "Paste your study notes here (at least a few sentences)" });
+  const text = h("textarea", { id: "nx", placeholder: "Paste your study notes here (at least a few sentences)", "aria-describedby": "nx-help" });
   const other = h("p", { hidden: true }, h("a", { href: "#/notes", onclick: (e) => { e.preventDefault(); window.scrollTo(0, 0); const h1 = document.querySelector("#app h1"); if (h1) h1.focus({ preventScroll: true }); } }, "Or pick a ready-made topic"));
   const failed = () => { own.disabled = false; own.removeAttribute("aria-busy"); other.hidden = false; msg.scrollIntoView({ block: "center" }); };
   const own = h("button", { class: "primary block", onclick: () => { own.disabled = true; own.setAttribute("aria-busy", "true"); other.hidden = true; startQuiz("/notes", { title: title.value.trim(), text: text.value }, msg, failed); } }, "Make my quiz");
   const form = h("div", { class: "ownform", hidden: true },
-    h("label", { for: "nt" }, "Title"), title, h("label", { for: "nx" }, "Notes"), text,
+    h("label", { for: "nt" }, "Title"), title, h("label", { for: "nx" }, "Notes"), text, h("p", { class: "muted small", id: "nx-help" }, "At least a few sentences, about one topic."),
     h("p", { class: "muted small" }, "Your notes are sent to Google's Gemini AI, which writes the questions. Paste notes about one topic, and nothing personal or confidential."), h("p", {}, own), msg, other);
   const open = h("button", { class: "block", "aria-expanded": "false", onclick: () => { form.hidden = false; open.hidden = true; open.setAttribute("aria-expanded", "true"); title.focus(); } }, "Paste my own notes");
   const ownBox = h("div", { class: "panel own" }, h("h2", {}, "Or use your own notes"),
@@ -506,7 +506,7 @@ async function viewNotes() {
   const sug = d.topics.find(t => t.id === d.suggested);
   const rest = d.topics.filter(t => t !== sug);
   const out = [];
-  if (sug) out.push(h("h2", {}, "Suggested for you"), h("div", { class: "panel sug" }, h("div", { class: "sug-head" }, tile(sug), h("h3", {}, sug.title)), h("p", { class: "muted" }, sug.blurb + " (" + meta(sug) + ")"), mk(sug, sug.done ? "Read again" : "Read and start")));
+  if (sug) out.push(h("h2", {}, "Suggested for you"), h("div", { class: "panel sug" }, h("div", { class: "sug-head" }, tile(sug), h("h3", {}, sug.title)), h("p", { class: "muted" }, sug.blurb), h("p", { class: "muted small meta-line" }, meta(sug)), mk(sug, sug.done ? "Read again" : "Read and start")));
   if (rest.length) out.push(h("h2", {}, sug ? "Other topics" : "Topics"), h("ul", { class: "ledger topics" }, rest.map(t => {
     const label = t.done ? "Read again" : "Read";
     return h("li", {}, h("a", { class: "item row withtile", href: "#/notes/" + t.id, "aria-label": label + ": " + t.title }, tile(t),
@@ -542,6 +542,7 @@ async function viewCurve(cid, theta, keep) {
   const H = Math.round(Math.min(300, Math.max(200, W * 0.62))), L = Math.round(FS * 2.6) + 8, B = FS + 15, T = 14, Rr = 12;
   const maxD = r.points[r.points.length - 1].day;
   const x = d => L + (d / maxD) * (W - L - Rr), y = v => T + (1 - v) * (H - T - B);
+  let revX = 0;
   const left = r.next_review_day - r.elapsed_days;                        // days from now, the same quantity as Today's rows
   const when = left <= 0 ? "review now" : "review " + aboutDays(left);
   const NS = "http://www.w3.org/2000/svg";
@@ -556,13 +557,24 @@ async function viewCurve(cid, theta, keep) {
   svg.append(se("polyline", { class: "curve", points: pts.join(" ") }));
   svg.append(se("text", { class: "halo", x: L + 6, y: y(r.theta) + FS + 4, "text-anchor": "start" }, "target " + Math.round(r.theta * 100) + "%"));
   if (r.next_review_day <= maxD) {
-    const rx = x(r.next_review_day), lw = when.length * FS * 0.56, lx = Math.max(L + 4, Math.min(rx + 6, W - Rr - lw));   // label stays inside the chart at any text size
+    const rx = x(r.next_review_day), lw = when.length * FS * 0.56, lx = Math.max(L + 4, Math.min(rx + 6, W - Rr - lw)); revX = lx;   // label stays inside the chart at any text size
     svg.append(se("line", { class: "review", x1: rx, x2: rx, y1: T, y2: H - B }));
     svg.append(se("text", { class: "lab halo", x: lx, y: T + FS, "text-anchor": "start" }, when));
   }
-  if (r.elapsed_days <= maxD) svg.append(se("circle", { class: "now", cx: x(r.elapsed_days), cy: y(r.R_now), r: 6 }));
+  if (r.elapsed_days <= maxD) {                                              // "now N%" goes where it collides with nothing already drawn
+    const cx = x(r.elapsed_days), cy = y(r.R_now), nowTxt = "now " + Math.round(r.R_now * 100) + "%", nw = nowTxt.length * FS * 0.64;
+    const tgtTxt = "target " + Math.round(r.theta * 100) + "%", busy = [
+      [L + 2, y(r.theta), L + 12 + tgtTxt.length * FS * 0.62, y(r.theta) + FS + 10],                       // target label
+      r.next_review_day <= maxD ? [revX - 3, T - 3, revX + when.length * FS * 0.6 + 3, T + FS + 7] : null,               // review label
+      [cx - 8, cy - 8, cx + 8, cy + 8]].filter(Boolean);                                                         // the dot itself
+    const fits = ([x0, y0, x1, y1]) => x0 >= L && x1 <= W - Rr && y0 >= 0 && y1 <= H - B && !busy.some(([a, b, c, d]) => x0 < c && a < x1 && y0 < d && b < y1);
+    const spots = [[cx - 10 - nw, cy - FS / 2], [cx + 10, cy - FS / 2], [cx + 10, cy + 8], [cx - 10 - nw, cy + 8], [cx + 10, cy - FS - 10], [cx - nw / 2, cy + FS + 10]];
+    const spot = spots.find(([a, b]) => fits([a, b, a + nw, b + FS + 2]));
+    svg.append(se("circle", { class: "now", cx, cy, r: 6 }));
+    if (spot) svg.append(se("text", { class: "lab halo", x: spot[0], y: spot[1] + FS * 0.85, "text-anchor": "start" }, nowTxt));   // no room (large text): the sentence under the chart already says it
+  }
   const nodes = [h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today")),
-    h("h1", { dir: "auto" }, r.concept), svg,
+    h("h1", { dir: "auto" }, r.concept), svg, h("p", { class: "muted small axis-cap" }, "days since you last practised"),
     h("p", { class: "muted" }, "The dot is you now, at " + Math.round(r.R_now * 100) + "% recall. REMEM asks you to review at the vertical line. Recall falls to about 90% after " + pl(Math.round(r.stability_days), "day") + ".")];
   if (S.role === "demo" || S.role === "admin") {
     const lab = h("b", {}, "target " + Math.round(r.theta * 100) + "%");
@@ -577,7 +589,7 @@ async function viewCurve(cid, theta, keep) {
 function viewMe() {
   const old = h("input", { id: "op", type: "password", autocomplete: "current-password" }), nw = h("input", { id: "np", type: "password", autocomplete: "new-password" });
   const msg = h("div", { class: "muted", role: "status" });
-  mount(h("h1", {}, S.user || "Me"), S.role !== "student" ? h("p", { class: "muted" }, "Role: " + S.role) : null,
+  mount(h("h1", {}, "Me"), h("p", { class: "muted" }, S.user || "", S.role !== "student" ? " (role: " + S.role + ")" : ""),
     h("h2", {}, "Change password"),
     h("form", { class: "stack", onsubmit: async (e) => { e.preventDefault(); try { await api("/auth/password", { method: "POST", body: { old_password: old.value, new_password: nw.value } }); msg.className = "ok"; msg.textContent = "Password changed."; old.value = nw.value = ""; } catch (ex) { msg.className = "err"; msg.textContent = errText(ex); } } },
       h("input", { type: "text", autocomplete: "username", value: S.user || "", hidden: true, "aria-hidden": "true", tabindex: "-1" }),
