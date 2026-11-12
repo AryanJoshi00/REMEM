@@ -2,7 +2,7 @@
  "concepts": [
   {
    "name": "Serving size",
-   "source_span": "A pack often contains more than one serving, so eating the whole pack means multiplying the numbers.",
+   "source_span": "The numbers on a label are given for one serving, or for a fixed amount such as 100 grams. - A pack often contains more than one serving, so eating the whole pack means multiplying the numbers. - Always check the serving size and the number of servings per pack before comparing products.",
    "questions": [
     {
      "stem": "A pack contains 3 servings and one serving has 200 kcal. How many kcal are in the whole pack?",
