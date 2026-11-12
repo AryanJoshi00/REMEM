@@ -33,7 +33,7 @@ LIVE_DB = ROOT / "data" / "pilot" / "remem_live.db"
 PRIMARY, INK, MUTED, RULE, BAND = "#1f4e5f", "#1b1f24", "#4b5563", "#d9dde3", "#f3f4f6"
 GREEN, AMBER, RED = "#17784f", "#a85a00", "#b3261e"                          # status: supported / partly / not supported, warnings, danger
 METHOD = {"REMEM": "#00907a", "SM-2": "#c44e00", "Fixed gap": "#6b4fa0"}    # the three scheduling methods, dashboard only (never shown to students)
-PREDICTED, OBSERVED = "#9aa1ad", INK                                         # two-series charts: prediction light and dashed, outcome in ink
+PREDICTED, OBSERVED = "#79818e", INK                                         # two-series charts: prediction light and dashed, outcome in ink
 FONT = "'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif"
 
 st.set_page_config(page_title="REMEM admin", page_icon="R", layout="wide")
@@ -727,7 +727,7 @@ def page_findings() -> None:
         return GREEN if v.startswith("Supported") else RED if v.startswith("Not supported") else MUTED if v == "Pending" else AMBER
     for r in rows:
         solid = " solid" if r["Verdict"] == "Supported" else ""                          # only a plain Supported is filled; qualified ones stay outlined
-        st.markdown(f'<div class="finding"><h3 class="fq">{html.escape(r["Question"])}</h3>'
+        st.markdown(f'<div class="finding"><div class="fq" role="heading" aria-level="3">{html.escape(r["Question"])}</div>'
                     f'<div class="fv{solid}" style="color:{tone(r["Verdict"])}">{html.escape(r["Verdict"])}</div>'
                     f'<p>{html.escape(r["What we found"])}</p>'
                     f'<p class="limit">{html.escape(r["Why not stronger"])}</p>'

@@ -163,7 +163,7 @@ h1.q { font-size: var(--fs-q); line-height: 1.3; font-weight: 600; letter-spacin
 .opt .tag { display: block; margin-top: 4px; font-size: var(--fs-xs); font-weight: 700; }
 .opt:disabled { opacity: 1; }
 .opt:disabled:not(.right):not(.wrong):not(.picked) { color: var(--muted); }                 /* readable distractors (6.6:1), not faded */
-.opt.right { border-color: var(--green); background: color-mix(in srgb, var(--green-fill) 16%, var(--surface)); }
+.opt.right { border-color: var(--green); background: color-mix(in srgb, var(--green-fill) 10%, var(--surface)); }
 .opt.right .key { background: var(--green); border-color: var(--green); color: var(--surface); }
 .opt.right .tag { color: var(--green); }
 .opt.wrong { border-color: var(--red); background: color-mix(in srgb, var(--red) 12%, var(--surface)); }

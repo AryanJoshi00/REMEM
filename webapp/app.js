@@ -212,9 +212,9 @@ function renderNav() {
 // ---------------------------------------------------------------- views
 const THETA_UI = 0.85;
 function skeleton(n, hero) { return h("div", { "aria-busy": "true", "aria-label": "Loading" }, hero ? h("div", { class: "skel hero" }) : null, Array.from({ length: n }, () => h("div", { class: "skel" }))); }
-function meter(R, fading) {            // the freshness bar: how much you still remember
+function meter(R, fading, name) {      // the freshness bar: how much you still remember
   const pct = Math.round(R * 100);
-  return h("div", { class: "meter" + (fading ? " fading" : ""), role: "meter", "aria-label": "Recall", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": pct, "aria-valuetext": pct + "% recall" }, h("i", { style: "--v:" + R }));
+  return h("div", { class: "meter" + (fading ? " fading" : ""), role: "meter", "aria-label": name ? name + ", recall" : "Recall", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": pct, "aria-valuetext": pct + "% recall" }, h("i", { style: "--v:" + R }));
 }
 function aboutDays(d) { return d <= 0.5 ? "today" : "in about " + pl(Math.max(1, Math.round(d)), "day"); }      // Today and the memory curve round the same way
 const daysText = aboutDays;
@@ -297,7 +297,7 @@ function renderHome(d) {
     if (c.new) kids.push(h("span", { class: "when" }, "not studied yet"), h("div", { class: "meter empty", "aria-hidden": "true" }));
     else {
       const late = kind === "due";
-      kids.push(h("span", { class: "when" + (late ? " late" : "") }, late ? "review now" : daysText(c.due_in_days)), meter(c.R_now, late || c.R_now < THETA_UI));
+      kids.push(h("span", { class: "when" + (late ? " late" : "") }, late ? "review now" : daysText(c.due_in_days)), meter(c.R_now, late || c.R_now < THETA_UI, c.name));
     }
     return h("li", {}, h("a", { class: "item", href }, kids));
   };
@@ -524,18 +524,22 @@ async function viewConcepts() {
   nodes.push(h("ul", { class: "ledger" }, d.concepts.map(c => h("li", {}, h("a", { class: "item", href: c.new ? "#/practice/" + c.concept_id : "#/curve/" + c.concept_id },
     h("span", { class: "name" }, c.name),
     h("span", { class: "when" }, c.new ? "not studied yet" : "remembered ~" + pl(Math.round(c.stability_days), "day")),
-    c.new ? h("div", { class: "meter empty", "aria-hidden": "true" }) : [meter(c.R_now, c.R_now < THETA_UI), h("span", { class: "note" }, "Mastery " + Math.round(c.mastery * 100) + "% · " + pl(c.n_responses, "answer"))])))));
+    c.new ? h("div", { class: "meter empty", "aria-hidden": "true" }) : [meter(c.R_now, c.R_now < THETA_UI, c.name), h("span", { class: "note" }, "Mastery " + Math.round(c.mastery * 100) + "% · " + pl(c.n_responses, "answer"))])))));
   mount(nodes);
 }
 
+let curveSeq = 0;
 async function viewCurve(cid, theta, keep) {
+  const gen = routeGen, seq = ++curveSeq;                                   // a late answer (an older slider value, or a page already left) must not redraw
   let r, ex;
   try { r = await api("/retention/" + cid + (theta ? "?theta=" + theta : "")); ex = await api("/explain/" + cid); }
-  catch (e) { return errScreen("Memory curve", e, h("a", { class: "btn", href: "#/" }, "Back")); }
+  catch (e) { if (gen !== routeGen || seq !== curveSeq) return; return errScreen("Memory curve", e, h("a", { class: "btn", href: "#/" }, "Back")); }
+  if (gen !== routeGen || seq !== curveSeq) return;
   // drawn in device pixels (1 unit = 1 px) so labels are the same size on a phone and a laptop
   const app = document.getElementById("app"), acs = getComputedStyle(app);
   const W = Math.round(Math.min(680, Math.max(280, app.clientWidth - parseFloat(acs.paddingLeft) - parseFloat(acs.paddingRight)))) || 328;
-  const H = Math.round(Math.min(300, Math.max(200, W * 0.62))), L = 42, B = 28, T = 14, Rr = 12, FS = W >= 500 ? 14 : 13;
+  const FS = Math.round((W >= 500 ? 14 : 13) * Math.max(1, parseFloat(getComputedStyle(document.documentElement).fontSize) / 17));   // labels follow the phone's text size
+  const H = Math.round(Math.min(300, Math.max(200, W * 0.62))), L = Math.round(FS * 2.6) + 8, B = FS + 15, T = 14, Rr = 12;
   const maxD = r.points[r.points.length - 1].day;
   const x = d => L + (d / maxD) * (W - L - Rr), y = v => T + (1 - v) * (H - T - B);
   const left = r.next_review_day - r.elapsed_days;                        // days from now, the same quantity as Today's rows
@@ -552,9 +556,9 @@ async function viewCurve(cid, theta, keep) {
   svg.append(se("polyline", { class: "curve", points: pts.join(" ") }));
   svg.append(se("text", { class: "halo", x: L + 6, y: y(r.theta) + FS + 4, "text-anchor": "start" }, "target " + Math.round(r.theta * 100) + "%"));
   if (r.next_review_day <= maxD) {
-    const rx = x(r.next_review_day), flip = rx > W - 140;
+    const rx = x(r.next_review_day), lw = when.length * FS * 0.56, lx = Math.max(L + 4, Math.min(rx + 6, W - Rr - lw));   // label stays inside the chart at any text size
     svg.append(se("line", { class: "review", x1: rx, x2: rx, y1: T, y2: H - B }));
-    svg.append(se("text", { class: "lab halo", x: flip ? rx - 6 : rx + 6, y: T + FS, "text-anchor": flip ? "end" : "start" }, when));
+    svg.append(se("text", { class: "lab halo", x: lx, y: T + FS, "text-anchor": "start" }, when));
   }
   if (r.elapsed_days <= maxD) svg.append(se("circle", { class: "now", cx: x(r.elapsed_days), cy: y(r.R_now), r: 6 }));
   const nodes = [h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today")),
