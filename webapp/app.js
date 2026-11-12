@@ -63,7 +63,8 @@ async function api(path, opts = {}) {
   if (!r.ok) {
     const d = data.detail;                                                   // a 422 sends a list of problems; show the first one in words
     const msg = Array.isArray(d) ? fieldProblem(d[0]) : d;
-    throw new Error(msg || ("Error " + r.status));
+    const err = new Error(msg || ("Error " + r.status)); err.status = r.status;  // the status lets a not-found screen skip a retry that cannot work
+    throw err;
   }
   return data;
 }
@@ -81,8 +82,9 @@ const OFFLINE_MSG ="You're offline. Check your connection and try again.";
 const isOffline = e => e instanceof TypeError || (e && e.message === "Offline");     // fetch failed, or the service worker's offline reply
 function errText(e) { return isOffline(e) ? OFFLINE_MSG : e.message; }
 function errScreen(title, e, back) {                                        // an error is never a dead end: say what happened, offer a retry and a way back
+  const retry = e && e.status === 404 ? null : h("button", { type: "button", onclick: () => route() }, "Try again");   // nothing to retry when the item does not exist
   return mount(h("h1", {}, title), h("div", { class: "err", role: "alert" }, errText(e)),
-    h("div", { class: "actions" }, h("button", { type: "button", onclick: () => route() }, "Try again"), back || null));
+    h("div", { class: "actions" }, retry, back || null));
 }
 function signOut(call = true) {
   if (call && S.token) fetch("api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + S.token } }).catch(() => {});
@@ -150,7 +152,7 @@ function viewInstall() {
   const e = env();
   const back = h("a", { class: "btn block", href: S.token ? "#/" : "#/login" }, S.token ? "Back to today" : "Back to sign in");
   if (e.standalone) return mount(h("h1", {}, "Already on your home screen"), phoneArt(), h("p", { class: "muted" }, "You're using REMEM as an app. Nothing more to do."), back);
-  const nodes = [h("h1", {}, "Add REMEM to your home screen"), phoneArt(), h("p", {}, "Put REMEM on your home screen. It opens full screen like an app, and the icon shows how many concepts are due.")];
+  const nodes = [h("h1", {}, "Add REMEM to your home screen"), phoneArt(), h("p", {}, "It opens full screen like an app, and the icon shows how many concepts are due.")];
   if (e.inApp) {
     const copy = h("button", { class: "block", onclick: async () => { try { await navigator.clipboard.writeText(location.origin + "/"); toast("Link copied. Paste it in Chrome or Safari."); } catch (x) { toast("Copy the address from the menu instead."); } } }, "Copy the link");
     nodes.push(h("div", { class: "panel" }, h("b", {}, "First, open it in your browser"), h("p", { class: "muted" }, "This page is open inside another app (such as WhatsApp or Instagram), and those can't add to the home screen. Tap the menu or the compass icon and choose Open in browser (Chrome or Safari), or copy the link and paste it there."), copy));
@@ -218,6 +220,10 @@ function meter(R, fading, name) {      // the freshness bar: how much you still 
 }
 function aboutDays(d) { return d <= 0.5 ? "today" : "in about " + pl(Math.max(1, Math.round(d)), "day"); }      // Today and the memory curve round the same way
 const daysText = aboutDays;
+function wholeDays(msg) {                // "Next review in about 4.4 days." -> "Next review in about 4 days.", rounded like Today; any other text is left as it is
+  const m = /^Next review in about (\d+(?:\.\d+)?) days?\.$/.exec(String(msg || ""));
+  return m ? "Next review " + aboutDays(Number(m[1])) + "." : msg;
+}
 
 function viewLogin() {
   const err = h("div", { class: "err", role: "alert" });
@@ -226,13 +232,16 @@ function viewLogin() {
   const showBtn = h("button", { type: "button", "aria-pressed": "false", onclick: () => { const on = p.type === "password"; p.type = on ? "text" : "password"; showBtn.textContent = on ? "Hide" : "Show"; showBtn.setAttribute("aria-pressed", String(on)); } }, "Show");
   const go = h("button", { class: "primary block", type: "submit" }, "Sign in");
   const form = h("form", { class: "stack", onsubmit: async (e) => {
-    e.preventDefault(); err.textContent = ""; go.disabled = true;
+    e.preventDefault(); err.textContent = ""; u.removeAttribute("aria-invalid"); p.removeAttribute("aria-invalid");
+    const empty = !u.value.trim() ? [u, "Enter your username."] : !p.value ? [p, "Enter your password."] : null;   // said at once, at the field
+    if (empty) { err.textContent = empty[1]; empty[0].setAttribute("aria-invalid", "true"); empty[0].focus(); return; }
+    go.disabled = true;
     try {
       const r = await api("/auth/login", { method: "POST", body: { username: u.value.trim(), password: p.value } });
       S.token = r.token; S.role = r.role; S.user = r.username;
       store.set("remem_token", r.token); store.set("remem_role", r.role); store.set("remem_user", r.username);
       location.hash = !r.profile_ok ? "#/about" : (r.consent_ok ? "#/" : "#/consent"); route();
-    } catch (ex) { err.textContent = errText(ex); go.disabled = false; }
+    } catch (ex) { err.textContent = errText(ex); go.disabled = false; if (!isOffline(ex)) { p.focus(); p.select(); } }
   } }, h("div", {}, h("label", { for: "u" }, "Username"), u), h("div", {}, h("label", { for: "p" }, "Password"), h("div", { class: "pw" }, p, showBtn)), err, go);
   u.id = "u"; p.id = "p";
   mount(h("h1", {}, "Remember what you study"), h("p", { class: "muted" }, "REMEM tells you what to revise, and when. Your project owner gives you a username and password."), form,
@@ -289,7 +298,7 @@ function renderHome(d) {
   if (S.offline) nodes.push(h("p", { class: "muted small offline", role: "status" }, "Offline. Showing what was saved on this phone."));
   const finalCard = d.final && d.final.open && d.final.remaining ? h("div", { class: "calm" }, h("b", {}, "Final check is open"),
     h("p", { class: "muted" }, pl(d.final.remaining, "question") + ", one per concept. It takes a few minutes and doesn't change your schedule."),
-    h("a", { class: "btn primary block", href: "#/final" }, "Start the final check")) : null;
+    h("a", { class: "btn outline block", href: "#/final" }, "Start the final check")) : null;   // secondary: the lead stays the one solid button
   const lead = d.due[0] || d.new[0];
   const row = (c, kind) => {
     const href = kind === "later" ? "#/curve/" + c.concept_id : "#/practice/" + c.concept_id;
@@ -359,7 +368,7 @@ async function viewPractice(cid) {
       sess.n++; if (r.correct) sess.ok++;
       const good = opts[r.correct_index]; good.classList.add("right"); good.querySelector(".key").replaceChildren(icon("M5 12.5l4.5 4.5L19 7.5")); if (!r.correct) good.querySelector(".txt").append(h("span", { class: "tag" }, "Correct answer"));      // only needed when the pick was wrong
       if (!r.correct) { const bad = opts[i]; bad.classList.add("wrong"); bad.querySelector(".key").replaceChildren(icon("M6 6l12 12M18 6L6 18")); bad.querySelector(".txt").append(h("span", { class: "tag" }, "Your answer")); }
-      fb.replaceChildren(h("div", {}, h("div", { class: "verdict " + (r.correct ? "ok" : "err") }, r.correct ? "Correct" : "Not quite"), h("div", { class: "muted" }, r.message), h("div", { class: "muted small sess" }, sess.ok + " of " + sess.n + " right this sitting"),
+      fb.replaceChildren(h("div", {}, h("div", { class: "verdict " + (r.correct ? "ok" : "err") }, r.correct ? "Correct" : "Not quite"), h("div", { class: "muted" }, wholeDays(r.message)), h("div", { class: "muted small sess" }, sess.ok + " of " + sess.n + " right this sitting"),
           r.source ? h("div", { class: "src" }, h("span", { class: "small" }, "From your notes"), h("q", { dir: "auto" }, r.source)) : null),
         h("button", { class: "primary block", onclick: () => viewPractice(cid) }, "Next question"),
         h("div", { class: "grid2" }, h("a", { class: "btn", href: "#/curve/" + cid }, "Memory curve"), h("a", { class: "btn", href: "#/" }, "Finish")));
@@ -395,7 +404,7 @@ async function viewFinal() {
     if (i >= total) {
       store.del("remem_due");
       return mount(h("h1", {}, "Final check done"), h("div", { class: "calm" }, h("b", {}, right + " of " + total + " correct"),
-        h("p", { class: "muted" }, "Thank you. These answers show how well REMEM timed your reviews.")), back);
+        h("p", { class: "muted" }, "Thank you. These are your answers to the " + pl(total, "question") + ".")), back);
     }
     mount(h("h1", {}, "Final check"), skeleton(2));
     let q; try { q = await api("/question/next?concept=" + f.items[i].concept_id + "&final=1"); }
@@ -507,11 +516,11 @@ async function viewNotes() {
   const rest = d.topics.filter(t => t !== sug);
   const out = [];
   if (sug) out.push(h("h2", {}, "Suggested for you"), h("div", { class: "panel sug" }, h("div", { class: "sug-head" }, tile(sug), h("h3", {}, sug.title)), h("p", { class: "muted" }, sug.blurb), h("p", { class: "muted small meta-line" }, meta(sug)), mk(sug, sug.done ? "Read again" : "Read and start")));
-  if (rest.length) out.push(h("h2", {}, sug ? "Other topics" : "Topics"), h("ul", { class: "ledger topics" }, rest.map(t => {
+  if (rest.length) out.push(sug ? h("h2", {}, "Other topics") : null, h("ul", { class: "ledger topics" }, rest.map(t => {   // no suggestion: the h1 already says it
     const label = t.done ? "Read again" : "Read";
     return h("li", {}, h("a", { class: "item row withtile", href: "#/notes/" + t.id, "aria-label": label + ": " + t.title }, tile(t),
       h("div", {}, h("span", { class: "name" }, t.title), h("div", { class: "muted" }, t.blurb), h("div", { class: "muted small" }, meta(t))),
-      h("span", { class: "go", "aria-hidden": "true" }, label, icon("M9 5l7 7-7 7", "chev"))));
+      h("span", { class: "go" + (t.done ? " quiet" : ""), "aria-hidden": "true" }, t.done ? null : label, icon("M9 5l7 7-7 7", "chev"))));   // done rows: chevron only, the label stays in aria-label
   })));
   slot.replaceWith(h("div", {}, out));
 }
@@ -523,7 +532,7 @@ async function viewConcepts() {
   if (!d.concepts.length) nodes.push(h("div", { class: "calm" }, h("b", {}, "No concepts yet"), h("p", { class: "muted" }, "Pick a topic and they will appear here."), h("a", { class: "btn primary block", href: "#/notes" }, "Pick a topic")));
   nodes.push(h("ul", { class: "ledger" }, d.concepts.map(c => h("li", {}, h("a", { class: "item", href: c.new ? "#/practice/" + c.concept_id : "#/curve/" + c.concept_id },
     h("span", { class: "name" }, c.name),
-    h("span", { class: "when" }, c.new ? "not studied yet" : "remembered ~" + pl(Math.round(c.stability_days), "day")),
+    h("span", { class: "when" }, c.new ? "not studied yet" : "remembered for about " + pl(Math.round(c.stability_days), "day")),
     c.new ? h("div", { class: "meter empty", "aria-hidden": "true" }) : [meter(c.R_now, c.R_now < THETA_UI, c.name), h("span", { class: "note" }, "Mastery " + Math.round(c.mastery * 100) + "% · " + pl(c.n_responses, "answer"))])))));
   mount(nodes);
 }
@@ -539,7 +548,7 @@ async function viewCurve(cid, theta, keep) {
   const app = document.getElementById("app"), acs = getComputedStyle(app);
   const W = Math.round(Math.min(680, Math.max(280, app.clientWidth - parseFloat(acs.paddingLeft) - parseFloat(acs.paddingRight)))) || 328;
   const FS = Math.round((W >= 500 ? 14 : 13) * Math.max(1, parseFloat(getComputedStyle(document.documentElement).fontSize) / 17));   // labels follow the phone's text size
-  const H = Math.round(Math.min(300, Math.max(200, W * 0.62))), L = Math.round(FS * 2.6) + 8, B = FS + 15, T = 14, Rr = 12;
+  const H = Math.max(Math.round(Math.min(300, Math.max(200, W * 0.62))), Math.round(FS * 15)), L = Math.round(FS * 2.6) + 8, B = FS + 15, T = Math.max(14, Math.round(FS * 0.7)), Rr = 12;   // H and T grow at large text so labels neither collide nor clip
   const maxD = r.points[r.points.length - 1].day;
   const x = d => L + (d / maxD) * (W - L - Rr), y = v => T + (1 - v) * (H - T - B);
   let revX = 0;
@@ -618,7 +627,7 @@ function route() {
     case "practice": return viewPractice(Number(b));
     case "curve": return viewCurve(Number(b));
     case "me": return viewMe();
-    case "login": return viewLogin();
+    case "login": location.replace("#/"); return;                          // already signed in: go to Today
     default: flushQueue(); return viewHome();
   }
 }
