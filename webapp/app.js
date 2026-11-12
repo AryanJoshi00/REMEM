@@ -41,15 +41,16 @@ function toast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), Math.max(4000, String(msg).length * 60));
 }
+const shown = nodes => nodes.flat(Infinity).filter(n => n != null && n !== false);     // an empty optional slot must not be drawn: replaceChildren(null) writes the word "null"
 function mount(...nodes) {
-  const app = document.getElementById("app"); app.replaceChildren(...nodes.flat()); window.scrollTo(0, 0);
+  const app = document.getElementById("app"); app.replaceChildren(...shown(nodes)); window.scrollTo(0, 0);
   const h1 = app.querySelector("h1");
   document.title = (h1 ? h1.textContent + " - " : "") + "REMEM";
   if (h1) { h1.tabIndex = -1; h1.focus({ preventScroll: true }); }          // a route change moves the reading position to the new heading
 }
 function remount(nodes, focusSel) {           // same screen redrawn in place (the demo's what-if slider): keep the scroll position and the focus
   const y = window.scrollY, app = document.getElementById("app");
-  app.replaceChildren(...nodes.flat()); window.scrollTo(0, y);
+  app.replaceChildren(...shown(nodes)); window.scrollTo(0, y);
   const el = focusSel && app.querySelector(focusSel); if (el) el.focus({ preventScroll: true });
 }
 
