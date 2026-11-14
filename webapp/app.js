@@ -356,6 +356,9 @@ async function viewPractice(cid) {
   if (sess.cid !== cid) { sess.cid = cid; sess.n = 0; sess.ok = 0; }
   mount(h("h1", {}, "Practice"), skeleton(2));
   let q; try { q = await api("/question/next?concept=" + cid); } catch (e) { return errScreen("Practice", e, h("a", { class: "btn", href: "#/" }, "Back to today")); }
+  if (q.done) return practiceDone(q);
+  if (q.position === 1) { sess.n = 0; sess.ok = 0; }                     // a new sitting starts its own count
+  const last = q.position >= q.total;
   const t0 = performance.now();
   let answered = false;
   const fb = h("div", { class: "fb stack", role: "status" });
@@ -371,7 +374,7 @@ async function viewPractice(cid) {
       if (!r.correct) { const bad = opts[i]; bad.classList.add("wrong"); bad.querySelector(".key").replaceChildren(icon("M6 6l12 12M18 6L6 18")); bad.querySelector(".txt").append(h("span", { class: "tag" }, "Your answer")); }
       fb.replaceChildren(h("div", {}, h("div", { class: "verdict " + (r.correct ? "ok" : "err") }, r.correct ? "Correct" : "Not quite"), h("div", { class: "muted" }, wholeDays(r.message)), h("div", { class: "muted small sess" }, sess.ok + " of " + sess.n + " right this sitting"),
           r.source ? h("div", { class: "src" }, h("span", { class: "small" }, "From your notes"), h("q", { dir: "auto" }, r.source)) : null),
-        h("button", { class: "primary block", onclick: () => viewPractice(cid) }, "Next question"),
+        h("button", { class: "primary block", onclick: () => viewPractice(cid) }, last ? "Finish" : "Next question"),
         h("div", { class: "grid2" }, h("a", { class: "btn", href: "#/curve/" + cid }, "Memory curve"), h("a", { class: "btn", href: "#/" }, "Finish")));
       store.del("remem_due");
       opts[i].classList.remove("picked");
@@ -385,8 +388,19 @@ async function viewPractice(cid) {
   const flag = h("button", { class: "link flag", type: "button", onclick: async () => {
     try { await api("/flag", { method: "POST", body: { question_id: q.question_id } }); toast("Thanks, question flagged"); flag.textContent = "Reported, thank you"; flag.disabled = true; } catch (x) { toast(errText(x)); }
   } }, "Report a bad question");
-  mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today"), h("span", { class: "where", dir: "auto" }, q.concept || "")), h("h1", { class: "q", dir: "auto" }, q.stem), h("div", { class: "opts" }, opts), fb,
+  mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today"), h("span", { class: "where", dir: "auto" }, (q.total ? "Question " + q.position + " of " + q.total + " · " : "") + (q.concept || ""))), h("h1", { class: "q", dir: "auto" }, q.stem), h("div", { class: "opts" }, opts), fb,
         h("p", { class: "links" }, q.topic_id ? h("a", { class: "flag", href: "#/notes/" + q.topic_id + "?r=1" }, "Read the notes again") : null, flag));
+}
+
+function practiceDone(q) {                         // every practice question has been asked once in this sitting: stop here, never loop back to the first
+  const own = sess.cid === q.concept_id && sess.n > 0;
+  const when = q.next_due_in_days == null ? "" : " Next review " + aboutDays(q.next_due_in_days) + ".";
+  mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today"), h("span", { class: "where", dir: "auto" }, q.concept || "")),
+    h("h1", {}, "Done for now"),
+    h("div", { class: "calm" }, h("b", {}, own ? sess.ok + " of " + sess.n + " right" : "You've answered every question on this concept"),
+      h("p", { class: "muted" }, "That was every question on " + (q.concept || "this concept") + " for this sitting. REMEM will bring it back when it's time." + when)),
+    h("p", {}, h("a", { class: "btn primary block", href: "#/" }, "Back to today")),
+    h("p", {}, h("a", { class: "btn block", href: "#/curve/" + q.concept_id }, "Memory curve")));
 }
 
 async function viewFinal() {

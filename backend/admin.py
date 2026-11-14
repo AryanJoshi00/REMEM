@@ -87,6 +87,7 @@ def reset(body: ResetIn, admin=Depends(admin_user)):
             ids.append(row["user_id"])
         for uid in ids:
             counts["answers"] += conn.execute("DELETE FROM responses WHERE user_id=?", (uid,)).rowcount
+            conn.execute("DELETE FROM repeat_answers WHERE user_id=?", (uid,))
             conn.execute("DELETE FROM state WHERE user_id=?", (uid,))
             counts["questions"] += conn.execute("DELETE FROM questions WHERE concept_id IN (SELECT concept_id FROM concepts WHERE user_id=?)", (uid,)).rowcount
             counts["concepts"] += conn.execute("DELETE FROM concepts WHERE user_id=?", (uid,)).rowcount

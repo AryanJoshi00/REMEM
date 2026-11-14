@@ -97,6 +97,20 @@ CREATE TABLE IF NOT EXISTS state (
   sm2_interval REAL NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, concept_id)
 );
+CREATE TABLE IF NOT EXISTS repeat_answers (         -- answers to a question already answered in the same sitting (the early-pilot repeat bug,
+  response_id INTEGER PRIMARY KEY,                  -- fixed by backend.repair_repeats). Kept for the record; no model, schedule or statistic reads them
+  user_id INTEGER NOT NULL,
+  concept_id INTEGER NOT NULL,
+  question_id INTEGER NOT NULL,
+  idem_key TEXT NOT NULL,
+  ts INTEGER NOT NULL,
+  correct INTEGER NOT NULL,
+  rt_ms INTEGER,
+  mode TEXT NOT NULL,
+  arm TEXT NOT NULL,
+  result_json TEXT,
+  moved_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS llm_cache (
   chunk_hash TEXT PRIMARY KEY,
   prompt_version TEXT NOT NULL,
