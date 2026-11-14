@@ -88,7 +88,13 @@ function errScreen(title, e, back) {                                        // a
     h("div", { class: "actions" }, retry, back || null));
 }
 function signOut(call = true) {
-  if (call && S.token) fetch("api/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + S.token } }).catch(() => {});
+  if (call && S.token) {
+    const auth = { Authorization: "Bearer " + S.token, "Content-Type": "application/json" };
+    (async () => {                                                           // this phone stops getting this account's reminders, then the session ends
+      try { const sub = await currentSub(); if (sub) await fetch("api/push/unsubscribe", { method: "POST", headers: auth, body: JSON.stringify({ endpoint: sub.endpoint }) }); } catch (e) { /* best effort */ }
+      fetch("api/auth/logout", { method: "POST", headers: auth }).catch(() => {});
+    })();
+  }
   setBadge(0); S.token = S.role = S.user = null;
   ["remem_token", "remem_role", "remem_user", "remem_queue", "remem_due"].forEach(store.del);
   if ("caches" in window) caches.delete("remem-api").catch(() => {});
@@ -127,11 +133,90 @@ function installBannerHidden() { const t = Number(store.get("remem_install_hide"
 function setBadge(n) {                              // the number of concepts due, shown on the home-screen icon where the phone allows it
   try { if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n); else if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) { /* not supported */ }
 }
+// ---------------------------------------------------------------- review reminders (web push)
+const PUSH = { key: null, synced: false };
+function swReady() {                                 // the service worker, or an error rather than waiting forever
+  if (!("serviceWorker" in navigator)) return Promise.reject(new Error("This browser can't show reminders."));
+  return Promise.race([navigator.serviceWorker.ready, new Promise((_, no) => setTimeout(() => no(new Error("The app is still loading. Try again in a moment.")), 8000))]);
+}
+async function currentSub() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  try { return await (await swReady()).pushManager.getSubscription(); } catch (e) { return null; }
+}
+function b64bytes(s) { const raw = atob((s + "=".repeat((4 - s.length % 4) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(raw, c => c.charCodeAt(0)); }
+async function pushKey() { if (!PUSH.key) PUSH.key = await api("/push/key"); return PUSH.key; }
+async function reminderState() {                     // on | off | blocked | needs-install | unsupported | unavailable
+  const e = env();
+  if (e.ios && !e.standalone) return "needs-install";
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "unsupported";
+  try { if (!(await pushKey()).enabled) return "unavailable"; } catch (x) { return "unavailable"; }
+  if (Notification.permission === "denied") return "blocked";
+  return Notification.permission === "granted" && await currentSub() ? "on" : "off";
+}
+async function turnOnReminders() {
+  const perm = await Notification.requestPermission();                       // first, while the tap still counts: phones only show the prompt after a tap
+  if (perm !== "granted") throw new Error(perm === "denied" ? "Notifications are blocked. Allow them for REMEM in your phone's settings." : "Reminders are still off.");
+  const k = await pushKey();
+  if (!k.enabled) throw new Error("Reminders aren't available yet.");
+  const reg = await swReady();
+  const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64bytes(k.public_key) });
+  await api("/push/subscribe", { method: "POST", body: sub.toJSON() });
+  store.set("remem_push", "1");
+}
+async function turnOffReminders() {
+  const sub = await currentSub();
+  if (sub) { await api("/push/unsubscribe", { method: "POST", body: { endpoint: sub.endpoint } }); await sub.unsubscribe().catch(() => {}); }
+  store.del("remem_push");
+}
+async function syncReminders() {                     // once per visit: keep the server's copy current (new phone, signed in as someone else, or a renewed address)
+  if (PUSH.synced || !S.token || !("Notification" in window) || Notification.permission !== "granted") return;
+  PUSH.synced = true;
+  try {
+    let sub = await currentSub();
+    if (!sub && store.get("remem_push") === "1") { const k = await pushKey(); if (k.enabled) sub = await (await swReady()).pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64bytes(k.public_key) }); }
+    if (sub) await api("/push/subscribe", { method: "POST", body: sub.toJSON() });
+  } catch (e) { /* tried again on the next visit */ }
+}
+function clearShownReminders() {                     // opening Today answers the reminder: take it off the lock screen
+  swReady().then(r => r.getNotifications({ tag: "remem-due" })).then(ns => ns.forEach(n => n.close())).catch(() => {});
+}
+function remindersHidden() { const t = Number(store.get("remem_remind_hide") || 0); return Date.now() - t < 7 * 86400000; }
+async function fillReminderCard(slot) {              // Today: offer reminders once the person has studied something
+  if (remindersHidden() || await reminderState() !== "off") return;
+  const go = h("button", { class: "btn outline", type: "button", onclick: async () => {     // secondary: the next quiz stays the one solid button
+    go.disabled = true; go.setAttribute("aria-busy", "true");
+    try { await turnOnReminders(); slot.replaceChildren(h("div", { class: "calm" }, h("b", {}, "Reminders are on"), h("p", { class: "muted" }, "You'll get one on days a concept is due, between 9 am and 9 pm."))); }
+    catch (e) { go.disabled = false; go.removeAttribute("aria-busy"); toast(errText(e)); }
+  } }, "Turn on reminders");
+  slot.replaceChildren(h("div", { class: "calm" }, h("b", {}, "Get a reminder when it's time"),
+    h("p", { class: "muted" }, "REMEM can tell you when a concept is due to review: at most once a day, and never at night."),
+    h("div", { class: "actions" }, go, h("button", { class: "link", type: "button", onclick: () => { store.set("remem_remind_hide", String(Date.now())); slot.replaceChildren(); } }, "Not now"))));
+}
+async function fillReminderSettings(slot) {          // Me: the current state in words, and the one action that fits it
+  const st = await reminderState();
+  const msg = h("div", { class: "muted", role: "status" });
+  const redo = () => fillReminderSettings(slot);
+  const btn = (label, fn, cls) => { const b = h("button", { class: cls || "", type: "button", onclick: async () => { b.disabled = true; try { await fn(); } catch (e) { msg.className = "err"; msg.textContent = errText(e); } b.disabled = false; } }, label); return b; };
+  const text = {
+    on: "On. REMEM sends one reminder on days a concept is due, between 9 am and 9 pm.",
+    off: "Off. Turn them on to hear when a concept is due to review.",
+    blocked: "Notifications are blocked for REMEM. Allow them in your phone's settings (Notifications), then come back here.",
+    "needs-install": "On iPhone, reminders work once REMEM is on your home screen. Add it, open it from the home screen, and turn reminders on here.",
+    unsupported: "This browser can't show reminders. Use Chrome on Android, or add REMEM to your home screen on iPhone.",
+    unavailable: "Reminders aren't available right now.",
+  }[st];
+  const acts = [];
+  if (st === "off") acts.push(btn("Turn on reminders", async () => { await turnOnReminders(); redo(); }, "primary"));
+  if (st === "on") acts.push(btn("Send a test reminder", async () => { const r = await api("/push/test", { method: "POST" }); msg.className = r.sent ? "ok" : "err"; msg.textContent = r.sent ? "Sent. It should appear in a few seconds." : "It couldn't reach this phone. Turn reminders off and on again."; }),
+                             btn("Turn off", async () => { await turnOffReminders(); redo(); }));
+  if (st === "needs-install") acts.push(h("a", { class: "btn", href: "#/install" }, "Show how"));
+  slot.replaceChildren(...shown([h("p", {}, text), acts.length ? h("div", { class: "actions" }, acts) : null, msg]));
+}
 function installBanner() {
   const e = env();
   if (e.standalone || installBannerHidden()) return null;
   return h("div", { class: "calm install" }, h("b", {}, "Add REMEM to your home screen"),
-    h("p", { class: "muted" }, "It opens like an app, and the icon shows how many concepts are due."),
+    h("p", { class: "muted" }, "It opens like an app, and it can remind you when concepts are due."),
     h("div", { class: "actions" }, h("a", { class: "btn", href: "#/install" }, "Show how"),
       h("button", { class: "link", type: "button", onclick: () => { store.set("remem_install_hide", String(Date.now())); route(); } }, "Not now")));
 }
@@ -329,12 +414,14 @@ function renderHome(d) {
       h("a", { class: "btn primary block", href: "#/notes" }, "Pick a topic"));
     if (finalCard) nodes.push(finalCard);
   }
+  if (!S.offline && (d.due.length || d.upcoming.length)) { const slot = h("div", { class: "remind-slot" }); nodes.push(slot); fillReminderCard(slot); }   // offered once something has been studied
   section("Later", d.upcoming, "later");
   const ib = installBanner(); if (ib) nodes.push(ib);
   mount(nodes);
 }
 
 async function viewHome() {
+  syncReminders(); clearShownReminders();
   let cached = null; try { cached = JSON.parse(store.get("remem_due") || "null"); } catch (e) { /* ignore */ }
   if (cached) renderHome(cached); else mount(h("h1", {}, "Today"), skeleton(3, true));     // show last known state instantly, refresh underneath
   let d;
@@ -613,7 +700,10 @@ async function viewCurve(cid, theta, keep) {
 function viewMe() {
   const old = h("input", { id: "op", type: "password", autocomplete: "current-password" }), nw = h("input", { id: "np", type: "password", autocomplete: "new-password" });
   const msg = h("div", { class: "muted", role: "status" });
+  const reminders = h("div", { class: "stack" }, h("p", { class: "muted" }, "Checking..."));
+  fillReminderSettings(reminders);
   mount(h("h1", {}, "Me"), h("p", { class: "muted" }, S.user || "", S.role !== "student" ? " (role: " + S.role + ")" : ""),
+    h("h2", {}, "Reminders"), reminders,
     h("h2", {}, "Change password"),
     h("form", { class: "stack", onsubmit: async (e) => { e.preventDefault(); try { await api("/auth/password", { method: "POST", body: { old_password: old.value, new_password: nw.value } }); msg.className = "ok"; msg.textContent = "Password changed."; old.value = nw.value = ""; } catch (ex) { msg.className = "err"; msg.textContent = errText(ex); } } },
       h("input", { type: "text", autocomplete: "username", value: S.user || "", hidden: true, "aria-hidden": "true", tabindex: "-1" }),

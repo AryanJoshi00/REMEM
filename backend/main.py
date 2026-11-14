@@ -4,7 +4,9 @@ Run:  python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 """
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import os
 import random
 import time
@@ -14,8 +16,8 @@ import numpy as np
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 
-from backend import admin, auth, config, db, engine, fallback, llm, topics
-from backend.schemas import FlagIn, LoginIn, NoteIn, PasswordIn, ProfileIn, RespondIn, TopicIn
+from backend import admin, auth, config, db, engine, fallback, llm, push, topics
+from backend.schemas import FlagIn, LoginIn, NoteIn, PasswordIn, ProfileIn, PushEndIn, PushSubIn, RespondIn, TopicIn
 from models.stability import retrievability_power
 from scheduler.scheduler import t_review_days
 
@@ -38,7 +40,16 @@ def get_models() -> engine.Models:
 async def lifespan(app):
     db.init_db()
     get_models()
+    task = None
+    if push.enabled():                                   # review reminders: a light check inside this process (backend.push)
+        lg = logging.getLogger("remem.push")
+        if not lg.handlers:
+            h = logging.StreamHandler(); h.setFormatter(logging.Formatter("%(levelname)s:     %(name)s %(message)s")); lg.addHandler(h)
+        lg.setLevel(logging.INFO)
+        task = asyncio.create_task(push.loop())
     yield
+    if task:
+        task.cancel()
 
 
 _DOCS = {} if os.getenv("REMEM_DOCS") == "1" else {"docs_url": None, "redoc_url": None, "openapi_url": None}   # no public API explorer in production
@@ -463,6 +474,53 @@ def flag_question(body: FlagIn, user=Depends(auth.consented_user)):
         conn.execute("UPDATE questions SET flagged=1 WHERE question_id=?", (body.question_id,))
         db.audit(conn, "flag_question", user["user_id"], str(body.question_id), ts=now_ms())
     return {"ok": True}
+
+
+# ----------------------------------------------------------------------------- reminders (web push)
+@api.get("/push/key")
+def push_key(user=Depends(auth.consented_user)):
+    return {"enabled": push.enabled(), "public_key": config.VAPID_PUBLIC_KEY if push.enabled() else None}
+
+
+@api.post("/push/subscribe")
+def push_subscribe(body: PushSubIn, user=Depends(auth.consented_user)):
+    if not push.enabled():
+        raise HTTPException(503, "Reminders aren't switched on for this server yet.")
+    if not push.endpoint_ok(body.endpoint):
+        raise HTTPException(400, "This browser's push address isn't supported.")
+    with db.session() as conn:                           # one phone, one account: signing in as someone else moves the phone's reminders to them
+        conn.execute("""INSERT INTO push_subs(endpoint,user_id,p256dh,auth,created_at) VALUES (?,?,?,?,?)
+                        ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id, p256dh=excluded.p256dh, auth=excluded.auth, fails=0""",
+                     (body.endpoint, user["user_id"], body.keys.p256dh, body.keys.auth, now_ms()))
+        db.audit(conn, "push_on", user["user_id"], ts=now_ms())
+    return {"ok": True}
+
+
+@api.post("/push/unsubscribe")
+def push_unsubscribe(body: PushEndIn, user=Depends(auth.current_user)):
+    with db.session() as conn:
+        n = conn.execute("DELETE FROM push_subs WHERE endpoint=? AND user_id=?", (body.endpoint, user["user_id"])).rowcount
+        if n:
+            db.audit(conn, "push_off", user["user_id"], ts=now_ms())
+    return {"ok": True}
+
+
+@api.post("/push/test")
+def push_test(user=Depends(auth.consented_user)):
+    """Send one sample reminder to this account's devices right away, so the person sees what it looks like."""
+    if not push.enabled():
+        raise HTTPException(503, "Reminders aren't switched on for this server yet.")
+    now = now_ms()
+    with db.session() as conn:
+        last = conn.execute("SELECT MAX(ts) FROM reminders WHERE user_id=? AND kind='test'", (user["user_id"],)).fetchone()[0]
+        if last and now - last < 60_000:
+            raise HTTPException(429, "A test reminder was just sent. Try again in a minute.")
+        if not conn.execute("SELECT 1 FROM push_subs WHERE user_id=?", (user["user_id"],)).fetchone():
+            raise HTTPException(404, "Reminders aren't on for this account. Turn them on first.")
+        n = push.due_count(conn, user["user_id"], now)
+    payload = {"title": "Reminders are on", "body": "This is what a REMEM reminder looks like. You'll get one when a concept is due to review.", "count": n, "url": "./#/"}
+    sent, failed = push.send_to_user(user["user_id"], payload, "test", now)
+    return {"sent": sent, "failed": failed}
 
 
 api.include_router(admin.router)
