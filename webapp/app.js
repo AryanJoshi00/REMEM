@@ -1,8 +1,8 @@
-/* REMEM student app (PWA). Plain JS, no build step. All server text is inserted with textContent (never innerHTML). */
+/* Remem student app (PWA). Plain JS, no build step. All server text is inserted with textContent (never innerHTML). */
 "use strict";
 
 const CONSENT_TEXT =
-`REMEM pilot - what you agree to
+`Remem pilot - what you agree to
 
 - This is a university project (Aryan Joshi, final year). In all results you appear only as an account number such as user01.
 - The name, contact, age and topic answers from the first form are private to the project owner, never shared, and used only for this project and a follow-up survey if needed.
@@ -45,7 +45,7 @@ const shown = nodes => nodes.flat(Infinity).filter(n => n != null && n !== false
 function mount(...nodes) {
   const app = document.getElementById("app"); app.replaceChildren(...shown(nodes)); window.scrollTo(0, 0);
   const h1 = app.querySelector("h1");
-  document.title = (h1 ? h1.textContent + " - " : "") + "REMEM";
+  document.title = (h1 ? h1.textContent + " - " : "") + "Remem";
   if (h1) { h1.tabIndex = -1; h1.focus({ preventScroll: true }); }          // a route change moves the reading position to the new heading
 }
 function remount(nodes, focusSel) {           // same screen redrawn in place (the demo's what-if slider): keep the scroll position and the focus
@@ -155,7 +155,7 @@ async function reminderState() {                     // on | off | blocked | nee
 }
 async function turnOnReminders() {
   const perm = await Notification.requestPermission();                       // first, while the tap still counts: phones only show the prompt after a tap
-  if (perm !== "granted") throw new Error(perm === "denied" ? "Notifications are blocked. Allow them for REMEM in your phone's settings." : "Reminders are still off.");
+  if (perm !== "granted") throw new Error(perm === "denied" ? "Notifications are blocked. Allow them for Remem in your phone's settings." : "Reminders are still off.");
   const k = await pushKey();
   if (!k.enabled) throw new Error("Reminders aren't available yet.");
   const reg = await swReady();
@@ -189,7 +189,7 @@ async function fillReminderCard(slot) {              // Today: offer reminders o
     catch (e) { go.disabled = false; go.removeAttribute("aria-busy"); toast(errText(e)); }
   } }, "Turn on reminders");
   slot.replaceChildren(h("div", { class: "calm" }, h("b", {}, "Get a reminder when it's time"),
-    h("p", { class: "muted" }, "REMEM can tell you when a concept is due to review: at most once a day, and never at night."),
+    h("p", { class: "muted" }, "Remem can tell you when a concept is due to review: at most once a day, and never at night."),
     h("div", { class: "actions" }, go, h("button", { class: "link", type: "button", onclick: () => { store.set("remem_remind_hide", String(Date.now())); slot.replaceChildren(); } }, "Not now"))));
 }
 async function fillReminderSettings(slot) {          // Me: the current state in words, and the one action that fits it
@@ -198,11 +198,11 @@ async function fillReminderSettings(slot) {          // Me: the current state in
   const redo = () => fillReminderSettings(slot);
   const btn = (label, fn, cls) => { const b = h("button", { class: cls || "", type: "button", onclick: async () => { b.disabled = true; try { await fn(); } catch (e) { msg.className = "err"; msg.textContent = errText(e); } b.disabled = false; } }, label); return b; };
   const text = {
-    on: "On. REMEM sends one reminder on days a concept is due, between 9 am and 9 pm.",
+    on: "On. Remem sends one reminder on days a concept is due, between 9 am and 9 pm.",
     off: "Off. Turn them on to hear when a concept is due to review.",
-    blocked: "Notifications are blocked for REMEM. Allow them in your phone's settings (Notifications), then come back here.",
-    "needs-install": "On iPhone, reminders work once REMEM is on your home screen. Add it, open it from the home screen, and turn reminders on here.",
-    unsupported: "This browser can't show reminders. Use Chrome on Android, or add REMEM to your home screen on iPhone.",
+    blocked: "Notifications are blocked for Remem. Allow them in your phone's settings (Notifications), then come back here.",
+    "needs-install": "On iPhone, reminders work once Remem is on your home screen. Add it, open it from the home screen, and turn reminders on here.",
+    unsupported: "This browser can't show reminders. Use Chrome on Android, or add Remem to your home screen on iPhone.",
     unavailable: "Reminders aren't available right now.",
   }[st];
   const acts = [];
@@ -215,14 +215,14 @@ async function fillReminderSettings(slot) {          // Me: the current state in
 function installBanner() {
   const e = env();
   if (e.standalone || installBannerHidden()) return null;
-  return h("div", { class: "calm install" }, h("b", {}, "Add REMEM to your home screen"),
+  return h("div", { class: "calm install" }, h("b", {}, "Add Remem to your home screen"),
     h("p", { class: "muted" }, "It opens like an app, and it can remind you when concepts are due."),
     h("div", { class: "actions" }, h("a", { class: "btn", href: "#/install" }, "Show how"),
       h("button", { class: "link", type: "button", onclick: () => { store.set("remem_install_hide", String(Date.now())); route(); } }, "Not now")));
 }
 function phoneArt() {
   const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
-  svg.setAttribute("viewBox", "0 0 120 150"); svg.setAttribute("class", "phone-art"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "A phone with the REMEM icon on its home screen");
+  svg.setAttribute("viewBox", "0 0 120 150"); svg.setAttribute("class", "phone-art"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "A phone with the Remem icon on its home screen");
   const add = (tag, a) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); svg.append(el); return el; };
   add("rect", { x: 14, y: 6, width: 92, height: 138, rx: 16, class: "pa-body" });
   add("rect", { x: 22, y: 20, width: 76, height: 112, rx: 8, class: "pa-screen" });
@@ -237,8 +237,8 @@ function stepList(steps) {
 function viewInstall() {
   const e = env();
   const back = h("a", { class: "btn block", href: S.token ? "#/" : "#/login" }, S.token ? "Back to today" : "Back to sign in");
-  if (e.standalone) return mount(h("h1", {}, "Already on your home screen"), phoneArt(), h("p", { class: "muted" }, "You're using REMEM as an app. Nothing more to do."), back);
-  const nodes = [h("h1", {}, "Add REMEM to your home screen"), phoneArt(), h("p", {}, "It opens full screen like an app, and the icon shows how many concepts are due.")];
+  if (e.standalone) return mount(h("h1", {}, "Already on your home screen"), phoneArt(), h("p", { class: "muted" }, "You're using Remem as an app. Nothing more to do."), back);
+  const nodes = [h("h1", {}, "Add Remem to your home screen"), phoneArt(), h("p", {}, "It opens full screen like an app, and the icon shows how many concepts are due.")];
   if (e.inApp) {
     const copy = h("button", { class: "block", onclick: async () => { try { await navigator.clipboard.writeText(location.origin + "/"); toast("Link copied. Paste it in Chrome or Safari."); } catch (x) { toast("Copy the address from the menu instead."); } } }, "Copy the link");
     nodes.push(h("div", { class: "panel" }, h("b", {}, "First, open it in your browser"), h("p", { class: "muted" }, "This page is open inside another app (such as WhatsApp or Instagram), and those can't add to the home screen. Tap the menu or the compass icon and choose Open in browser (Chrome or Safari), or copy the link and paste it there."), copy));
@@ -248,17 +248,17 @@ function viewInstall() {
     nodes.push(h("p", { class: "muted small" }, "Prefer to do it yourself? The steps are below."));
   }
   let steps, title;
-  if (e.ios) { title = e.iosOtherBrowser ? "On iPhone, in your browser" : "On iPhone, in Safari"; steps = [e.iosOtherBrowser ? "Tap the Share button (a square with an arrow) in the toolbar or the address bar." : "Tap the Share button (a square with an arrow) at the bottom of Safari.", "Scroll down in the sheet and tap Add to Home Screen.", "Tap Add in the top corner. REMEM appears on your home screen."]; }
+  if (e.ios) { title = e.iosOtherBrowser ? "On iPhone, in your browser" : "On iPhone, in Safari"; steps = [e.iosOtherBrowser ? "Tap the Share button (a square with an arrow) in the toolbar or the address bar." : "Tap the Share button (a square with an arrow) at the bottom of Safari.", "Scroll down in the sheet and tap Add to Home Screen.", "Tap Add in the top corner. Remem appears on your home screen."]; }
   else if (e.samsung) { title = "On Samsung Internet"; steps = ["Tap the menu (three lines) at the bottom right.", "Tap Add page to, then Home screen.", "Tap Add."]; }
-  else if (e.android) { title = "On Android, in Chrome"; steps = ["Tap the menu (three dots) at the top right.", "Tap Install app. If you see Add to Home screen instead, tap that.", "Tap Install or Add. REMEM appears on your home screen."]; }
-  else { title = "On a computer"; steps = ["Look for the install icon at the right end of the address bar, or open the browser menu.", "Choose Install REMEM (Chrome and Edge).", "Confirm. REMEM opens in its own window."]; }
+  else if (e.android) { title = "On Android, in Chrome"; steps = ["Tap the menu (three dots) at the top right.", "Tap Install app. If you see Add to Home screen instead, tap that.", "Tap Install or Add. Remem appears on your home screen."]; }
+  else { title = "On a computer"; steps = ["Look for the install icon at the right end of the address bar, or open the browser menu.", "Choose Install Remem (Chrome and Edge).", "Confirm. Remem opens in its own window."]; }
   nodes.push(h("h2", {}, title), stepList(steps));
   nodes.push(h("details", { class: "own" }, h("summary", {}, "Can't see the option?"),
     h("ul", { class: "muted" },
       h("li", {}, "Open the link in Chrome (Android) or Safari (iPhone). Links opened from WhatsApp, Instagram or similar usually can't be added."),
       h("li", {}, "On iPhone, other browsers can add it only on recent iOS versions; Safari always can."),
       h("li", {}, "Private or incognito tabs hide the option. Open a normal tab."),
-      h("li", {}, "You can use REMEM in the browser without adding it. Nothing is lost."))));
+      h("li", {}, "You can use Remem in the browser without adding it. Nothing is lost."))));
   nodes.push(h("p", {}, back));
   mount(nodes);
 }
@@ -330,8 +330,8 @@ function viewLogin() {
     } catch (ex) { err.textContent = errText(ex); go.disabled = false; if (!isOffline(ex)) { p.focus(); p.select(); } }
   } }, h("div", {}, h("label", { for: "u" }, "Username"), u), h("div", {}, h("label", { for: "p" }, "Password"), h("div", { class: "pw" }, p, showBtn)), err, go);
   u.id = "u"; p.id = "p";
-  mount(h("h1", {}, "Remember what you study"), h("p", { class: "muted" }, "REMEM tells you what to revise, and when. Your project owner gives you a username and password."), form,
-    env().standalone ? null : h("p", {}, h("a", { href: "#/install" }, "Add REMEM to your home screen")));
+  mount(h("h1", {}, "Remember what you study"), h("p", { class: "muted" }, "Remem tells you what to revise, and when. Your project owner gives you a username and password."), form,
+    env().standalone ? null : h("p", {}, h("a", { href: "#/install" }, "Add Remem to your home screen")));
 }
 
 async function viewAbout() {
@@ -410,7 +410,7 @@ function renderHome(d) {
     if (finalCard) nodes.push(finalCard);
   } else {
     nodes.push(h("div", { class: "calm" }, h("b", {}, "Welcome. Here is how it works"),
-      stepList(["Pick a topic and read the short text once.", "Answer a few quiz questions on it.", "REMEM tells you when to come back, just before you would forget."])),
+      stepList(["Pick a topic and read the short text once.", "Answer a few quiz questions on it.", "Remem tells you when to come back, just before you would forget."])),
       h("a", { class: "btn primary block", href: "#/notes" }, "Pick a topic"));
     if (finalCard) nodes.push(finalCard);
   }
@@ -485,7 +485,7 @@ function practiceDone(q) {                         // every practice question ha
   mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today"), h("span", { class: "where", dir: "auto" }, q.concept || "")),
     h("h1", {}, "Done for now"),
     h("div", { class: "calm" }, h("b", {}, own ? sess.ok + " of " + sess.n + " right" : "You've answered every question on this concept"),
-      h("p", { class: "muted" }, "That was every question on " + (q.concept || "this concept") + " for this sitting. REMEM will bring it back when it's time." + when)),
+      h("p", { class: "muted" }, "That was every question on " + (q.concept || "this concept") + " for this sitting. Remem will bring it back when it's time." + when)),
     h("p", {}, h("a", { class: "btn primary block", href: "#/" }, "Back to today")),
     h("p", {}, h("a", { class: "btn block", href: "#/curve/" + q.concept_id }, "Memory curve")));
 }
@@ -686,7 +686,7 @@ async function viewCurve(cid, theta, keep) {
   }
   const nodes = [h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today")),
     h("h1", { dir: "auto" }, r.concept), svg, h("p", { class: "muted small axis-cap" }, "days since you last practised"),
-    h("p", { class: "muted" }, "The dot is you now, at " + Math.round(r.R_now * 100) + "% recall. REMEM asks you to review at the vertical line. Recall falls to about 90% after " + pl(Math.round(r.stability_days), "day") + ".")];
+    h("p", { class: "muted" }, "The dot is you now, at " + Math.round(r.R_now * 100) + "% recall. Remem asks you to review at the vertical line. Recall falls to about 90% after " + pl(Math.round(r.stability_days), "day") + ".")];
   if (S.role === "demo" || S.role === "admin") {
     const lab = h("b", {}, "target " + Math.round(r.theta * 100) + "%");
     const sl = h("input", { type: "range", min: 60, max: 97, value: Math.round(r.theta * 100), "aria-label": "What-if target retention", "aria-valuetext": Math.round(r.theta * 100) + "%",

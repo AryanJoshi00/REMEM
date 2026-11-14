@@ -42,7 +42,7 @@ python -m backend.admin_create_user create user01     # prints a generated passw
 python -m uvicorn backend.main:app --port 8000
 ```
 
-Open http://localhost:8000. Accounts are created by the owner only (at most 10 student accounts). `python -m backend.admin_create_user --help` lists reset, disable and list actions.
+Open http://localhost:8000. Accounts are created by the owner only (at most 15 student accounts: 10 for the study plus 5 spares). `python -m backend.admin_create_user --help` lists reset, disable and list actions.
 
 ## Run the dashboard
 

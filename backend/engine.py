@@ -73,7 +73,7 @@ def explain(concept_name: str, R_now: float, theta: float, n_sessions: int, days
     if R_now < theta:
         head = f"**{concept_name}**: time to review. Estimated recall is {R_now:.0%}, below your {theta:.0%} target."
     else:
-        head = f"**{concept_name}**: still fresh. Estimated recall is {R_now:.0%} (REMEM reminds you when it falls to {theta:.0%})."
+        head = f"**{concept_name}**: still fresh. Estimated recall is {R_now:.0%} (Remem reminds you when it falls to {theta:.0%})."
     return (f"{head} You have practised it in {plural(n_sessions, 'session')}. {recent} "
             f"You tend to remember this for about {plural(S_days, 'day')}.")
 

@@ -1,7 +1,7 @@
 """Owner-only account management (spec 17.3). Prints a generated password ONCE; it is never stored in plain text.
 
 Examples (run from the repo root, venv active):
-  python -m backend.admin_create_user create p01              # student (max 10)
+  python -m backend.admin_create_user create p01              # student (max 15)
   python -m backend.admin_create_user create demo --role demo
   python -m backend.admin_create_user reset p01
   python -m backend.admin_create_user disable p01

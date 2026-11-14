@@ -1,6 +1,6 @@
 {
-  "name": "REMEM - know what to revise and when",
-  "short_name": "REMEM",
+  "name": "Remem - know what to revise and when",
+  "short_name": "Remem",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
