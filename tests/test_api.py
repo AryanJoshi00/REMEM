@@ -463,3 +463,100 @@ def test_dashboard_refuses_plain_http_except_local():
     for bad in ("http://example.org", "ftp://example.org", "example.org"):
         with pytest.raises(ValueError):
             Server(bad)
+
+
+def _set_arm(cid, arm):
+    with db.session() as conn:
+        conn.execute("UPDATE concepts SET arm=? WHERE concept_id=?", (arm, cid))
+
+
+def test_sitting_asks_each_practice_question_once_then_stops(client):
+    h = login(client, "p01", "pw-for-p01!")
+    cid = make_concepts(client, h)[0]["concept_id"]
+    seen = []
+    for i in range(4):                                              # 5 variants, 1 kept for the final check: 4 practice questions
+        q = client.get(f"/api/question/next?concept={cid}", headers=h).json()
+        assert q["done"] is False and (q["position"], q["total"]) == (i + 1, 4)
+        seen.append(q["question_id"])
+        assert answer(client, h, cid, True).status_code == 200
+        client.clock["t"] += 20_000
+    assert len(set(seen)) == 4
+    end = client.get(f"/api/question/next?concept={cid}", headers=h).json()
+    assert end["done"] is True and end["answered"] == 4 and end["next_due_in_days"] > 0
+    again = client.post("/api/respond", json={"question_id": seen[0], "chosen_index": 0, "rt_ms": 5000, "idem_key": "repeat-1"}, headers=h)
+    assert again.status_code == 409                                 # a stale second tab cannot sneak a repeat in either
+    with db.session() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM responses").fetchone()[0] == 4
+    client.clock["t"] += config.SESSION_GAP_MS + 1                  # a later sitting may ask them again
+    assert client.get(f"/api/question/next?concept={cid}", headers=h).json()["position"] == 1
+
+
+@pytest.mark.parametrize("arm, days", [("sm2", 1.0), ("fixed", config.FIXED_INTERVAL_DAYS)])
+def test_baseline_schedules_move_once_per_sitting(client, arm, days):
+    h = login(client, "p01", "pw-for-p01!")
+    cid = make_concepts(client, h)[0]["concept_id"]
+    _set_arm(cid, arm)
+    t0 = client.clock["t"]
+    for _ in range(4):
+        r = answer(client, h, cid, True).json()
+        client.clock["t"] += 15_000
+    with db.session() as conn:
+        st = conn.execute("SELECT * FROM state WHERE concept_id=?", (cid,)).fetchone()
+    assert st["n_sessions"] == 1 and st["n_responses"] == 4
+    assert st["sm2_reps"] == 1 and st["sm2_interval"] == 1.0         # one review, not four (four would already be 16 days)
+    assert st["due_at"] == t0 + int(days * config.MS_PER_DAY) and r["next_due_in_days"] <= days
+
+
+def test_repair_moves_repeats_and_rebuilds_the_schedule(client, monkeypatch, tmp_path):
+    from backend import repair_repeats
+    h1, h2 = login(client, "p01", "pw-for-p01!"), login(client, "p02", "pw-for-p02!")
+    c1, c2 = make_concepts(client, h1)[0]["concept_id"], make_concepts(client, h2)[0]["concept_id"]
+    _set_arm(c1, "sm2"); _set_arm(c2, "sm2")
+    pattern = [True, True, False, True, True, True, True, True, False, True, True]     # 11 taps, like the report: 4 questions cycling
+    with monkeypatch.context() as m:                                # the old behaviour: no memory of the sitting
+        m.setattr(main, "sitting_question_ids", lambda *a: [])
+        for ok in pattern:
+            answer(client, h1, c1, ok); client.clock["t"] += 10_000
+    client.clock["t"] -= 10_000 * len(pattern)
+    for i, ok in enumerate(pattern):                                 # the same taps with the fix: only the first pass is accepted
+        if i < 4:
+            answer(client, h2, c2, ok)
+        client.clock["t"] += 10_000
+    with db.session() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM responses WHERE concept_id=?", (c1,)).fetchone()[0] == len(pattern)
+        conn.execute("UPDATE state SET sm2_reps=11, sm2_interval=348, due_at=last_ts+348*? WHERE concept_id=?", (config.MS_PER_DAY, c1))   # what the old engine stored
+        report = repair_repeats.repair(conn, main.get_models())
+        rows = {r["user_id"]: dict(r) for r in conn.execute("SELECT * FROM state")}
+        users = {r["user_id"]: (r["ability"], r["n_answers"]) for r in conn.execute("SELECT * FROM users")}
+        kept = [tuple(r) for r in conn.execute("SELECT user_id, correct, pred_R, mastery_after, stability_after, mode FROM responses ORDER BY user_id, ts")]
+        assert conn.execute("SELECT COUNT(*) FROM repeat_answers").fetchone()[0] == len(pattern) - 4
+    u1, u2 = rows[min(rows)], rows[max(rows)]
+    for k in ("mastery", "n_sessions", "n_responses", "stability_days", "sm2_ef", "sm2_reps", "sm2_interval", "due_at"):
+        assert u1[k] == pytest.approx(u2[k]), k                      # repaired account == an account that never saw the bug
+    assert users[u1["user_id"]] == pytest.approx(users[u2["user_id"]])
+    assert [r[1:] for r in kept if r[0] == u1["user_id"]] == [r[1:] for r in kept if r[0] == u2["user_id"]]
+    assert sum(r["repeats_moved"] for r in report) == len(pattern) - 4
+    with db.session() as conn:                                       # running it again changes nothing
+        assert sum(r["repeats_moved"] for r in repair_repeats.repair(conn, main.get_models())) == 0
+        assert dict(conn.execute("SELECT * FROM state WHERE concept_id=?", (c1,)).fetchone()) == pytest.approx(u1)
+
+
+def test_repair_replay_matches_the_live_api(client):
+    """With no repeats, rebuilding from the answers gives back exactly what the API stored."""
+    from backend import repair_repeats
+    h = login(client, "p01", "pw-for-p01!")
+    a, b = [c["concept_id"] for c in make_concepts(client, h)]
+    _set_arm(b, "sm2")
+    for day in range(3):
+        for cid in (a, b):
+            for ok in (True, False, True):
+                answer(client, h, cid, ok); client.clock["t"] += 30_000
+        client.clock["t"] += 2 * config.MS_PER_DAY
+    with db.session() as conn:
+        live = {r["concept_id"]: dict(r) for r in conn.execute("SELECT * FROM state")}
+        logged = [tuple(r) for r in conn.execute("SELECT pred_R, elapsed_days, mode, was_due, stability_after, mastery_after FROM responses ORDER BY response_id")]
+        user = tuple(conn.execute("SELECT ability, n_answers FROM users WHERE username='p01'").fetchone())
+        repair_repeats.repair(conn, main.get_models())
+        assert {r["concept_id"]: dict(r) for r in conn.execute("SELECT * FROM state")} == live
+        assert [tuple(r) for r in conn.execute("SELECT pred_R, elapsed_days, mode, was_due, stability_after, mastery_after FROM responses ORDER BY response_id")] == logged
+        assert tuple(conn.execute("SELECT ability, n_answers FROM users WHERE username='p01'").fetchone()) == user

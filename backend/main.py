@@ -103,6 +103,18 @@ def concept_status(models, c, st, now, theta):
             "mastery": round(st["mastery"], 4), "last_ts": st["last_ts"], "n_responses": st["n_responses"]}
 
 
+def sitting_question_ids(conn, uid: int, cid: int, now: int) -> list[int]:
+    """Practice questions already answered in the current sitting (answers to this concept with gaps under 30 minutes, ending
+    less than 30 minutes ago; the same rule the engine uses to count sessions). Each is asked at most once per sitting."""
+    out, prev = [], now
+    for r in conn.execute("SELECT question_id, ts FROM responses WHERE user_id=? AND concept_id=? AND mode!='final' ORDER BY ts DESC",
+                          (uid, cid)):
+        if prev - r["ts"] > config.SESSION_GAP_MS:
+            break
+        out.append(r["question_id"]); prev = r["ts"]
+    return out
+
+
 def get_concept(conn, user, cid):
     c = conn.execute("SELECT * FROM concepts WHERE concept_id=? AND user_id=?", (cid, user["user_id"])).fetchone()
     if c is None:
@@ -346,8 +358,17 @@ def next_question(concept: int, final: int = 0, user=Depends(auth.consented_user
                               (user["user_id"], user["user_id"], concept)).fetchall()
             if not qs:
                 raise HTTPException(404, "No questions available for this concept")
-            q = sorted(qs, key=lambda r: (r["used"], r["last_used"] or 0, r["variant_no"]))[0]
-    return {"question_id": q["question_id"], "concept_id": concept, "concept": cname, "topic_id": topic_id, "stem": q["stem"], "options": json.loads(q["options_json"])}
+            done = set(sitting_question_ids(conn, user["user_id"], concept, now_ms()))
+            left = [r for r in qs if r["question_id"] not in done]
+            if not left:                                                 # every practice question asked once: this sitting is over
+                st = conn.execute("SELECT due_at FROM state WHERE user_id=? AND concept_id=?", (user["user_id"], concept)).fetchone()
+                due_in = day_label(st["due_at"], now_ms()) if st and st["due_at"] else None
+                return {"done": True, "concept_id": concept, "concept": cname, "topic_id": topic_id, "answered": len(done & {r["question_id"] for r in qs}),
+                        "next_due_in_days": due_in}
+            q = sorted(left, key=lambda r: (r["used"], r["last_used"] or 0, r["variant_no"]))[0]
+            pos = {"position": len(qs) - len(left) + 1, "total": len(qs)}
+    out = {"done": False, "question_id": q["question_id"], "concept_id": concept, "concept": cname, "topic_id": topic_id, "stem": q["stem"], "options": json.loads(q["options_json"])}
+    return out if final else {**out, **pos}
 
 
 @api.post("/respond")
@@ -376,6 +397,8 @@ def respond(body: RespondIn, user=Depends(auth.consented_user)):
             conn.execute("""INSERT INTO responses(user_id,concept_id,question_id,idem_key,ts,correct,rt_ms,mode,arm,result_json)
                             VALUES (?,?,?,?,?,?,?,?,?,?)""", (user["user_id"], cid, q["question_id"], body.idem_key, ts, int(correct), body.rt_ms, "final", q["arm"], json.dumps(result)))
             return result
+        if q["question_id"] in sitting_question_ids(conn, user["user_id"], cid, ts):   # e.g. a second tab: one answer per question per sitting
+            raise HTTPException(409, "You've already answered this question in this sitting.")
         st_row = conn.execute("SELECT * FROM state WHERE user_id=? AND concept_id=?", (user["user_id"], cid)).fetchone()
         st = rowdict(st_row) or {}
         meds = [r["rt_ms"] for r in conn.execute("SELECT rt_ms FROM responses WHERE user_id=? AND rt_ms IS NOT NULL ORDER BY ts DESC LIMIT 50", (user["user_id"],))]

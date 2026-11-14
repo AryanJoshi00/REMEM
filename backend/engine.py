@@ -97,14 +97,19 @@ def apply_response(models: Models, state: dict, user_ability: float, arm: str, c
     t_rev = t_review_days(S, models.stability.beta, theta, t_min, t_max)
     remem_due = ts_ms + int(t_rev * config.MS_PER_DAY)
 
+    # SM-2 and the fixed interval schedule whole reviews, so they move on once per sitting, graded on its first answer
+    # (the only one that tests recall after the gap). Later answers in the same sitting keep their schedule as it is.
     sm = SM2State(state.get("sm2_ef", 2.5) if state else 2.5, state.get("sm2_reps", 0) if state else 0, state.get("sm2_interval", 0.0) if state else 0.0)
-    sm = sm2_update(sm, quality_from_response(correct, rt_ms or 0, median_rt_ms))
-    if arm == "sm2":
-        due = ts_ms + int(sm.interval_days * config.MS_PER_DAY)
-    elif arm == "fixed":
-        due = ts_ms + int(fixed_interval(config.FIXED_INTERVAL_DAYS) * config.MS_PER_DAY)
-    else:
+    if new_session:
+        sm = sm2_update(sm, quality_from_response(correct, rt_ms or 0, median_rt_ms))
+    if arm not in ("sm2", "fixed"):
         due = remem_due
+    elif not new_session and state.get("due_at"):
+        due = state["due_at"]
+    elif arm == "sm2":
+        due = ts_ms + int(sm.interval_days * config.MS_PER_DAY)
+    else:
+        due = ts_ms + int(fixed_interval(config.FIXED_INTERVAL_DAYS) * config.MS_PER_DAY)
 
     new_state = {"mastery": m_new, "n_sessions": n_sessions, "n_responses": (0 if first else state["n_responses"]) + 1,
                  "last_ts": ts_ms, "stability_days": S, "t_review_days": t_rev, "due_at": due, "remem_due_at": remem_due,
