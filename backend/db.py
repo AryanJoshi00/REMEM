@@ -111,6 +111,24 @@ CREATE TABLE IF NOT EXISTS repeat_answers (         -- answers to a question alr
   result_json TEXT,
   moved_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS push_subs (               -- one row per phone or browser that turned reminders on
+  endpoint TEXT PRIMARY KEY,                        -- the push service address the browser gave us (Google, Apple, Mozilla or Microsoft)
+  user_id INTEGER NOT NULL REFERENCES users(user_id),
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  fails INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS reminders (              -- every reminder the server tried to send, for the dashboard and for checking the rules
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  ts INTEGER NOT NULL,
+  n_due INTEGER NOT NULL,
+  kind TEXT NOT NULL,                               -- due | test
+  sent INTEGER NOT NULL,                            -- devices reached
+  failed INTEGER NOT NULL,
+  detail TEXT
+);
 CREATE TABLE IF NOT EXISTS llm_cache (
   chunk_hash TEXT PRIMARY KEY,
   prompt_version TEXT NOT NULL,

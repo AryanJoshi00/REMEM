@@ -13,6 +13,7 @@ uvicorn==0.54.0
 pydantic==2.14.1
 python-dotenv==1.2.4
 requests==2.34.2
+pywebpush==2.5.0
 # Admin dashboard
 streamlit==1.66.0
 # Tests

@@ -42,3 +42,12 @@ MS_PER_DAY = 86_400_000
 SESSION_GAP_MS = 30 * 60 * 1000
 ABILITY_GAMMA = 0.9
 CONSENT_VERSION = "v2"
+
+# Review reminders (web push). Off until both keys are set; make them once with `python -m backend.push keys`.
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "")                     # the site address (https://...), so push services know who sends
+REMINDERS_ON = os.getenv("REMEM_REMINDERS", "1") == "1"
+REMIND_EVERY_S = int(os.getenv("REMEM_REMIND_EVERY_S", "900"))     # how often the server looks for concepts that have fallen due
+REMIND_FROM_HOUR, REMIND_UNTIL_HOUR = 9, 21                         # reminders only go out between 9 am and 9 pm India time
+TZ_OFFSET_MS = int(5.5 * 3600 * 1000)                              # India Standard Time, UTC+5:30

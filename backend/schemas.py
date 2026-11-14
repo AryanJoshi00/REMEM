@@ -38,3 +38,17 @@ class RespondIn(BaseModel):
 
 class FlagIn(BaseModel):
     question_id: int
+
+
+class PushKeys(BaseModel):
+    p256dh: str = Field(min_length=20, max_length=200)
+    auth: str = Field(min_length=8, max_length=100)
+
+
+class PushSubIn(BaseModel):
+    endpoint: str = Field(min_length=10, max_length=1000)
+    keys: PushKeys
+
+
+class PushEndIn(BaseModel):
+    endpoint: str = Field(min_length=10, max_length=1000)
