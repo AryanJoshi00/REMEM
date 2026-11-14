@@ -25,7 +25,7 @@ T_MIN_DAYS = float(os.getenv("REMEM_T_MIN_DAYS", "1.0"))
 T_MAX_DAYS = float(os.getenv("REMEM_T_MAX_DAYS", "180"))
 FIXED_INTERVAL_DAYS = 3.0
 
-MAX_STUDENT_ACCOUNTS = 10
+MAX_STUDENT_ACCOUNTS = int(os.getenv("REMEM_MAX_STUDENTS", "15"))     # 10 for the study plus 5 spares; the best 10 are chosen for analysis
 NOTES_PER_DAY = int(os.getenv("REMEM_NOTES_PER_DAY", "3"))
 USE_FALLBACK_BANK = os.getenv("REMEM_FALLBACK", "1") == "1"       # ready-made topics fall back to the pre-written quiz when the language model fails
 MAX_NOTE_CHARS = 6000

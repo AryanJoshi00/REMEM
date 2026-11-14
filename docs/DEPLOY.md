@@ -38,7 +38,7 @@ cd /opt/remem
 sudo -u remem /opt/remem/venv/bin/python -m backend.admin_create_user create demo --role demo
 sudo -u remem /opt/remem/venv/bin/python -m backend.admin_create_user create p01
 ```
-Passwords are printed once; hand them out privately. Up to 10 student accounts.
+Passwords are printed once; hand them out privately. Up to 15 student accounts (10 for the study plus 5 spares; `REMEM_MAX_STUDENTS` in `.env` changes the cap).
 
 ## 5. Operate
 - Logs: `sudo journalctl -u remem -f`

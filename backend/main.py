@@ -518,7 +518,7 @@ def push_test(user=Depends(auth.consented_user)):
         if not conn.execute("SELECT 1 FROM push_subs WHERE user_id=?", (user["user_id"],)).fetchone():
             raise HTTPException(404, "Reminders aren't on for this account. Turn them on first.")
         n = push.due_count(conn, user["user_id"], now)
-    payload = {"title": "Reminders are on", "body": "This is what a REMEM reminder looks like. You'll get one when a concept is due to review.", "count": n, "url": "./#/"}
+    payload = {"title": "Reminders are on", "body": "This is what a Remem reminder looks like. You'll get one when a concept is due to review.", "count": n, "url": "./#/"}
     sent, failed = push.send_to_user(user["user_id"], payload, "test", now)
     return {"sent": sent, "failed": failed}
 
