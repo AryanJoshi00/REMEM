@@ -45,14 +45,34 @@
      "correct_index": 1
     },
     {
-     "stem": "Which of these is NOT one of the three exposure settings?",
+     "stem": "Your photo comes out too dark. Which change lets more light reach the sensor?",
      "options": [
-      "ISO",
-      "Aperture",
-      "Shutter speed",
-      "White balance"
+      "A faster shutter speed",
+      "A narrower aperture",
+      "A lower ISO",
+      "A wider aperture"
      ],
      "correct_index": 3
+    },
+    {
+     "stem": "Why might changing one exposure setting mean changing another?",
+     "options": [
+      "To change the colours",
+      "To keep the same overall exposure",
+      "To make the file smaller",
+      "To focus faster"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which of these does NOT change how much light the photo gets?",
+     "options": [
+      "White balance",
+      "Aperture",
+      "Shutter speed",
+      "ISO"
+     ],
+     "correct_index": 0
     }
    ]
   },
@@ -101,14 +121,34 @@
      "correct_index": 2
     },
     {
-     "stem": "In what is aperture measured?",
+     "stem": "For a portrait with a blurred background, which setting helps?",
      "options": [
-      "Seconds",
-      "Hertz",
-      "Pixels",
-      "f-numbers"
+      "A narrow aperture",
+      "A slow shutter speed",
+      "A wide aperture",
+      "A low ISO"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "For a landscape where both the near flowers and the far mountains must be sharp, which aperture suits best?",
+     "options": [
+      "f/1.8",
+      "f/2.8",
+      "f/4",
+      "f/16"
      ],
      "correct_index": 3
+    },
+    {
+     "stem": "Which gives a wider lens opening, f/2 or f/11?",
+     "options": [
+      "f/11",
+      "f/2",
+      "They are the same",
+      "It depends on the ISO"
+     ],
+     "correct_index": 1
     }
    ]
   },
@@ -157,14 +197,34 @@
      "correct_index": 3
     },
     {
-     "stem": "What is a common guide for the slowest shutter speed when holding the camera by hand?",
+     "stem": "To freeze a footballer mid-kick, which shutter speed would you choose?",
      "options": [
-      "At least 1 over the focal length",
-      "Exactly 1/2000",
-      "Always 1/10",
-      "At least 1 second"
+      "1/2000",
+      "1/8",
+      "1/2",
+      "1 second"
      ],
      "correct_index": 0
+    },
+    {
+     "stem": "To show a waterfall as a smooth blur, which shutter speed suits?",
+     "options": [
+      "1/2000",
+      "1/500",
+      "1/125",
+      "1 second"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "By the hand-held guide, what is the slowest safe shutter speed with a 200 mm lens?",
+     "options": [
+      "1/20",
+      "1/50",
+      "1/200",
+      "1/2000"
+     ],
+     "correct_index": 2
     }
    ]
   },
@@ -213,12 +273,32 @@
      "correct_index": 3
     },
     {
-     "stem": "When would you raise the ISO?",
+     "stem": "You double the ISO from 400 to 800. What happens to the image?",
      "options": [
-      "When you want less grain",
-      "When you want a slower shutter",
-      "When shooting in bright sunlight",
-      "When shooting in the dark"
+      "One stop darker",
+      "One stop brighter",
+      "No change",
+      "Four stops brighter"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Two photos of the same dark room: one at ISO 200, one at ISO 3200. Which shows more grain?",
+     "options": [
+      "ISO 200",
+      "Both the same",
+      "ISO 3200",
+      "Neither"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Why not always shoot at the highest ISO?",
+     "options": [
+      "It drains the battery",
+      "It blurs moving things",
+      "It changes the colours",
+      "It adds noise that looks like grain"
      ],
      "correct_index": 3
     }
@@ -269,14 +349,34 @@
      "correct_index": 1
     },
     {
-     "stem": "If you use a faster shutter speed, how can you keep the same exposure?",
+     "stem": "From f/4 to f/8 is how many stops narrower?",
      "options": [
-      "Use a wider aperture or a higher ISO",
-      "Move further away",
-      "Use a narrower aperture",
-      "Lower the ISO"
+      "One",
+      "Two",
+      "Three",
+      "Four"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "You go from f/2.8 to f/4. To keep the same exposure, what could you do to the ISO?",
+     "options": [
+      "Double it",
+      "Halve it",
+      "Leave it",
+      "Multiply it by four"
      ],
      "correct_index": 0
+    },
+    {
+     "stem": "Closing the aperture by one stop lets in how much light?",
+     "options": [
+      "Twice as much",
+      "The same amount",
+      "Four times as much",
+      "Half as much"
+     ],
+     "correct_index": 3
     }
    ]
   },
@@ -325,12 +425,32 @@
      "correct_index": 0
     },
     {
-     "stem": "Where can the subject be placed according to the rule of thirds?",
+     "stem": "Sunrise is at 6:00 and sunset at 18:30. Which time is in golden hour?",
      "options": [
-      "At the crossings of the dividing lines",
-      "Outside the frame",
-      "Only in the exact centre",
-      "Only at the very edge"
+      "9:00",
+      "12:30",
+      "15:00",
+      "18:00"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which landscape photo follows the rule of thirds?",
+     "options": [
+      "A horizon exactly across the middle",
+      "A horizon along the lower third line of the frame",
+      "A subject cut off at the edge",
+      "A subject filling the whole frame"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Indoors under yellow bulbs, white paper looks yellow in your photo. Which setting is meant to fix this?",
+     "options": [
+      "White balance",
+      "ISO",
+      "Aperture",
+      "Shutter speed"
      ],
      "correct_index": 0
     }

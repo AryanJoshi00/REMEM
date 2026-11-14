@@ -2,7 +2,7 @@
 
 Rule (the same for every arm, so the comparison stays fair): every REMIND_EVERY_S the server looks at each account that
 turned reminders on. If at least one studied concept is due, it is between 9 am and 9 pm India time, and the account has
-not had a reminder yet today, it sends one notification: "N concepts are ready to review". So nobody gets more than
+not had a reminder yet today, it sends one notification: "Today's test is ready: N questions are waiting". So nobody gets more than
 one reminder a day, and nobody gets one at night. The message carries only the count (it is encrypted end to end).
 
 Keys: run `python -m backend.push keys` once and put the two printed lines in the server's .env.
@@ -17,7 +17,7 @@ import sys
 import time
 from urllib.parse import urlparse
 
-from backend import config, db
+from backend import config, daily, db
 
 log = logging.getLogger("remem.push")
 
@@ -51,14 +51,13 @@ def local_hour(ts: int) -> int:
 
 
 def due_count(conn, uid: int, now: int) -> int:
-    """Studied concepts whose review time has come (the same list as 'Due now' on Today)."""
-    return conn.execute("""SELECT COUNT(*) FROM state s JOIN concepts c ON c.concept_id=s.concept_id
-                           WHERE s.user_id=? AND s.last_ts IS NOT NULL AND s.due_at<=?""", (uid, now)).fetchone()[0]
+    """Questions waiting in today's test (the same number as the card on Today and the badge on the app icon)."""
+    return daily.remaining(conn, uid, now)
 
 
 def message(n: int) -> dict:
-    body = "1 concept is ready to review. A quick quiz now keeps it fresh." if n == 1 else f"{n} concepts are ready to review. A quick quiz now keeps them fresh."
-    return {"title": "Time to review", "body": body, "count": n, "url": "./#/"}
+    body = ("1 question is waiting." if n == 1 else f"{n} questions are waiting.") + " A few minutes now keeps what you studied fresh."
+    return {"title": "Today's test is ready", "body": body, "count": n, "url": "./#/"}
 
 
 def _send_one(sub, payload: dict) -> int | None:

@@ -133,6 +133,40 @@ function installBannerHidden() { const t = Number(store.get("remem_install_hide"
 function setBadge(n) {                              // the number of concepts due, shown on the home-screen icon where the phone allows it
   try { if (n > 0 && navigator.setAppBadge) navigator.setAppBadge(n); else if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) { /* not supported */ }
 }
+// ---------------------------------------------------------------- sounds: original tones built in the browser (no files, nothing to download)
+const SND = { ctx: null, out: null };
+function soundOn() { return store.get("remem_sound") !== "0"; }
+function audioReady() {                              // called inside the tap itself: phones only allow sound that starts from a tap
+  if (!soundOn()) return null;
+  try {
+    if (!SND.ctx) {
+      const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
+      SND.ctx = new C(); const comp = SND.ctx.createDynamicsCompressor(); SND.out = SND.ctx.createGain(); SND.out.gain.value = 0.55;
+      SND.out.connect(comp); comp.connect(SND.ctx.destination);
+    }
+    if (SND.ctx.state === "suspended") SND.ctx.resume();
+    return SND.ctx;
+  } catch (e) { return null; }
+}
+function tone(t, f, dur, o = {}) {
+  const c = SND.ctx, g = c.createGain(), peak = o.gain ?? 0.35;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + (o.attack ?? 0.006)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  let out = g; if (o.lp) { const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = o.lp; lp.Q.value = 0.7; g.connect(lp); out = lp; }
+  out.connect(SND.out);
+  (o.parts || [[1, 1, o.type || "sine"]]).forEach(([m, a, ty]) => {
+    const os = c.createOscillator(), og = c.createGain(); os.type = ty || "sine"; os.frequency.setValueAtTime(f * m, t);
+    if (o.glide) os.frequency.exponentialRampToValueAtTime(o.glide * m, t + (o.glideT ?? dur * 0.8));
+    og.gain.value = a; os.connect(og); og.connect(g); os.start(t); os.stop(t + dur + 0.05);
+  });
+}
+const PLUCK = [[1, 1, "sine"], [2, 0.35, "sine"], [3, 0.12, "triangle"]], BELL = [[1, 1, "triangle"], [2, 0.5, "sine"], [4.01, 0.12, "sine"]];
+const SOUNDS = {
+  right: t => { tone(t, 520, 0.07, { glide: 900, glideT: 0.05, gain: 0.18 }); tone(t + 0.06, 880, 0.32, { parts: PLUCK, gain: 0.3 }); tone(t + 0.14, 1318.5, 0.5, { parts: PLUCK, gain: 0.32 }); },   // Bubbly
+  wrong: t => { tone(t, 174.6, 0.16, { type: "square", lp: 900, gain: 0.22 }); tone(t + 0.13, 146.8, 0.3, { type: "square", lp: 700, gain: 0.22 }); },                                             // Soft bonk
+  end: t => { const n = [523.3, 659.3, 784, 1046.5]; n.forEach((f, i) => tone(t + i * 0.09, f, 0.3, { parts: PLUCK, gain: 0.24 })); n.forEach(f => tone(t + 0.4, f, 1.1, { parts: BELL, gain: 0.11, attack: 0.03 })); },   // Fanfare
+};
+function play(name) { const c = audioReady(); if (!c) return; try { SOUNDS[name](c.currentTime + 0.02); } catch (e) { /* no sound is fine */ } }
+
 // ---------------------------------------------------------------- review reminders (web push)
 const PUSH = { key: null, synced: false };
 function swReady() {                                 // the service worker, or an error rather than waiting forever
@@ -283,7 +317,7 @@ function icon(name, cls) {
   svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("aria-hidden", "true"); if (cls) svg.setAttribute("class", cls);
   const path = document.createElementNS(NS, "path"); path.setAttribute("d", name.startsWith("M") ? name : ICONS[name]); svg.append(path); return svg;
 }
-function dueCount() { try { const d = JSON.parse(store.get("remem_due") || "null"); return d ? d.due.length : 0; } catch (e) { return 0; } }
+function dueCount() { try { const d = JSON.parse(store.get("remem_due") || "null"); return d && d.test ? d.test.questions : 0; } catch (e) { return 0; } }
 function renderNav() {
   const nav = document.getElementById("nav"), who = document.getElementById("who");
   nav.replaceChildren(); who.textContent = S.token ? S.user : "";
@@ -292,7 +326,7 @@ function renderNav() {
   [["#/", "Today", "today"], ["#/notes", "Topics", "notes"], ["#/concepts", "Concepts", "concepts"], ["#/me", "Me", "me"]].forEach(([href, label, ic]) => {
     const on = href === "#/" ? cur === "#/" : cur.startsWith(href);
     const badge = href === "#/" && n;
-    nav.append(h("a", { href, class: on ? "on" : "", "aria-current": on ? "page" : false, "aria-label": badge ? label + ", " + pl(n, "concept") + " due" : false },
+    nav.append(h("a", { href, class: on ? "on" : "", "aria-current": on ? "page" : false, "aria-label": badge ? label + ", " + pl(n, "question") + " waiting" : false },
       icon(ic), label, badge ? h("span", { class: "badge", "aria-hidden": "true" }, String(n)) : null));
   });
 }
@@ -305,11 +339,6 @@ function meter(R, fading, name) {      // the freshness bar: how much you still 
   return h("div", { class: "meter" + (fading ? " fading" : ""), role: "meter", "aria-label": name ? name + ", recall" : "Recall", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": pct, "aria-valuetext": pct + "% recall" }, h("i", { style: "--v:" + R }));
 }
 function aboutDays(d) { return d <= 0.5 ? "today" : "in about " + pl(Math.max(1, Math.round(d)), "day"); }      // Today and the memory curve round the same way
-const daysText = aboutDays;
-function wholeDays(msg) {                // "Next review in about 4.4 days." -> "Next review in about 4 days.", rounded like Today; any other text is left as it is
-  const m = /^Next review in about (\d+(?:\.\d+)?) days?\.$/.exec(String(msg || ""));
-  return m ? "Next review " + aboutDays(Number(m[1])) + "." : msg;
-}
 
 function viewLogin() {
   const err = h("div", { class: "err", role: "alert" });
@@ -330,7 +359,7 @@ function viewLogin() {
     } catch (ex) { err.textContent = errText(ex); go.disabled = false; if (!isOffline(ex)) { p.focus(); p.select(); } }
   } }, h("div", {}, h("label", { for: "u" }, "Username"), u), h("div", {}, h("label", { for: "p" }, "Password"), h("div", { class: "pw" }, p, showBtn)), err, go);
   u.id = "u"; p.id = "p";
-  mount(h("h1", {}, "Remember what you study"), h("p", { class: "muted" }, "Remem tells you what to revise, and when. Your project owner gives you a username and password."), form,
+  mount(h("h1", {}, "Remember what you study"), h("p", { class: "muted" }, "Remem quizzes you just before you'd forget, so what you study actually stays. Your project owner gives you a username and password."), form,
     env().standalone ? null : h("p", {}, h("a", { href: "#/install" }, "Add Remem to your home screen")));
 }
 
@@ -377,52 +406,83 @@ function viewConsent() {
 }
 
 function renderHome(d) {
-  setBadge(d.due.length);
+  const t = d.test || { questions: 0, answered: 0, concepts: 0 };
+  setBadge(t.questions);
   const nodes = [h("h1", {}, "Today")];
-  const counts = [d.due.length ? d.due.length + " due" : "", d.new.length ? d.new.length + " new" : ""].filter(Boolean).join(", ");
-  if (counts) nodes.push(h("p", { class: "muted" }, counts));
   if (S.offline) nodes.push(h("p", { class: "muted small offline", role: "status" }, "Offline. Showing what was saved on this phone."));
-  const finalCard = d.final && d.final.open && d.final.remaining ? h("div", { class: "calm" }, h("b", {}, "Final check is open"),
-    h("p", { class: "muted" }, pl(d.final.remaining, "question") + ", one per concept. It takes a few minutes and doesn't change your schedule."),
-    h("a", { class: "btn outline block", href: "#/final" }, "Start the final check")) : null;   // secondary: the lead stays the one solid button
-  const lead = d.due[0] || d.new[0];
-  const row = (c, kind) => {
-    const href = kind === "later" ? "#/curve/" + c.concept_id : "#/practice/" + c.concept_id;
-    const kids = [h("span", { class: "name", dir: "auto" }, c.name)];
-    if (c.new) kids.push(h("span", { class: "when" }, "not studied yet"), h("div", { class: "meter empty", "aria-hidden": "true" }));
-    else {
-      const late = kind === "due";
-      kids.push(h("span", { class: "when" + (late ? " late" : "") }, late ? "review now" : daysText(c.due_in_days)), meter(c.R_now, late || c.R_now < THETA_UI, c.name));
-    }
-    return h("li", {}, h("a", { class: "item", href }, kids));
-  };
-  const section = (title, items, kind) => { if (items.length) nodes.push(h("h2", {}, title), h("ul", { class: "ledger" }, items.map(c => row(c, kind)))); };
-  // order: the one thing to do next, then the final check, then the lists; the install banner (lowest value, dismissible) last
-  if (lead) {
-    nodes.push(h("div", { class: "next" }, h("h2", { dir: "auto" }, lead.name), h("p", {}, lead.new ? "New concept. Take the first quiz." : "Your recall has dropped to about " + Math.round(lead.R_now * 100) + "%. A quick review brings it back."),
-      h("a", { class: "btn", href: "#/practice/" + lead.concept_id }, lead.new ? "Start the quiz" : "Review now")));
-    if (finalCard) nodes.push(finalCard);
-    section("Also due", d.due.slice(lead === d.due[0] ? 1 : 0), "due");
-    section("New", d.new.slice(lead === d.new[0] && !d.due.length ? 1 : 0), "new");
-  } else if (d.upcoming.length) {
-    nodes.push(h("div", { class: "calm" }, h("b", {}, "You're all caught up"), h("p", { class: "muted" }, "Next review: " + d.upcoming[0].name + " " + daysText(d.upcoming[0].due_in_days) + ".")),
-      h("a", { class: "btn block", href: "#/notes" }, "Pick another topic"));
-    if (finalCard) nodes.push(finalCard);
-  } else {
-    nodes.push(h("div", { class: "calm" }, h("b", {}, "Welcome. Here is how it works"),
-      stepList(["Pick a topic and read the short text once.", "Answer a few quiz questions on it.", "Remem tells you when to come back, just before you would forget."])),
-      h("a", { class: "btn primary block", href: "#/notes" }, "Pick a topic"));
-    if (finalCard) nodes.push(finalCard);
+  const mins = n => "About " + pl(Math.max(1, Math.round(n * 15 / 60)), "minute") + ".";          // about 15 seconds a question
+  const first = d.first || [];
+  let hero = false;
+  if (t.questions > 0) {                    // one card, no concept names: the test checks what you remember, not what you can guess
+    hero = true;
+    nodes.push(h("div", { class: "next" }, h("h2", {}, t.answered ? "Finish today's test" : "Today's test"),
+      h("p", {}, (t.answered ? pl(t.questions, "question") + " left" : pl(t.questions, "question") + " from " + pl(t.concepts, "concept")) + ". " + mins(t.questions)),
+      h("a", { class: "btn", href: "#/test" }, t.answered ? "Continue the test" : "Start the test")));
   }
-  if (!S.offline && (d.due.length || d.upcoming.length)) { const slot = h("div", { class: "remind-slot" }); nodes.push(slot); fillReminderCard(slot); }   // offered once something has been studied
-  section("Later", d.upcoming, "later");
+  first.forEach(f => {                      // a topic just read: its first quiz, kept apart from the reviews
+    const card = [h("h2", {}, "First quiz: " + f.title), h("p", {}, pl(f.questions, "question") + " on what you just read. " + mins(f.questions))];
+    if (!hero) { hero = true; nodes.push(h("div", { class: "next" }, card, h("a", { class: "btn", href: "#/test?note=" + f.note_id }, "Start the first quiz"))); }
+    else nodes.push(h("div", { class: "calm" }, h("b", {}, "First quiz: " + f.title), h("p", { class: "muted" }, card[1].textContent), h("a", { class: "btn outline block", href: "#/test?note=" + f.note_id }, "Start the first quiz")));
+  });
+  const fin = d.final || {};
+  if (fin.open && fin.remaining > 0) {
+    nodes.push(h("div", { class: "calm" }, h("b", {}, "The Remem Test is open"),
+      h("p", { class: "muted" }, "One last check on everything you've studied: " + pl(fin.remaining, "question") + ", no hints. It doesn't change your schedule."),
+      h("a", { class: "btn outline block", href: "#/final" }, fin.answered ? "Continue the Remem Test" : "Start the Remem Test")));
+  } else if (fin.finished) {
+    nodes.push(h("div", { class: "calm" }, h("b", {}, "You finished the Remem Test"), h("p", { class: "muted" }, "Thank you. Your notes are unlocked again, so you can re-read any topic.")));
+  }
+  if (!hero && d.studied) {
+    nodes.push(h("div", { class: "calm" }, h("b", {}, "You're all caught up"),
+      h("p", { class: "muted" }, d.next_test_in_days == null ? "Your next test will appear here." : "Your next test is " + aboutDays(d.next_test_in_days) + ". Remem will remind you."),
+      h("a", { class: "btn block", href: "#/notes" }, "Pick another topic")));
+  } else if (!hero && !d.studied) {
+    nodes.push(h("div", { class: "calm" }, h("b", {}, "How Remem works"),
+      stepList(["Pick a topic and read it once. Just understand it, no need to memorise.", "Take a short quiz.", "Remem works out when you're about to forget and sends you a quick test then."])),
+      h("a", { class: "btn primary block", href: "#/notes" }, "Pick a topic"));
+  }
+  if (!S.offline && d.studied) { const slot = h("div", { class: "remind-slot" }); nodes.push(slot); fillReminderCard(slot); }   // offered once something has been studied
   const ib = installBanner(); if (ib) nodes.push(ib);
   mount(nodes);
+  if (d.whats_new && !S.offline) showWhatsNew(d);
 }
-
+let whatsNewShown = false;
+function showWhatsNew(d) {                 // once, only for people who had answered questions before these changes went live
+  if (whatsNewShown || !window.HTMLDialogElement) return;
+  whatsNewShown = true;
+  const seen = () => api("/whats-new/seen", { method: "POST" }).catch(() => {});
+  const close = () => { dlg.close(); dlg.remove(); };
+  const reads = d.last_read || [];
+  const item = (title, text) => h("li", {}, h("b", {}, title), " " + text);
+  const dlg = h("dialog", { class: "sheet", "aria-labelledby": "wn-title" },
+    h("h2", { id: "wn-title" }, "Thank you for testing Remem"),
+    h("p", {}, "I made a few mistakes in the first days, and your feedback helped me fix them. Here's what's new:"),
+    h("ol", { class: "wn" },
+      item("No more repeated questions.", "Each question comes up once per test. The schedule is fixed too, so nothing gets pushed 348 days away any more."),
+      item("One test a day.", "Everything due is mixed into one short test, without telling you the topic. That way it checks what you remember, not what you can guess. You see the right answers at the end."),
+      item("Reminders.", "Turn them on, and Remem tells you when your test is ready."),
+      item("Notes lock after one read.", "If you could re-read, Remem couldn't tell what you remembered from what you just read. You get one last read now; after that, your notes open again once you finish the Remem Test.")),
+    h("p", { class: "muted" }, "Thanks for your help. — Aryan"),
+    h("div", { class: "stack" },
+      reads.length ? h("button", { class: "primary block", type: "button", onclick: () => { seen(); close(); location.hash = reads.length === 1 ? "#/notes/" + reads[0].topic_id : "#/notes"; } }, "Read my notes one last time") : null,
+      h("button", { class: reads.length ? "block" : "primary block", type: "button", onclick: () => { seen(); close(); } }, "Got it")));
+  dlg.addEventListener("cancel", () => { seen(); setTimeout(() => dlg.remove(), 0); });   // Esc or the back gesture counts as seen
+  document.body.append(dlg); dlg.showModal();
+}
+function confirmSheet(title, text, yes, no) {     // a small native sheet; resolves true for the first button
+  return new Promise(resolve => {
+    if (!window.HTMLDialogElement) { resolve(window.confirm(title + "\n\n" + text)); return; }
+    const done = v => { dlg.close(); dlg.remove(); resolve(v); };
+    const dlg = h("dialog", { class: "sheet", "aria-labelledby": "cs-title" }, h("h2", { id: "cs-title" }, title), h("p", {}, text),
+      h("div", { class: "stack" }, h("button", { class: "primary block", type: "button", onclick: () => done(true) }, yes), h("button", { class: "block", type: "button", onclick: () => done(false) }, no)));
+    dlg.addEventListener("cancel", e => { e.preventDefault(); done(false); });
+    document.body.append(dlg); dlg.showModal();
+  });
+}
 async function viewHome() {
   syncReminders(); clearShownReminders();
   let cached = null; try { cached = JSON.parse(store.get("remem_due") || "null"); } catch (e) { /* ignore */ }
+  if (cached && !cached.test) cached = null;                                         // saved by an older version of the app: not drawn
   if (cached) renderHome(cached); else mount(h("h1", {}, "Today"), skeleton(3, true));     // show last known state instantly, refresh underneath
   let d;
   try { d = await api("/due"); }
@@ -438,101 +498,119 @@ async function viewHome() {
   if (!same && (location.hash === "" || location.hash === "#/")) renderHome(d);     // no second render (and no second bar animation) when nothing changed
 }
 
-const sess = { cid: null, n: 0, ok: 0 };           // this sitting only: how many questions answered, and how many right
-async function viewPractice(cid) {
-  if (sess.cid !== cid) { sess.cid = cid; sess.n = 0; sess.ok = 0; }
-  mount(h("h1", {}, "Practice"), skeleton(2));
-  let q; try { q = await api("/question/next?concept=" + cid); } catch (e) { return errScreen("Practice", e, h("a", { class: "btn", href: "#/" }, "Back to today")); }
-  if (q.done) return practiceDone(q);
-  if (q.position === 1) { sess.n = 0; sess.ok = 0; }                     // a new sitting starts its own count
-  const last = q.position >= q.total;
+function progress(done, total) {          // the progress bar: grows smoothly as each answer is given
+  const fill = h("i", { style: "width:" + (total ? 100 * done / total : 0) + "%" });
+  const bar = h("div", { class: "progress", role: "progressbar", "aria-label": "Progress", "aria-valuemin": 0, "aria-valuemax": total, "aria-valuenow": done, "aria-valuetext": done + " of " + total + " answered" }, fill);
+  bar.step = n => { fill.style.width = (total ? 100 * n / total : 0) + "%"; bar.setAttribute("aria-valuenow", n); bar.setAttribute("aria-valuetext", n + " of " + total + " answered"); };
+  return bar;
+}
+function testHeader(prog, pos, total) {
+  return h("div", { class: "testbar" }, h("a", { class: "btn link close", href: "#/", "aria-label": "Close the test. Your answers are saved." }, icon("M6 6l12 12M18 6L6 18")),
+    prog, h("span", { class: "count", "aria-hidden": "true" }, pos + " of " + total));
+}
+function newKey() { return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(); }
+
+async function viewTest(note) {           // today's test (all due concepts, mixed) or one topic's first quiz; no concept names until the end
+  const title = note ? "First quiz" : "Today's test", back = h("a", { class: "btn", href: "#/" }, "Back to today");
+  mount(h("h1", {}, title), skeleton(2));
+  let q; try { q = await api("/test/next" + (note ? "?note=" + note : "")); } catch (e) { return errScreen(title, e, back); }
+  if (q.done) return testDone(q, note);
+  const prog = progress(q.position - 1, q.total), last = q.position >= q.total;
   const t0 = performance.now();
   let answered = false;
   const fb = h("div", { class: "fb stack", role: "status" });
   const opts = q.options.map((text, i) => h("button", { class: "opt", onclick: async () => {
     if (answered) return; answered = true;
+    audioReady();                                                            // unlock sound inside the tap; it plays when the answer comes back
     opts.forEach(b => b.disabled = true);
-    const body = { question_id: q.question_id, chosen_index: i, rt_ms: Math.round(performance.now() - t0), idem_key: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()) };
-    opts[i].classList.add("picked");                                         // after rt_ms is taken: shows the tap registered while the answer is checked
+    const body = { question_id: q.question_id, chosen_index: i, rt_ms: Math.round(performance.now() - t0), idem_key: newKey() };
+    opts[i].classList.add("picked");
     try {
       const r = await api("/respond", { method: "POST", body });
-      sess.n++; if (r.correct) sess.ok++;
-      const good = opts[r.correct_index]; good.classList.add("right"); good.querySelector(".key").replaceChildren(icon("M5 12.5l4.5 4.5L19 7.5")); if (!r.correct) good.querySelector(".txt").append(h("span", { class: "tag" }, "Correct answer"));      // only needed when the pick was wrong
-      if (!r.correct) { const bad = opts[i]; bad.classList.add("wrong"); bad.querySelector(".key").replaceChildren(icon("M6 6l12 12M18 6L6 18")); bad.querySelector(".txt").append(h("span", { class: "tag" }, "Your answer")); }
-      fb.replaceChildren(h("div", {}, h("div", { class: "verdict " + (r.correct ? "ok" : "err") }, r.correct ? "Correct" : "Not quite"), h("div", { class: "muted" }, wholeDays(r.message)), h("div", { class: "muted small sess" }, sess.ok + " of " + sess.n + " right this sitting"),
-          r.source ? h("div", { class: "src" }, h("span", { class: "small" }, "From your notes"), h("q", { dir: "auto" }, r.source)) : null),
-        h("button", { class: "primary block", onclick: () => viewPractice(cid) }, last ? "Finish" : "Next question"),
-        h("div", { class: "grid2" }, h("a", { class: "btn", href: "#/curve/" + cid }, "Memory curve"), h("a", { class: "btn", href: "#/" }, "Finish")));
+      play(r.correct ? "right" : "wrong");
+      prog.step(q.position);
+      const mine = opts[i];                                                 // only your own pick is marked: the right answers come at the end,
+      mine.classList.add(r.correct ? "right" : "wrong");                    // so every answer in the test is a clean test of memory
+      mine.querySelector(".key").replaceChildren(icon(r.correct ? "M5 12.5l4.5 4.5L19 7.5" : "M6 6l12 12M18 6L6 18"));
+      fb.replaceChildren(...shown([h("div", { class: "verdict " + (r.correct ? "ok" : "err") }, r.correct ? "Correct" : "Not quite"),
+        r.correct ? null : h("p", { class: "muted small" }, "You'll see the right answer at the end of the test."),
+        h("button", { class: "primary block", onclick: () => viewTest(note) }, last ? "See how you did" : "Next question")]));
       store.del("remem_due");
       opts[i].classList.remove("picked");
       fb.scrollIntoView({ block: "end", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
       const next = fb.querySelector("button.primary"); if (next) next.focus({ preventScroll: true });
     } catch (e) {
       if (e instanceof TypeError) { const qd = queue(); qd.push(body); saveQueue(qd); fb.replaceChildren(h("div", { class: "panel" }, "You're offline. Your answer is saved and will sync when you reconnect."), h("a", { class: "btn block", href: "#/" }, "Back to today")); }
-      else { answered = false; opts[i].classList.remove("picked"); opts.forEach(b => b.disabled = false); toast(errText(e)); }
+      else { answered = false; opts[i].classList.remove("picked"); opts.forEach(b => b.disabled = false); toast(errText(e)); if (e.status === 409) viewTest(note); }
     }
   } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[i]), h("span", { class: "txt", dir: "auto" }, text)));
   const flag = h("button", { class: "link flag", type: "button", onclick: async () => {
     try { await api("/flag", { method: "POST", body: { question_id: q.question_id } }); toast("Thanks, question flagged"); flag.textContent = "Reported, thank you"; flag.disabled = true; } catch (x) { toast(errText(x)); }
   } }, "Report a bad question");
-  mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today"), h("span", { class: "where", dir: "auto" }, (q.total ? "Question " + q.position + " of " + q.total + " · " : "") + (q.concept || ""))), h("h1", { class: "q", dir: "auto" }, q.stem), h("div", { class: "opts" }, opts), fb,
-        h("p", { class: "links" }, q.topic_id ? h("a", { class: "flag", href: "#/notes/" + q.topic_id + "?r=1" }, "Read the notes again") : null, flag));
+  mount(testHeader(prog, q.position, q.total), h("h1", { class: "q", dir: "auto" }, q.stem), h("div", { class: "opts" }, opts), fb, h("p", { class: "links" }, flag));
 }
 
-function practiceDone(q) {                         // every practice question has been asked once in this sitting: stop here, never loop back to the first
-  const own = sess.cid === q.concept_id && sess.n > 0;
-  const when = q.next_due_in_days == null ? "" : " Next review " + aboutDays(q.next_due_in_days) + ".";
-  mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today"), h("span", { class: "where", dir: "auto" }, q.concept || "")),
-    h("h1", {}, "Done for now"),
-    h("div", { class: "calm" }, h("b", {}, own ? sess.ok + " of " + sess.n + " right" : "You've answered every question on this concept"),
-      h("p", { class: "muted" }, "That was every question on " + (q.concept || "this concept") + " for this sitting. Remem will bring it back when it's time." + when)),
-    h("p", {}, h("a", { class: "btn primary block", href: "#/" }, "Back to today")),
-    h("p", {}, h("a", { class: "btn block", href: "#/curve/" + q.concept_id }, "Memory curve")));
+function testDone(s, note) {               // the score, then each concept by name: how it went and when it comes back
+  store.del("remem_due");
+  const back = h("p", {}, h("a", { class: "btn primary block", href: "#/" }, "Back to today"));
+  if (!s.total) return mount(h("h1", {}, "Nothing to answer right now"), h("p", { class: "muted" }, "There's no test waiting. Remem will bring your next one when it's time."), back);
+  play("end");
+  const rows = s.concepts.filter(c => c.marks.length).map(c => h("li", {},
+    h("span", { class: "name", dir: "auto" }, c.name),
+    h("span", { class: "dots", role: "img", "aria-label": c.marks.filter(Boolean).length + " of " + c.marks.length + " right" }, c.marks.map(m => h("i", { class: m ? "on" : "" }))),
+    h("span", { class: "when" }, c.next_due_in_days == null ? "" : "Back " + aboutDays(c.next_due_in_days))));
+  const missed = (s.missed || []).map(m => h("li", { class: "miss" },
+    h("p", { class: "q", dir: "auto" }, m.stem),
+    m.chosen_index == null || m.chosen_index === m.correct_index ? null
+      : h("p", { class: "ans bad", dir: "auto" }, h("span", { class: "lab" }, "Your answer"), m.options[m.chosen_index]),
+    h("p", { class: "ans good", dir: "auto" }, h("span", { class: "lab" }, "Right answer"), m.options[m.correct_index])));
+  mount(h("h1", {}, note ? "First quiz done" : "Test done"),
+    h("div", { class: "score" }, h("b", {}, s.right + " of " + s.total), h("span", {}, " right")),
+    h("ul", { class: "ledger summary" }, rows),
+    h("h2", {}, missed.length ? "Your mistakes" : "No mistakes this time"),
+    missed.length ? h("ul", { class: "misses" }, missed) : null, back);
 }
 
-async function viewFinal() {
-  const back = h("a", { class: "btn block", href: "#/" }, "Back to today");
-  mount(h("h1", {}, "Final check"), skeleton(2));
-  let f; try { f = await api("/final"); } catch (e) { return errScreen("Final check", e, back); }
-  if (!f.open || !f.items.length) {
-    return mount(h("h1", {}, "Final check"), h("div", { class: "calm" }, h("b", {}, f.open ? "Nothing to answer right now" : "The final check isn't open"),
-      h("p", { class: "muted" }, f.open ? "There are no final-check questions waiting for you. If you haven't studied a topic yet, pick one first." : "Your project owner will tell you when it opens.")), back);
-  }
-  const total = f.items.length; let right = 0;
-  mount(h("h1", {}, "Final check"), h("p", {}, pl(total, "question") + ", one for each concept in your topics. You won't see whether an answer is right until the end, and your review schedule stays as it is."),
-    h("button", { class: "primary block", onclick: () => ask(0) }, "Begin"), h("p", {}, back));
+async function viewFinal() {               // the Remem Test: three unseen questions per concept, shuffled, no names, no right or wrong until the end
+  const back = h("p", {}, h("a", { class: "btn block", href: "#/" }, "Back to today")), title = "The Remem Test";
+  mount(h("h1", {}, title), skeleton(2));
+  let d; try { d = await api("/due"); } catch (e) { return errScreen(title, e, back); }
+  const fin = d.final || {};
+  if (!fin.open) return mount(h("h1", {}, title), h("div", { class: "calm" }, h("b", {}, "The Remem Test isn't open yet"), h("p", { class: "muted" }, "Your project owner will tell you when it opens.")), back);
+  if (!fin.total) return mount(h("h1", {}, title), h("div", { class: "calm" }, h("b", {}, "Nothing to answer"), h("p", { class: "muted" }, "Study a topic first, then come back for the Remem Test.")), back);
+  if (fin.remaining > 0) {
+    mount(h("h1", {}, title), h("p", {}, "Do you still remember? " + pl(fin.total, "question") + " on the concepts you've studied, mixed together, with no hints. You'll see your score at the end, and your review schedule stays as it is."),
+      h("button", { class: "primary block", onclick: () => ask() }, fin.answered ? "Continue (" + fin.remaining + " left)" : "Begin"), back);
+  } else ask();
 
-  async function ask(i) {
-    if (i >= total) {
-      store.del("remem_due");
-      return mount(h("h1", {}, "Final check done"), h("div", { class: "calm" }, h("b", {}, right + " of " + total + " correct"),
-        h("p", { class: "muted" }, "Thank you. These are your answers to the " + pl(total, "question") + ".")), back);
+  async function ask() {
+    mount(h("h1", {}, title), skeleton(2));
+    let q; try { q = await api("/final/next"); }
+    catch (e) { return mount(h("h1", {}, title), h("div", { class: "err", role: "alert" }, errText(e)), h("button", { class: "block", onclick: () => ask() }, "Try again"), back); }
+    if (q.done) {
+      play("end"); store.del("remem_due");
+      return mount(h("h1", {}, "Remem Test done"), h("div", { class: "score" }, h("b", {}, q.right + " of " + q.total), h("span", {}, " right")),
+        h("p", { class: "muted" }, "Thank you. Your notes are unlocked again, so you can re-read any topic."), h("p", {}, h("a", { class: "btn primary block", href: "#/" }, "Back to today")));
     }
-    mount(h("h1", {}, "Final check"), skeleton(2));
-    let q; try { q = await api("/question/next?concept=" + f.items[i].concept_id + "&final=1"); }
-    catch (e) { return mount(h("h1", {}, "Final check"), h("div", { class: "err", role: "alert" }, errText(e)), h("button", { class: "block", onclick: () => ask(i) }, "Try again"), h("p", {}, back)); }
-    const t0 = performance.now(); let sent = false;
+    const prog = progress(q.position - 1, q.total), t0 = performance.now(); let sent = false;
     const opts = q.options.map((text, k) => h("button", { class: "opt", onclick: async () => {
-      if (sent) return; sent = true; opts.forEach(b => { b.disabled = true; }); opts[k].classList.add("picked");
+      if (sent) return; sent = true; audioReady(); opts.forEach(b => { b.disabled = true; }); opts[k].classList.add("picked");
       try {
-        const r = await api("/respond", { method: "POST", body: { question_id: q.question_id, chosen_index: k, rt_ms: Math.round(performance.now() - t0), idem_key: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()) } });
-        if (r.correct) right++;
-        ask(i + 1);
-      } catch (e) { sent = false; opts.forEach(b => { b.disabled = false; }); opts[k].classList.remove("picked"); toast(errText(e)); }
-    } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[k]), h("span", { class: "txt" }, text)));
-    mount(h("div", { class: "bar" }, h("span", { class: "where" }, "Question " + (i + 1) + " of " + total), h("span", { class: "where" }, q.concept || "")),
-      h("h1", { class: "q" }, q.stem), h("div", { class: "opts" }, opts));
+        await api("/respond", { method: "POST", body: { question_id: q.question_id, chosen_index: k, rt_ms: Math.round(performance.now() - t0), idem_key: newKey() } });
+        prog.step(q.position);
+        setTimeout(ask, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 380);    // let the bar finish its step
+      } catch (e) { sent = false; opts.forEach(b => { b.disabled = false; }); opts[k].classList.remove("picked"); toast(errText(e)); if (e.status === 409) ask(); }
+    } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[k]), h("span", { class: "txt", dir: "auto" }, text)));
+    mount(testHeader(prog, q.position, q.total), h("h1", { class: "q", dir: "auto" }, q.stem), h("div", { class: "opts" }, opts));
   }
 }
 
 // ---- making a quiz: used by the reading page (ready-made topics) and by the paste-your-own-notes form
-function quizReady(s) {
+function quizReady(s) {                    // no concept names here: the quiz itself is the first test of what was read
   store.del("remem_due");
-  const first = s.concepts[0];
   mount(h("h1", {}, "Your quiz is ready"),
-    h("p", { class: "muted" }, pl(s.concepts.length, "concept") + " to learn. Questions come one at a time."),
-    h("ul", { class: "ledger" }, s.concepts.map(c => h("li", {}, h("a", { class: "item", href: "#/practice/" + c.concept_id }, h("span", { class: "name", dir: "auto" }, c.name), h("span", { class: "go", "aria-hidden": "true" }, icon("M9 5l7 7-7 7", "chev")))))),
-    h("p", {}, h("a", { class: "btn primary block", href: first ? "#/practice/" + first.concept_id : "#/" }, "Start the first quiz")),
+    h("p", { class: "muted" }, "Questions on what you just read, one at a time, mixed together."),
+    h("p", {}, h("a", { class: "btn primary block", href: "#/test?note=" + s.note_id }, "Start the first quiz")),
     h("p", {}, h("a", { class: "btn block", href: "#/" }, "Go to Today")));
 }
 async function pollNote(id, msg, onFail) {
@@ -570,24 +648,36 @@ function readingBlocks(text) {                                  // plain text ->
   });
   flush(); return out;
 }
-async function viewTopic(tid, review) {
+async function viewTopic(tid) {
   mount(h("h1", {}, "Reading"), skeleton(4));
-  let t; try { t = await api("/topics/" + tid); } catch (e) { return errScreen("Reading", e, h("a", { class: "btn", href: "#/notes" }, "Back to topics")); }
+  const toTopics = h("a", { class: "btn", href: "#/notes" }, "Back to topics");
+  let t; try { t = await api("/topics/" + tid); }
+  catch (e) {
+    if (e.status === 403) return mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/notes", "aria-label": "Back to topics" }, icon("M15 5l-7 7 7 7", "chev"), "Topics")),
+      h("h1", {}, "Notes locked"), h("div", { class: "calm" }, h("b", {}, "You've read these notes once"),
+        h("p", { class: "muted" }, "They stay locked until you finish the Remem Test, so Remem measures what you remember, not what you just re-read.")), h("p", {}, toTopics));
+    return errScreen("Reading", e, toTopics);
+  }
   const msg = h("div", { class: "muted", role: "status" });
   const sentinel = h("div", { class: "end", "aria-hidden": "true" });
   const hint = h("span", { class: "hint", id: "readhint", "aria-live": "polite" }, "Read to the end");
-  const go = h("button", { class: "primary", disabled: true, onclick: () => {
-    if (review) { history.length > 1 ? history.back() : (location.hash = "#/"); return; }
+  const go = h("button", { class: "primary", disabled: true, onclick: async () => {
+    if (t.done) { location.hash = t.last_read ? "#/" : "#/notes"; return; }
+    if (!(await confirmSheet("Ready for the quiz?", "Your notes will lock after this.", "Start the quiz", "Keep reading"))) return;
     go.disabled = true;
-    mount(h("h1", {}, "Making your quiz"), msg, skeleton(3), h("p", {}, h("a", { class: "btn block", href: "#/notes/" + tid }, "Back to the notes")));
+    mount(h("h1", {}, "Making your quiz"), msg, skeleton(3));
     startQuiz("/notes/topic", { topic_id: tid }, msg, () => {});
-  }, "aria-describedby": "readhint" }, review ? "Back to the quiz" : "I've read it. Make my quiz");
-  const unlock = () => { go.disabled = false; hint.textContent = review ? "" : "Ready when you are"; bar.classList.add("ready"); };
+  }, "aria-describedby": "readhint" }, t.done ? "Done reading" : "I've read it. Make my quiz");
+  const unlock = () => { go.disabled = false; hint.textContent = t.done ? "" : "Ready when you are"; bar.classList.add("ready"); };
   const bar = h("div", { class: "readbar" }, h("div", { class: "inner" }, hint, go));
   const title = t.title.split(":")[0];
+  const note = t.last_read
+    ? h("div", { class: "panel hint-panel" }, h("b", {}, "This is your last read."), h("p", { class: "muted" }, "When you leave this page, these notes lock until you finish the Remem Test."))
+    : t.done ? null
+    : h("div", { class: "panel hint-panel" }, h("b", {}, "Read to understand, not to memorise."),
+        h("p", { class: "muted" }, "Go at your own pace. Remembering is Remem's job: it will test you at the right times. You can read this once. When you start the quiz, the notes lock until the Remem Test."));
   mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/notes", "aria-label": "Back to topics" }, icon("M15 5l-7 7 7 7", "chev"), "Topics")),
-    h("h1", {}, title), h("p", { class: "muted" }, t.subject + ", about " + t.minutes + " min read"),
-    review ? null : h("div", { class: "panel hint-panel" }, h("b", {}, "Read this once before the quiz."), h("p", { class: "muted" }, "The questions come next and are based on this text. Nothing is timed while you read.")),
+    h("h1", {}, title), h("p", { class: "muted" }, t.subject + ", about " + t.minutes + " min read"), note,
     h("article", { class: "reading" }, readingBlocks(t.text)), sentinel, bar);
   const check = () => { if (sentinel.getBoundingClientRect().top < innerHeight) { unlock(); removeEventListener("scroll", check); removeEventListener("resize", check); } };    // the end of the text is on screen
   addEventListener("scroll", check, { passive: true }); addEventListener("resize", check); setTimeout(check, 300);
@@ -612,14 +702,15 @@ async function viewNotes() {
   let d; try { d = await api("/topics"); } catch (e) { slot.replaceWith(h("div", {}, h("div", { class: "err", role: "alert" }, "Could not load topics: " + errText(e)), h("button", { type: "button", onclick: () => route() }, "Try again"))); return; }
   d.topics.sort((a, b) => (b.id === d.suggested) - (a.id === d.suggested));       // suggested topic first
   const mk = (t, label) => h("a", { class: "btn primary", href: "#/notes/" + t.id, "aria-label": label + ": " + t.title }, label);
-  const meta = t => t.subject + ", " + t.minutes + " min read" + (t.done ? ", done before" : "") + (t.known ? ", you know this one" : "");
+  const lock = t => !t.done ? "" : t.reading === "locked" ? ", locked until the Remem Test" : t.reading === "last" ? ", one last read left" : ", done before";
+  const meta = t => t.subject + ", " + t.minutes + " min read" + lock(t) + (t.known ? ", you know this one" : "");
   const tile = (t, cls) => h("span", { class: "tile " + (cls || ""), "aria-hidden": "true" }, icon(SUBJECT_ICONS[t.subject] || "M5 5h14v14H5z"));
   const sug = d.topics.find(t => t.id === d.suggested);
   const rest = d.topics.filter(t => t !== sug);
   const out = [];
   if (sug) out.push(h("h2", {}, "Suggested for you"), h("div", { class: "panel sug" }, h("div", { class: "sug-head" }, tile(sug), h("h3", {}, sug.title)), h("p", { class: "muted" }, sug.blurb), h("p", { class: "muted small meta-line" }, meta(sug)), mk(sug, sug.done ? "Read again" : "Read and start")));
   if (rest.length) out.push(sug ? h("h2", {}, "Other topics") : null, h("ul", { class: "ledger topics" }, rest.map(t => {   // no suggestion: the h1 already says it
-    const label = t.done ? "Read again" : "Read";
+    const label = !t.done ? "Read" : t.reading === "locked" ? "Locked" : t.reading === "last" ? "Read one last time" : "Read again";
     return h("li", {}, h("a", { class: "item row withtile", href: "#/notes/" + t.id, "aria-label": label + ": " + t.title }, tile(t),
       h("div", {}, h("span", { class: "name" }, t.title), h("div", { class: "muted" }, t.blurb), h("div", { class: "muted small" }, meta(t))),
       h("span", { class: "go" + (t.done ? " quiet" : ""), "aria-hidden": "true" }, t.done ? null : label, icon("M9 5l7 7-7 7", "chev"))));   // done rows: chevron only, the label stays in aria-label
@@ -632,7 +723,7 @@ async function viewConcepts() {
   let d; try { d = await api("/concepts"); } catch (e) { return errScreen("Concepts", e); }
   const nodes = [h("h1", {}, "Concepts")];
   if (!d.concepts.length) nodes.push(h("div", { class: "calm" }, h("b", {}, "No concepts yet"), h("p", { class: "muted" }, "Pick a topic and they will appear here."), h("a", { class: "btn primary block", href: "#/notes" }, "Pick a topic")));
-  nodes.push(h("ul", { class: "ledger" }, d.concepts.map(c => h("li", {}, h("a", { class: "item", href: c.new ? "#/practice/" + c.concept_id : "#/curve/" + c.concept_id },
+  nodes.push(h("ul", { class: "ledger" }, d.concepts.map(c => h("li", {}, h(c.new ? "div" : "a", { class: "item", href: c.new ? false : "#/curve/" + c.concept_id },
     h("span", { class: "name" }, c.name),
     h("span", { class: "when" }, c.new ? "not studied yet" : "remembered for about " + pl(Math.round(c.stability_days), "day")),
     c.new ? h("div", { class: "meter empty", "aria-hidden": "true" }) : [meter(c.R_now, c.R_now < THETA_UI, c.name), h("span", { class: "note" }, "Mastery " + Math.round(c.mastery * 100) + "% · " + pl(c.n_responses, "answer"))])))));
@@ -693,7 +784,7 @@ async function viewCurve(cid, theta, keep) {
       oninput: () => { lab.textContent = "target " + sl.value + "%"; sl.setAttribute("aria-valuetext", sl.value + "%"); }, onchange: () => viewCurve(cid, sl.value / 100, true) });
     nodes.push(h("div", { class: "panel" }, h("div", {}, "What-if target (demo only) ", lab), sl));
   }
-  nodes.push(h("p", {}, rich(ex.explanation)), h("div", { class: "grid2" }, h("a", { class: "btn primary", href: "#/practice/" + cid }, "Practise now"), h("a", { class: "btn", href: "#/" }, "Back")));
+  nodes.push(h("p", {}, rich(ex.explanation)), h("p", {}, h("a", { class: "btn block", href: "#/concepts" }, "Back to concepts")));        // no practising early: the schedule decides when
   if (keep) remount(nodes, 'input[type="range"]'); else mount(nodes);
 }
 
@@ -704,6 +795,9 @@ function viewMe() {
   fillReminderSettings(reminders);
   mount(h("h1", {}, "Me"), h("p", { class: "muted" }, S.user || "", S.role !== "student" ? " (role: " + S.role + ")" : ""),
     h("h2", {}, "Reminders"), reminders,
+    h("h2", {}, "Sounds"),
+    h("label", { class: "switch" }, h("span", {}, "Play a sound for right and wrong answers"),
+      h("input", { type: "checkbox", role: "switch", checked: soundOn(), onchange: e => { store.set("remem_sound", e.target.checked ? "1" : "0"); if (e.target.checked) play("right"); } })),
     h("h2", {}, "Change password"),
     h("form", { class: "stack", onsubmit: async (e) => { e.preventDefault(); try { await api("/auth/password", { method: "POST", body: { old_password: old.value, new_password: nw.value } }); msg.className = "ok"; msg.textContent = "Password changed."; old.value = nw.value = ""; } catch (ex) { msg.className = "err"; msg.textContent = errText(ex); } } },
       h("input", { type: "text", autocomplete: "username", value: S.user || "", hidden: true, "aria-hidden": "true", tabindex: "-1" }),
@@ -722,14 +816,14 @@ function route() {
   if (hash.startsWith("#/install")) return viewInstall();
   if (!S.token) return viewLogin();
   const [path, query] = hash.split("?"), [, a, b] = path.split("/");
-  if (a !== "practice") sess.cid = null;
   switch (a) {
     case "about": return viewAbout();
     case "consent": return viewConsent();
-    case "notes": return b ? viewTopic(b, query === "r=1") : viewNotes();
+    case "notes": return b ? viewTopic(b) : viewNotes();
     case "final": return viewFinal();
     case "concepts": return viewConcepts();
-    case "practice": return viewPractice(Number(b));
+    case "test": return viewTest(new URLSearchParams(query || "").get("note"));
+    case "practice": location.replace("#/test"); return;                  // old links: practice now happens only in the daily test
     case "curve": return viewCurve(Number(b));
     case "me": return viewMe();
     case "login": location.replace("#/"); return;                          // already signed in: go to Today

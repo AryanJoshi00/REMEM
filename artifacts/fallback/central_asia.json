@@ -45,12 +45,32 @@
      "correct_index": 0
     },
     {
-     "stem": "Which old trade routes ran through Central Asia?",
+     "stem": "Why were Central Asian cities such as Samarkand important in the past?",
      "options": [
-      "The Amazon trail",
-      "The Spice Route to Brazil",
-      "The Panama canal",
-      "The Silk Road"
+      "They were ocean ports",
+      "They lay on the Silk Road between China and Europe",
+      "They were Roman capitals",
+      "They had the largest deserts"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "From which language does the ending -stan come?",
+     "options": [
+      "Russian",
+      "Turkish",
+      "Persian",
+      "Chinese"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which list names exactly the five Central Asian countries in the notes?",
+     "options": [
+      "Kazakhstan, Uzbekistan, Afghanistan, Tajikistan, Turkmenistan",
+      "Kazakhstan, Pakistan, Kyrgyzstan, Tajikistan, Turkmenistan",
+      "Mongolia, Uzbekistan, Kyrgyzstan, Tajikistan, Turkmenistan",
+      "Kazakhstan, Uzbekistan, Kyrgyzstan, Tajikistan, Turkmenistan"
      ],
      "correct_index": 3
     }
@@ -101,14 +121,34 @@
      "correct_index": 0
     },
     {
-     "stem": "What is steppe?",
+     "stem": "You land in Astana and pay in tenge. Which country are you in?",
      "options": [
-      "Dense rainforest",
-      "Frozen sea",
-      "Volcanic rock",
-      "Dry grassland"
+      "Uzbekistan",
+      "Kazakhstan",
+      "Kyrgyzstan",
+      "Turkmenistan"
      ],
-     "correct_index": 3
+     "correct_index": 1
+    },
+    {
+     "stem": "What covers much of Kazakhstan?",
+     "options": [
+      "Mountains",
+      "Desert",
+      "Dry grassland called steppe",
+      "Rainforest"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which country has the largest area without any coastline?",
+     "options": [
+      "Kazakhstan",
+      "Tajikistan",
+      "Kyrgyzstan",
+      "Uzbekistan"
+     ],
+     "correct_index": 0
     }
    ]
   },
@@ -157,14 +197,34 @@
      "correct_index": 1
     },
     {
-     "stem": "What language is spoken in Uzbekistan?",
+     "stem": "Travelling from Uzbekistan to the open sea, at least how many borders must you cross?",
      "options": [
-      "Uzbek",
-      "Turkmen",
-      "Tajik",
-      "Kyrgyz"
+      "None",
+      "One",
+      "Two",
+      "Three"
      ],
-     "correct_index": 0
+     "correct_index": 2
+    },
+    {
+     "stem": "Which other country also uses a currency called the som?",
+     "options": [
+      "Kazakhstan",
+      "Tajikistan",
+      "Turkmenistan",
+      "Kyrgyzstan"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which language is spoken in the country that has Samarkand and Bukhara?",
+     "options": [
+      "Tajik",
+      "Uzbek",
+      "Kazakh",
+      "Turkmen"
+     ],
+     "correct_index": 1
     }
    ]
   },
@@ -213,14 +273,34 @@
      "correct_index": 1
     },
     {
-     "stem": "Which Central Asian country has Bishkek as its capital?",
+     "stem": "A traveller swims in a mountain lake that never freezes, then flies home from Bishkek. Which country did they visit?",
      "options": [
       "Kyrgyzstan",
-      "Turkmenistan",
+      "Kazakhstan",
       "Tajikistan",
-      "Kazakhstan"
+      "Uzbekistan"
      ],
      "correct_index": 0
+    },
+    {
+     "stem": "Which other Central Asian country uses the som as well?",
+     "options": [
+      "Kazakhstan",
+      "Uzbekistan",
+      "Tajikistan",
+      "Turkmenistan"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which describes Kyrgyzstan rather than Turkmenistan?",
+     "options": [
+      "Mostly desert",
+      "Has the Gates of Hell crater",
+      "Mostly mountains",
+      "Uses the manat"
+     ],
+     "correct_index": 2
     }
    ]
   },
@@ -269,14 +349,34 @@
      "correct_index": 2
     },
     {
-     "stem": "What share of Tajikistan is mountainous?",
+     "stem": "Someone pays in somoni in Dushanbe, near the Pamir Mountains. Which country are they in?",
      "options": [
-      "About a third",
-      "About 10 percent",
-      "Half",
-      "More than 90 percent"
+      "Kyrgyzstan",
+      "Uzbekistan",
+      "Turkmenistan",
+      "Tajikistan"
      ],
      "correct_index": 3
+    },
+    {
+     "stem": "Which pair is right?",
+     "options": [
+      "Tajikistan uses the som, Kyrgyzstan the somoni",
+      "Tajikistan uses the somoni, Kyrgyzstan the som",
+      "Both use the som",
+      "Both use the somoni"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which description fits Tajikistan rather than Turkmenistan?",
+     "options": [
+      "Mostly mountains, with a language close to Persian",
+      "Mostly desert, with the Karakum",
+      "Has the Gates of Hell crater",
+      "Uses the manat"
+     ],
+     "correct_index": 0
     }
    ]
   },
@@ -325,12 +425,32 @@
      "correct_index": 1
     },
     {
-     "stem": "Since when has the Darvaza gas crater been burning?",
+     "stem": "A traveller pays in manat and visits a gas crater that has burned for decades. Which country are they in?",
      "options": [
-      "Since 2010",
-      "Since the Silk Road era",
-      "Since the 1870s",
-      "Since the 1970s"
+      "Kazakhstan",
+      "Turkmenistan",
+      "Uzbekistan",
+      "Tajikistan"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which word best describes most of Turkmenistan's land?",
+     "options": [
+      "Mountains",
+      "Rainforest",
+      "Desert",
+      "Grassland called steppe"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "By 2025, about how long had the Darvaza gas crater been burning?",
+     "options": [
+      "About 15 years",
+      "About 150 years",
+      "About 500 years",
+      "About 50 years"
      ],
      "correct_index": 3
     }

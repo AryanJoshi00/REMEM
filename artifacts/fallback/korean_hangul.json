@@ -45,12 +45,32 @@
      "correct_index": 1
     },
     {
-     "stem": "How are Hangul letters arranged when written?",
+     "stem": "A Korean word has two syllables. How is it written in Hangul?",
      "options": [
-      "In a single line like English",
-      "Stacked into square syllable blocks",
-      "Only in long vertical columns",
-      "In a circle"
+      "As one long line of letters",
+      "As two square blocks side by side",
+      "As a single block",
+      "Vertically, one letter per line"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Why could more Koreans learn to read after Hangul?",
+     "options": [
+      "It used Chinese characters",
+      "It was easier to learn than Chinese characters",
+      "It had more letters",
+      "It was only for the king"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "How many basic vowels does Hangul have?",
+     "options": [
+      "8",
+      "10",
+      "14",
+      "24"
      ],
      "correct_index": 1
     }
@@ -101,14 +121,34 @@
      "correct_index": 0
     },
     {
-     "stem": "Which sound does ㅅ make?",
+     "stem": "How is 하 read?",
      "options": [
-      "j",
-      "h",
-      "d",
-      "s"
+      "ha",
+      "na",
+      "ga",
+      "a"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which pair is a plain consonant and its version with a puff of breath?",
+     "options": [
+      "ㄱ and ㄴ",
+      "ㅁ and ㅂ",
+      "ㅅ and ㅈ",
+      "ㄷ and ㅌ"
      ],
      "correct_index": 3
+    },
+    {
+     "stem": "Which letter starts a syllable that sounds like ja?",
+     "options": [
+      "ㅊ",
+      "ㅅ",
+      "ㅈ",
+      "ㄷ"
+     ],
+     "correct_index": 2
     }
    ]
   },
@@ -157,14 +197,34 @@
      "correct_index": 2
     },
     {
-     "stem": "What do ㅑ, ㅕ, ㅛ and ㅠ add to a vowel?",
+     "stem": "How is 너 read?",
      "options": [
-      "A longer silence",
-      "A rising tone",
-      "A final n sound",
-      "A y sound"
+      "na",
+      "neo",
+      "no",
+      "nu"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which vowel adds a y sound to ㅗ?",
+     "options": [
+      "ㅑ",
+      "ㅕ",
+      "ㅠ",
+      "ㅛ"
      ],
      "correct_index": 3
+    },
+    {
+     "stem": "Which vowel would you hear in the middle of the English word 'cup'?",
+     "options": [
+      "ㅏ",
+      "ㅗ",
+      "ㅓ",
+      "ㅡ"
+     ],
+     "correct_index": 2
     }
    ]
   },
@@ -213,12 +273,32 @@
      "correct_index": 0
     },
     {
-     "stem": "What does the syllable 구 sound like?",
+     "stem": "Where does ㅜ go in the block 누?",
      "options": [
-      "go",
-      "ga",
-      "gu",
-      "na"
+      "Below ㄴ",
+      "To the right of ㄴ",
+      "Above ㄴ",
+      "Before ㄴ"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "How is the block made of ㅁ and ㅗ read?",
+     "options": [
+      "ma",
+      "mo",
+      "mu",
+      "om"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which block has its vowel to the right of the consonant?",
+     "options": [
+      "노",
+      "누",
+      "니",
+      "느"
      ],
      "correct_index": 2
     }
@@ -269,14 +349,34 @@
      "correct_index": 2
     },
     {
-     "stem": "What does the syllable 오 sound like?",
+     "stem": "How is 우 read?",
      "options": [
-      "o",
+      "wu",
+      "ng",
       "u",
-      "i",
-      "a"
+      "o"
      ],
-     "correct_index": 0
+     "correct_index": 2
+    },
+    {
+     "stem": "In 앙, how are the two ㅇ letters pronounced?",
+     "options": [
+      "Both silent",
+      "First silent, second ng",
+      "Both ng",
+      "First ng, second silent"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Which syllable starts with a double consonant?",
+     "options": [
+      "바",
+      "파",
+      "아",
+      "빠"
+     ],
+     "correct_index": 3
     }
    ]
   },
@@ -325,12 +425,32 @@
      "correct_index": 2
     },
     {
-     "stem": "Which word means love?",
+     "stem": "Which word means meat?",
      "options": [
+      "고기 (gogi)",
+      "나무 (namu)",
       "아기 (agi)",
-      "사랑 (sarang)",
-      "바다 (bada)",
-      "고기 (gogi)"
+      "바다 (bada)"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "In 사랑 (sarang), which letter makes the final ng sound?",
+     "options": [
+      "ㄹ",
+      "ㅅ",
+      "ㅏ",
+      "ㅇ"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "How many syllable blocks is 안녕 written in?",
+     "options": [
+      "One",
+      "Two",
+      "Three",
+      "Six"
      ],
      "correct_index": 1
     }

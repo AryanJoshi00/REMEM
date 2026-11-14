@@ -16,7 +16,7 @@ import numpy as np
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 
-from backend import admin, auth, config, db, engine, fallback, llm, push, topics
+from backend import admin, auth, config, daily, db, engine, fallback, llm, push, topics
 from backend.schemas import FlagIn, LoginIn, NoteIn, PasswordIn, ProfileIn, PushEndIn, PushSubIn, RespondIn, TopicIn
 from models.stability import retrievability_power
 from scheduler.scheduler import t_review_days
@@ -72,6 +72,8 @@ async def security_headers(request, call_next):
     resp = await call_next(request)
     for k, v in SECURITY_HEADERS.items():
         resp.headers.setdefault(k, v)
+    if not request.url.path.startswith("/api/"):
+        resp.headers.setdefault("Cache-Control", "no-cache")        # app files: always check for a newer version, so an update reaches phones at once
     return resp
 
 
@@ -117,13 +119,7 @@ def concept_status(models, c, st, now, theta):
 def sitting_question_ids(conn, uid: int, cid: int, now: int) -> list[int]:
     """Practice questions already answered in the current sitting (answers to this concept with gaps under 30 minutes, ending
     less than 30 minutes ago; the same rule the engine uses to count sessions). Each is asked at most once per sitting."""
-    out, prev = [], now
-    for r in conn.execute("SELECT question_id, ts FROM responses WHERE user_id=? AND concept_id=? AND mode!='final' ORDER BY ts DESC",
-                          (uid, cid)):
-        if prev - r["ts"] > config.SESSION_GAP_MS:
-            break
-        out.append(r["question_id"]); prev = r["ts"]
-    return out
+    return [r["question_id"] for r in daily.sitting(conn, uid, cid, now)]
 
 
 def get_concept(conn, user, cid):
@@ -233,7 +229,7 @@ def run_generation(note_id: int) -> None:
                                (user["user_id"], note_id, c.name, c.source_span, arm, ts)).lastrowid
             for i, q in enumerate(c.questions, start=1):
                 conn.execute("INSERT INTO questions(concept_id,variant_no,stem,options_json,correct_idx,is_final_test,created_at) VALUES (?,?,?,?,?,?,?)",
-                             (cid, i, q.stem, json.dumps(q.options), q.correct_index, 1 if i == llm.N_VARIANTS else 0, ts))
+                             (cid, i, q.stem, json.dumps(q.options), q.correct_index, 1 if i > llm.N_PRACTICE else 0, ts))      # 4 practice, then 3 kept for the Remem Test
         conn.execute("UPDATE notes SET status='done' WHERE note_id=?", (note_id,))
 
 
@@ -254,6 +250,15 @@ def add_note(body: NoteIn, bg: BackgroundTasks, user=Depends(auth.consented_user
     return {"note_id": nid, "status": "pending"}
 
 
+def reading_state(conn, uid: int, topic_id: str, finished: bool | None = None) -> str:
+    """'open' (not studied yet, or the Remem Test is finished), 'last' (one last read is still allowed) or 'locked'.
+    Notes are read once: re-reading is study the model never sees, so it would blur what a review measures."""
+    notes = conn.execute("SELECT last_read FROM notes WHERE user_id=? AND topic_id=? AND status!='failed'", (uid, topic_id)).fetchall()
+    if not notes or (remem_test_state(conn, uid)["finished"] if finished is None else finished):
+        return "open"
+    return "last" if any(n["last_read"] for n in notes) else "locked"
+
+
 @api.get("/topics")
 def topics_list(user=Depends(auth.consented_user)):
     with db.session() as conn:
@@ -261,19 +266,27 @@ def topics_list(user=Depends(auth.consented_user)):
         sug = topics.suggest(conn, user["user_id"])
         row = conn.execute("SELECT known_topics FROM profiles WHERE user_id=?", (user["user_id"],)).fetchone()
         known = set(json.loads(row["known_topics"])) if row else set()
-    return {"suggested": sug, "topics": [{**{k: t[k] for k in ("id", "title", "subject", "blurb", "minutes", "words")}, "done": t["id"] in done, "known": t["id"] in known}
-                                         for t in topics.all_topics()]}
+        finished = remem_test_state(conn, user["user_id"])["finished"]
+        reading = {tid: reading_state(conn, user["user_id"], tid, finished) for tid in done}
+    return {"suggested": sug, "topics": [{**{k: t[k] for k in ("id", "title", "subject", "blurb", "minutes", "words")}, "done": t["id"] in done, "known": t["id"] in known,
+                                          "reading": reading.get(t["id"], "open")} for t in topics.all_topics()]}
 
 
 @api.get("/topics/{topic_id}")
 def topic_read(topic_id: str, user=Depends(auth.consented_user)):
-    """The full text of a ready-made topic, so the student reads it before any question is asked."""
+    """The full text of a ready-made topic, read once before the quiz. Locked after that until the Remem Test is finished;
+    people who made a quiz before the lock existed get one last read, used up when they open it or start their next test."""
     t = topics.get_topic(topic_id)
     if t is None:
         raise HTTPException(404, "Unknown topic")
     with db.session() as conn:
+        state = reading_state(conn, user["user_id"], topic_id)
+        if state == "locked":
+            raise HTTPException(403, "These notes are locked until you finish the Remem Test.")
+        if state == "last":
+            conn.execute("UPDATE notes SET last_read=0 WHERE user_id=? AND topic_id=?", (user["user_id"], topic_id))
         done = conn.execute("SELECT 1 FROM notes WHERE user_id=? AND topic_id=? AND status!='failed' LIMIT 1", (user["user_id"], topic_id)).fetchone() is not None
-    return {**{k: t[k] for k in ("id", "title", "subject", "blurb", "minutes", "words", "text")}, "done": done}
+    return {**{k: t[k] for k in ("id", "title", "subject", "blurb", "minutes", "words", "text")}, "done": done, "last_read": state == "last"}
 
 
 @api.post("/notes/topic")
@@ -308,15 +321,65 @@ def due(user=Depends(auth.consented_user)):
     new = [i for i in items if i["new"]]
     due_now = sorted([i for i in items if not i["new"] and i["due"]], key=lambda i: i["R_now"])
     upcoming = sorted([i for i in items if not i["new"] and not i["due"]], key=lambda i: i["due_in_days"])
+    uid = user["user_id"]
     with db.session() as conn:
-        fin = final_state(conn, user["user_id"])
-    return {"new": new, "due": due_now, "upcoming": upcoming, "theta": config.THETA, "final": {"open": fin["open"], "remaining": len(fin["items"])}}
+        fin = remem_test_state(conn, uid)
+        review = daily.build(conn, uid, now)
+        first = []
+        for n in conn.execute("""SELECT n.note_id, n.title FROM notes n WHERE n.user_id=? AND n.status='done' AND EXISTS (
+                                   SELECT 1 FROM concepts c LEFT JOIN state s ON s.concept_id=c.concept_id AND s.user_id=c.user_id
+                                   WHERE c.note_id=n.note_id AND (s.last_ts IS NULL OR s.last_ts > ?)) ORDER BY n.note_id""",
+                              (uid, now - config.SESSION_GAP_MS)).fetchall():          # a concept never answered, or one answered in the last 30 minutes
+            t = daily.build(conn, uid, now, n["note_id"])
+            if t["total"] > t["answered"]:
+                first.append({"note_id": n["note_id"], "title": n["title"].split(":")[0], "questions": t["total"] - t["answered"], "concepts": len(t["concepts"])})
+        later = [s["due_at"] for s in states.values() if s["last_ts"] is not None and (s["due_at"] or 0) > now]
+        seen = conn.execute("SELECT 1 FROM audit WHERE user_id=? AND event='whats_new_seen'", (uid,)).fetchone()
+        cut = conn.execute("SELECT value FROM settings WHERE key='whats_new_cutoff'").fetchone()
+        old_hand = bool(cut) and conn.execute("SELECT 1 FROM responses WHERE user_id=? AND ts<?", (uid, int(cut["value"]))).fetchone() is not None
+        last_read = [{"topic_id": r["topic_id"], "title": r["title"].split(":")[0]} for r in conn.execute(
+            "SELECT DISTINCT topic_id, title FROM notes WHERE user_id=? AND last_read=1 AND topic_id IS NOT NULL AND status='done'", (uid,))]
+    return {"new": new, "due": due_now, "upcoming": upcoming, "theta": config.THETA,
+            "test": {"questions": review["total"] - review["answered"], "answered": review["answered"], "concepts": len(review["concepts"])},
+            "first": first, "studied": bool(later) or bool(review["concepts"]),
+            "next_test_in_days": day_label(min(later), now) if later else None,
+            "final": {k: fin[k] for k in ("open", "total", "answered", "finished")} | {"remaining": fin["total"] - fin["answered"]},
+            "whats_new": old_hand and not seen and not fin["finished"], "last_read": last_read if not fin["finished"] else []}
+
+
+def remem_test_state(conn, uid: int) -> dict:
+    """The Remem Test (the delayed test): three unseen questions per concept, available only while the owner has opened it."""
+    row = conn.execute("SELECT value FROM settings WHERE key='final_test_open'").fetchone()
+    is_open = bool(row) and row["value"] == "1"
+    rows = conn.execute("""SELECT q.question_id, q.concept_id FROM questions q JOIN concepts c ON c.concept_id=q.concept_id
+                           WHERE c.user_id=? AND q.is_final_test=1 AND q.flagged=0 ORDER BY q.question_id""", (uid,)).fetchall()
+    qs = [r["question_id"] for r in rows]
+    answered = {r["question_id"]: r["correct"] for r in conn.execute("SELECT question_id, correct FROM responses WHERE user_id=? AND mode='final'", (uid,))}
+    done = [q for q in qs if q in answered]
+    finished = (bool(done) and len(done) == len(qs)) or conn.execute(
+        "SELECT 1 FROM audit WHERE user_id=? AND event='remem_test_finished'", (uid,)).fetchone() is not None
+    return {"open": is_open, "total": len(qs), "answered": len(done), "right": sum(answered[q] for q in done),
+            "finished": finished, "order": remem_test_order(uid, rows), "done": set(done)}
+
+
+def remem_test_order(uid: int, rows) -> list[int]:
+    """The Remem Test order, fixed per person: concepts spread out (never the same one twice in a row where avoidable),
+    and each concept's own questions in a shuffled order."""
+    by_concept: dict[int, list[int]] = {}
+    for r in rows:
+        by_concept.setdefault(r["concept_id"], []).append(r["question_id"])
+    rng = random.Random(f"remem-test:{uid}")
+    for cid in sorted(by_concept):
+        rng.shuffle(by_concept[cid])
+    slots = daily._order({cid: len(v) for cid, v in by_concept.items()}, f"remem-test:{uid}")
+    nxt = {cid: iter(v) for cid, v in by_concept.items()}
+    return [next(nxt[cid]) for cid in slots]
 
 
 def final_state(conn, uid: int) -> dict:
-    """The delayed test: one reserved question per concept, available only while the owner has opened it."""
-    row = conn.execute("SELECT value FROM settings WHERE key='final_test_open'").fetchone()
-    if not row or row["value"] != "1":
+    """Older shape kept for the API: the concepts that still have an unanswered Remem Test question."""
+    st = remem_test_state(conn, uid)
+    if not st["open"]:
         return {"open": False, "items": []}
     items = conn.execute("""SELECT c.concept_id, c.name FROM concepts c WHERE c.user_id=? AND EXISTS (
                               SELECT 1 FROM questions q WHERE q.concept_id=c.concept_id AND q.is_final_test=1 AND q.flagged=0
@@ -329,6 +392,69 @@ def final_state(conn, uid: int) -> dict:
 def final_check(user=Depends(auth.consented_user)):
     with db.session() as conn:
         return final_state(conn, user["user_id"])
+
+
+@api.get("/final/next")
+def remem_test_next(user=Depends(auth.consented_user)):
+    """The next Remem Test question: every concept's three unseen questions, shuffled once per person, no concept names."""
+    uid = user["user_id"]
+    with db.session() as conn:
+        st = remem_test_state(conn, uid)
+        if not st["open"]:
+            raise HTTPException(403, "The Remem Test is not open yet")
+        if st["total"] == st["answered"]:
+            return {"done": True, "total": st["total"], "right": st["right"]}
+        qid = next(q for q in st["order"] if q not in st["done"])
+        q = conn.execute("SELECT question_id, stem, options_json FROM questions WHERE question_id=?", (qid,)).fetchone()
+    return {"done": False, "question_id": q["question_id"], "stem": q["stem"], "options": json.loads(q["options_json"]),
+            "position": st["answered"] + 1, "total": st["total"]}
+
+
+# ----------------------------------------------------------------------------- the daily test
+@api.get("/test/next")
+def test_next(note: int | None = Query(default=None), user=Depends(auth.consented_user)):
+    """Next question of today's test (all due concepts, mixed) or of one note's first quiz. No concept names until the end."""
+    uid, now = user["user_id"], now_ms()
+    with db.session() as conn:
+        if note is not None and conn.execute("SELECT 1 FROM notes WHERE note_id=? AND user_id=?", (note, uid)).fetchone() is None:
+            raise HTTPException(404, "Unknown note")
+        t = daily.build(conn, uid, now, note)
+        nxt = daily.next_question(t)
+        if nxt is None:
+            return {"done": True, **test_summary(conn, uid, now, t)}
+        _, q = nxt
+    return {"done": False, "question_id": q["question_id"], "stem": q["stem"], "options": json.loads(q["options_json"]),
+            "position": t["answered"] + 1, "total": t["total"], "concepts": len(t["concepts"])}
+
+
+def test_summary(conn, uid: int, now: int, t: dict) -> dict:
+    """End of a test: the score, then each concept by name with its answers (oldest first) and when it comes back."""
+    rows = []
+    for cid, v in t["concepts"].items():
+        c = conn.execute("SELECT c.name, s.due_at FROM concepts c LEFT JOIN state s ON s.concept_id=c.concept_id AND s.user_id=c.user_id WHERE c.concept_id=?", (cid,)).fetchone()
+        marks = [bool(r["correct"]) for r in reversed(v["run"])]
+        rows.append({"name": c["name"], "marks": marks, "next_due_in_days": day_label(c["due_at"], now) if c["due_at"] else None})
+    rows.sort(key=lambda r: r["next_due_in_days"] if r["next_due_in_days"] is not None else 1e9)
+    missed = []
+    for v in t["concepts"].values():
+        for r in reversed(v["run"]):
+            if r["correct"]:
+                continue
+            q = conn.execute("""SELECT q.stem, q.options_json, q.correct_idx, x.result_json FROM questions q
+                                JOIN responses x ON x.question_id=q.question_id AND x.user_id=? AND x.ts=?
+                                WHERE q.question_id=?""", (uid, r["ts"], r["question_id"])).fetchone()
+            chosen = json.loads(q["result_json"] or "{}").get("chosen_index")
+            missed.append({"ts": r["ts"], "stem": q["stem"], "options": json.loads(q["options_json"]), "correct_index": q["correct_idx"], "chosen_index": chosen})
+    missed.sort(key=lambda m: m.pop("ts"))
+    return {"total": t["answered"], "right": sum(sum(r["marks"]) for r in rows), "concepts": rows, "missed": missed}
+
+
+@api.post("/whats-new/seen")
+def whats_new_seen(user=Depends(auth.consented_user)):
+    with db.session() as conn:
+        if not conn.execute("SELECT 1 FROM audit WHERE user_id=? AND event='whats_new_seen'", (user["user_id"],)).fetchone():
+            db.audit(conn, "whats_new_seen", user["user_id"], ts=now_ms())
+    return {"ok": True}
 
 
 @api.get("/concepts")
@@ -356,12 +482,12 @@ def next_question(concept: int, final: int = 0, user=Depends(auth.consented_user
         if final:
             on = conn.execute("SELECT value FROM settings WHERE key='final_test_open'").fetchone()
             if not on or on["value"] != "1":
-                raise HTTPException(403, "The final test is not open")
+                raise HTTPException(403, "The Remem Test is not open yet")
             q = conn.execute("""SELECT q.* FROM questions q WHERE q.concept_id=? AND q.is_final_test=1 AND q.flagged=0
                                 AND q.question_id NOT IN (SELECT question_id FROM responses WHERE user_id=? AND mode='final')""",
                              (concept, user["user_id"])).fetchone()
             if q is None:
-                raise HTTPException(404, "No final-test question left for this concept")
+                raise HTTPException(404, "No Remem Test question left for this concept")
         else:
             qs = conn.execute("""SELECT q.*, (SELECT COUNT(*) FROM responses r WHERE r.question_id=q.question_id AND r.user_id=?) used,
                                         (SELECT MAX(ts) FROM responses r WHERE r.question_id=q.question_id AND r.user_id=?) last_used
@@ -401,15 +527,24 @@ def respond(body: RespondIn, user=Depends(auth.consented_user)):
         if q["is_final_test"]:
             on = conn.execute("SELECT value FROM settings WHERE key='final_test_open'").fetchone()
             if not on or on["value"] != "1":
-                raise HTTPException(403, "The final test is not open")
+                raise HTTPException(403, "The Remem Test is not open yet")
             if conn.execute("SELECT 1 FROM responses WHERE user_id=? AND question_id=? AND mode='final'", (user["user_id"], q["question_id"])).fetchone():
-                raise HTTPException(409, "This final-test question has already been answered")
-            result = {"correct": correct, "correct_index": q["correct_idx"], "message": "Final test answer recorded."}
+                raise HTTPException(409, "This Remem Test question has already been answered")
+            result = {"correct": correct, "chosen_index": body.chosen_index}            # the Remem Test shows nothing until its score
             conn.execute("""INSERT INTO responses(user_id,concept_id,question_id,idem_key,ts,correct,rt_ms,mode,arm,result_json)
                             VALUES (?,?,?,?,?,?,?,?,?,?)""", (user["user_id"], cid, q["question_id"], body.idem_key, ts, int(correct), body.rt_ms, "final", q["arm"], json.dumps(result)))
+            st = remem_test_state(conn, user["user_id"])
+            if st["total"] and st["answered"] == st["total"] and not conn.execute(
+                    "SELECT 1 FROM audit WHERE user_id=? AND event='remem_test_finished'", (user["user_id"],)).fetchone():
+                db.audit(conn, "remem_test_finished", user["user_id"], ts=ts)     # stays finished even if a new topic adds questions later
             return result
-        if q["question_id"] in sitting_question_ids(conn, user["user_id"], cid, ts):   # e.g. a second tab: one answer per question per sitting
+        run = sitting_question_ids(conn, user["user_id"], cid, ts)
+        if q["question_id"] in run:                                           # e.g. a second tab: one answer per question per sitting
             raise HTTPException(409, "You've already answered this question in this sitting.")
+        due_row = conn.execute("SELECT due_at FROM state WHERE user_id=? AND concept_id=? AND last_ts IS NOT NULL", (user["user_id"], cid)).fetchone()
+        if due_row and not run and (due_row["due_at"] or 0) > ts:             # no practising early: the concept's schedule decides when
+            raise HTTPException(409, "This concept isn't due yet.")
+        conn.execute("UPDATE notes SET last_read=0 WHERE user_id=? AND last_read=1", (user["user_id"],))   # a test has started: the one last read is gone
         st_row = conn.execute("SELECT * FROM state WHERE user_id=? AND concept_id=?", (user["user_id"], cid)).fetchone()
         st = rowdict(st_row) or {}
         meds = [r["rt_ms"] for r in conn.execute("SELECT rt_ms FROM responses WHERE user_id=? AND rt_ms IS NOT NULL ORDER BY ts DESC LIMIT 50", (user["user_id"],))]
@@ -422,9 +557,8 @@ def respond(body: RespondIn, user=Depends(auth.consented_user)):
                      {"u": user["user_id"], "c": cid, **new_state})
         conn.execute("UPDATE users SET ability=?, n_answers=n_answers+1 WHERE user_id=?", (ability, user["user_id"]))
         days_to_next = (new_state["due_at"] - ts) / config.MS_PER_DAY
-        result = {"correct": correct, "correct_index": q["correct_idx"], "mastery": round(new_state["mastery"], 4),
-                  "stability_days": round(new_state["stability_days"], 2), "next_due_in_days": round(days_to_next, 2),
-                  "source": q["source_span"], "message": f"Next review in about {engine.plural(days_to_next, 'day', 1) if days_to_next < 10 else engine.plural(round(days_to_next), 'day')}."}
+        result = {"correct": correct, "chosen_index": body.chosen_index, "mastery": round(new_state["mastery"], 4),     # the right option is shown
+                  "stability_days": round(new_state["stability_days"], 2), "next_due_in_days": round(days_to_next, 2)}         # at the end of the test
         conn.execute("""INSERT INTO responses(user_id,concept_id,question_id,idem_key,ts,correct,rt_ms,pred_R,elapsed_days,mode,arm,was_due,stability_after,mastery_after,result_json)
                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                      (user["user_id"], cid, q["question_id"], body.idem_key, ts, int(correct), body.rt_ms, info["pred_R"], info["elapsed_days"],

@@ -45,14 +45,34 @@
      "correct_index": 1
     },
     {
-     "stem": "If you eat two servings, you should:",
+     "stem": "Crisps A: 150 kcal per 30 g serving. Crisps B: 520 kcal per 100 g. Which has more energy per gram?",
      "options": [
-      "Ignore the numbers",
-      "Double the numbers on the label",
-      "Halve the numbers",
-      "Add 2 to each number"
+      "A",
+      "B",
+      "They are the same",
+      "You can't tell from the labels"
      ],
      "correct_index": 1
+    },
+    {
+     "stem": "Two snacks both say '120 kcal per serving'. Why might one give you far more energy when you finish the pack?",
+     "options": [
+      "kcal are measured differently by each brand",
+      "One label must be wrong",
+      "Energy depends on the price",
+      "Their serving sizes and servings per pack can differ"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "A 3-serving pack lists 4 g of sugar per serving. You eat two-thirds of the pack. How much sugar is that?",
+     "options": [
+      "2.7 g",
+      "4 g",
+      "8 g",
+      "12 g"
+     ],
+     "correct_index": 2
     }
    ]
   },
@@ -101,14 +121,34 @@
      "correct_index": 3
     },
     {
-     "stem": "Do calories show whether a food is healthy?",
+     "stem": "A drink has 840 kJ. About how many kcal is that?",
      "options": [
-      "Only when below 100",
-      "Yes, always",
-      "Yes, but only for fruit",
-      "No, they only show the amount of energy"
+      "20",
+      "200",
+      "840",
+      "3500"
      ],
-     "correct_index": 3
+     "correct_index": 1
+    },
+    {
+     "stem": "An apple and a biscuit have the same number of calories. What does that tell you?",
+     "options": [
+      "They are equally healthy",
+      "The biscuit has more sugar",
+      "Only that they give the same energy, not which is healthier",
+      "Nothing at all"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "One snack lists 600 kJ, another 120 kcal. Which gives more energy?",
+     "options": [
+      "The 600 kJ one",
+      "The 120 kcal one",
+      "They are equal",
+      "You can't compare them"
+     ],
+     "correct_index": 0
     }
    ]
   },
@@ -157,14 +197,34 @@
      "correct_index": 2
     },
     {
-     "stem": "What is fibre?",
+     "stem": "A snack has 10 g of carbohydrate and 5 g of protein. How many kcal do these give?",
      "options": [
-      "A carbohydrate the body cannot fully digest",
-      "A protein",
-      "A mineral",
-      "A type of fat"
+      "15",
+      "45",
+      "60",
+      "135"
      ],
-     "correct_index": 0
+     "correct_index": 2
+    },
+    {
+     "stem": "Which gives more energy: 10 g of fat or 20 g of protein?",
+     "options": [
+      "20 g of protein",
+      "They are equal",
+      "You can't tell",
+      "10 g of fat"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Why can a small amount of oily food be high in calories?",
+     "options": [
+      "Oil contains sugar",
+      "Fat gives more than twice the energy per gram of carbohydrate or protein",
+      "Oil adds sodium",
+      "Fat cannot be digested"
+     ],
+     "correct_index": 1
     }
    ]
   },
@@ -213,12 +273,32 @@
      "correct_index": 3
     },
     {
-     "stem": "Which is a likely source of added sugar?",
+     "stem": "A plain yoghurt shows 5 g of total sugars and 0 g of added sugars. What does that tell you?",
      "options": [
-      "Plain water",
-      "A plain apple",
-      "A fresh carrot",
-      "A soft drink"
+      "All its sugar occurs naturally",
+      "It contains no sugar",
+      "Sugar was added while making it",
+      "The label is wrong"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "A drink lists 20 g of total sugars, of which 12 g are added. How much occurs naturally?",
+     "options": [
+      "12 g",
+      "20 g",
+      "8 g",
+      "32 g"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which label suggests a breakfast cereal has a lot of added sugar?",
+     "options": [
+      "It lists fibre",
+      "It shows 3 percent of the daily value of sugar",
+      "It contains milk powder",
+      "Sugar is the second ingredient"
      ],
      "correct_index": 3
     }
@@ -269,12 +349,32 @@
      "correct_index": 0
     },
     {
-     "stem": "For the same food, which amount is bigger?",
+     "stem": "A label shows 0.6 g of sodium. About how much salt is that?",
      "options": [
-      "The sodium amount",
+      "0.24 g",
+      "0.6 g",
+      "1.5 g",
+      "6 g"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which contains more sodium: 1 g of salt or 1 g of pure sodium?",
+     "options": [
+      "1 g of salt",
+      "1 g of pure sodium",
       "They are equal",
-      "It depends on the colour",
-      "The salt amount"
+      "Neither contains sodium"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "A label lists 2.5 g of salt. About how much sodium is that?",
+     "options": [
+      "0.4 g",
+      "2.5 g",
+      "6.25 g",
+      "1 g"
      ],
      "correct_index": 3
     }
@@ -325,14 +425,34 @@
      "correct_index": 3
     },
     {
-     "stem": "What does percent daily value tell you?",
+     "stem": "A cereal lists oats, sugar and salt, in that order. Which is present in the largest amount by weight?",
      "options": [
-      "The price per day",
-      "How much water to drink",
-      "How much one serving adds to a typical day's needs",
-      "How many days the food lasts"
+      "Sugar",
+      "Salt",
+      "They are equal",
+      "Oats"
      ],
-     "correct_index": 2
+     "correct_index": 3
+    },
+    {
+     "stem": "Cereal A gives 4 percent of the daily value of fibre per serving; cereal B gives 22 percent. Which is the high-fibre choice?",
+     "options": [
+      "Cereal A",
+      "Cereal B",
+      "Neither",
+      "Both equally"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "A cereal gives 10 percent of the daily value of fibre per serving. You eat two servings. How is your fibre from it described?",
+     "options": [
+      "20 percent, which counts as high",
+      "10 percent, which counts as low",
+      "5 percent, which counts as low",
+      "12 percent, which counts as high"
+     ],
+     "correct_index": 0
     }
    ]
   }

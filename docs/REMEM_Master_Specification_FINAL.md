@@ -104,7 +104,7 @@ REMEM is **done** when all of these are true (each is checkable):
 | FR-S1 | Log in with owner-issued username and password; no self-registration | Must |
 | FR-S2 | On first login show the consent text; block data entry until accepted | Must |
 | FR-S3 | Paste notes; see generation progress; see the resulting concepts | Must |
-| FR-S4 | Each concept gets at least 5 four-option MCQ variants (4 for reviews, 1 reserved for the delayed test); the first quiz happens right after creation | Must |
+| FR-S4 | Each concept gets 7 four-option MCQ variants (4 for reviews, 3 reserved for the delayed test, the Remem Test); the first quiz happens right after creation. *Amended during the pilot (Nov 2026): one reserved question per concept could not tell memory from a lucky guess (25% on four options), so three are reserved, written to one rubric: put the idea to use in a new situation, explain why, and tell it apart / order it / work it out. In daily tests the right answers are shown at the end of the test rather than after each question, so every answer in a test is a clean recall attempt and a concept's score in a test (not one question) is the measure of memory (delayed feedback also aids retention: Butler, Karpicke and Roediger, 2007).* | Must |
 | FR-S5 | Home shows concepts due now, ranked by ascending predicted recall, one reason line each | Must |
 | FR-S6 | Practice flow: show one question, record answer and response time, show correctness, show the new next-review date | Must |
 | FR-S7 | Concept list: mastery %, stability (days), last reviewed, next due | Must |
@@ -480,7 +480,7 @@ Three seeds where randomness exists (BKT starts, CV folds, SimLab cohorts); repo
 | Content | Each participant adds ≥ 2 topics from their own study material, ≥ 8 concepts each; 5 MCQ variants per concept |
 | Arms | Each **concept** is randomly assigned one policy at creation, balanced within user: **REMEM** (θ = 0.85), **SM-2**, **fixed 3-day**. Users see one due list and never see the arm. Assignment is stored before the first review |
 | Primary outcome | Calibration of predicted R on real reviews (reliability diagram, ECE, Brier) — independent of arm |
-| Secondary | Delayed test on day 14 with the reserved unseen variant per concept, by arm; reviews performed per arm; adherence (reviews done vs due, lateness) |
+| Secondary | Delayed test on day 14 (the Remem Test) with the three reserved unseen variants per concept, shuffled across concepts and shown without concept names, by arm; reviews performed per arm; adherence (reviews done vs due, lateness) |
 | Exploratory | Concept-link signal; labelled refit of β/w on pilot data |
 | Analysis | Descriptive plus per-user paired ranges; users with little activity are reported, not dropped; **no significance claims** |
 

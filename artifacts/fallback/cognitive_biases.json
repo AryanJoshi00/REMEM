@@ -45,14 +45,34 @@
      "correct_index": 1
     },
     {
-     "stem": "Anchoring bias involves which piece of information?",
+     "stem": "A seller asks 5000 rupees first, so 3000 rupees then feels like a bargain. Which bias is this?",
      "options": [
-      "The one our friends share",
-      "The first one we receive",
-      "The last one we receive",
-      "The most emotional one"
+      "Anchoring bias",
+      "Confirmation bias",
+      "Sunk cost fallacy",
+      "Framing effect"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "How can you protect yourself from anchoring in a negotiation?",
+     "options": [
+      "Always accept the first offer",
+      "Decide your own value before you hear the first number",
+      "Let the other side name a number first",
+      "Focus only on the discount"
      ],
      "correct_index": 1
+    },
+    {
+     "stem": "Which of these is anchoring rather than framing?",
+     "options": [
+      "Preferring '90 percent fat-free' to '10 percent fat'",
+      "Remembering only news that agrees with you",
+      "Thinking a 30 000 rupee phone is cheap because the first one you saw cost 80 000",
+      "Finishing a bad film because you paid for it"
+     ],
+     "correct_index": 2
     }
    ]
   },
@@ -101,14 +121,34 @@
      "correct_index": 2
     },
     {
-     "stem": "Which behaviour shows confirmation bias?",
+     "stem": "A manager decides a new employee is lazy. Over a month she notices every late arrival but none of the extra hours. What is going on?",
      "options": [
-      "Changing your opinion after new evidence",
-      "Reading only articles that agree with your opinion",
-      "Asking an expert for the full picture",
-      "Comparing both sides equally"
+      "Anchoring bias",
+      "Availability heuristic",
+      "Sunk cost fallacy",
+      "Confirmation bias"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "Which habit protects you best against confirmation bias?",
+     "options": [
+      "Trusting your first impression",
+      "Looking for evidence that could prove you wrong",
+      "Reading only sources you trust",
+      "Deciding as quickly as possible"
      ],
      "correct_index": 1
+    },
+    {
+     "stem": "Sam remembers only the stories that agree with his view of a politician. Neha fears sharks after one news story. Which one shows confirmation bias?",
+     "options": [
+      "Sam",
+      "Neha",
+      "Both",
+      "Neither"
+     ],
+     "correct_index": 0
     }
    ]
   },
@@ -157,14 +197,34 @@
      "correct_index": 2
     },
     {
-     "stem": "Which of these is a sunk cost?",
+     "stem": "Asha keeps going to a gym she hates only because she paid for the whole year. Which bias is this?",
      "options": [
-      "The price of a new product",
-      "A discount offered tomorrow",
-      "Money already spent on a ticket that cannot be refunded",
-      "Money you may earn next month"
+      "Anchoring bias",
+      "Framing effect",
+      "Sunk cost fallacy",
+      "Confirmation bias"
      ],
      "correct_index": 2
+    },
+    {
+     "stem": "A company has spent 2 crore rupees on a failing project. What should decide whether it carries on?",
+     "options": [
+      "Whether finishing it will bring more benefit from now on than it costs",
+      "The 2 crore already spent",
+      "How embarrassing stopping would be",
+      "How long they have worked on it"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which choice is NOT the sunk cost fallacy?",
+     "options": [
+      "Finishing a meal you dislike because you paid for it",
+      "Staying in a course you hate because of the fees already paid",
+      "Repairing an old car again because you have spent so much on it",
+      "Leaving a boring film because the rest of your evening is worth more"
+     ],
+     "correct_index": 3
     }
    ]
   },
@@ -213,12 +273,32 @@
      "correct_index": 2
     },
     {
-     "stem": "The availability heuristic is mainly about:",
+     "stem": "After several news stories about shark attacks, Riya thinks swimming in the sea is very dangerous. Which idea explains this?",
      "options": [
-      "Options available to buy",
-      "Examples coming easily to mind",
-      "Time available to decide",
-      "Prices being available"
+      "Sunk cost fallacy",
+      "Availability heuristic",
+      "Framing effect",
+      "Dunning-Kruger effect"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "How could you correct for the availability heuristic when judging a risk?",
+     "options": [
+      "Rely on the most recent news story",
+      "Ask a friend who was affected",
+      "Trust your first feeling",
+      "Check how often it actually happens, not how easily examples come to mind"
+     ],
+     "correct_index": 3
+    },
+    {
+     "stem": "After seeing one lottery winner on the news, Dev thinks winning is likely. Mira remembers only the times her horoscope was right. Who shows the availability heuristic?",
+     "options": [
+      "Mira",
+      "Dev",
+      "Both",
+      "Neither"
      ],
      "correct_index": 1
     }
@@ -269,14 +349,34 @@
      "correct_index": 2
     },
     {
-     "stem": "The effect is about:",
+     "stem": "After one week of chess lessons, Arjun is sure he could beat most club players. Which effect does this show?",
      "options": [
-      "Prices and discounts",
-      "Memory for numbers",
-      "Sleep and attention",
-      "Skill and self-assessment"
+      "Dunning-Kruger effect",
+      "Anchoring bias",
+      "Framing effect",
+      "Confirmation bias"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which would help most someone showing the Dunning-Kruger effect?",
+     "options": [
+      "More praise for their effort",
+      "Less practice",
+      "A harder topic to learn",
+      "A clear test that shows them their own mistakes"
      ],
      "correct_index": 3
+    },
+    {
+     "stem": "After one guitar lesson Rohan says he plays better than most people; Priya, a concert pianist, assumes others play as well as she does. Which is right?",
+     "options": [
+      "Only Rohan fits the Dunning-Kruger pattern",
+      "Only Priya fits it",
+      "Both fit it",
+      "Neither fits it"
+     ],
+     "correct_index": 2
     }
    ]
   },
@@ -325,14 +425,34 @@
      "correct_index": 0
     },
     {
-     "stem": "Which sentence is a loss frame?",
+     "stem": "A shop says 'Save 20 percent today' instead of 'Pay 80 percent of the price'. The deal is the same. Which effect makes the first sound better?",
      "options": [
-      "Ninety percent of patients will survive",
-      "Most patients do well",
-      "Patients are improving",
-      "Ten percent of patients will die"
+      "Sunk cost fallacy",
+      "Framing effect",
+      "Anchoring bias",
+      "Confirmation bias"
      ],
-     "correct_index": 3
+     "correct_index": 1
+    },
+    {
+     "stem": "Two adverts describe the same loan as '95 percent approved' and '5 percent rejected'. Most people prefer the first. Why?",
+     "options": [
+      "The first loan is cheaper",
+      "The second loan is illegal",
+      "The same facts feel different in a gain frame",
+      "People trust smaller numbers"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which pair describes the same facts, once in a gain frame and once in a loss frame?",
+     "options": [
+      "'80 percent pass' and '20 percent fail'",
+      "'80 percent pass' and '80 percent fail'",
+      "'20 percent pass' and '20 percent fail'",
+      "'80 percent pass' and '100 percent fail'"
+     ],
+     "correct_index": 0
     }
    ]
   }

@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 IST_OFFSET_MS = 5.5 * 3600 * 1000
+GAP_DAYS = 30 / 1440          # the session rule: answers to a concept less than 30 minutes apart belong to one test
 
 
 def open_ro(path) -> sqlite3.Connection:
@@ -68,34 +69,69 @@ def daily_activity(conn) -> pd.DataFrame:
     }).reset_index()
 
 
+def review_tests(conn) -> pd.DataFrame:
+    """One row per concept per review test: the evidence of memory.
+
+    A concept's answers in one test (gaps under 30 minutes) form one review. Its prediction is REMEM's pred_R at the first
+    answer, the moment the gap ended; the outcome is the share of its questions answered correctly in that test. Since the
+    right answers are shown only at the end of a test, every answer in it is a clean recall attempt, so no single question
+    decides the result. Reviews from before that change (cut-off: 'whats_new_cutoff') showed each right answer straight away,
+    so only their first answer counts. First quizzes are learning, not memory, and are left out.
+    """
+    cut = conn.execute("SELECT value FROM settings WHERE key='whats_new_cutoff'").fetchone()
+    cutoff = int(cut["value"]) if cut else None
+    r = _df(conn, """SELECT r.user_id, r.concept_id, r.ts, r.correct, r.pred_R, r.elapsed_days, r.mode, r.arm
+                     FROM responses r JOIN users u USING(user_id) WHERE u.role='student' AND r.mode IN ('first','review')
+                     ORDER BY r.user_id, r.concept_id, r.ts, r.response_id""")
+    cols = ["user_id", "concept_id", "arm", "start_ts", "pred_R", "gap_days", "n", "right", "score"]
+    if r.empty:
+        return pd.DataFrame(columns=cols)
+    gap_ms = GAP_DAYS * 86_400_000
+    new_test = (r["user_id"] != r["user_id"].shift()) | (r["concept_id"] != r["concept_id"].shift()) | (r["ts"] - r["ts"].shift() > gap_ms)
+    r["test"] = new_test.cumsum()
+    rows = []
+    for _, g in r.groupby("test", sort=False):
+        first = g.iloc[0]
+        if first["mode"] != "review" or pd.isna(first["pred_R"]):
+            continue
+        g = g if cutoff is None or first["ts"] >= cutoff else g.iloc[:1]
+        rows.append({"user_id": int(first["user_id"]), "concept_id": int(first["concept_id"]), "arm": first["arm"], "start_ts": int(first["ts"]),
+                     "pred_R": float(first["pred_R"]), "gap_days": float(first["elapsed_days"]), "n": len(g), "right": int(g["correct"].sum()),
+                     "score": float(g["correct"].mean())})
+    return pd.DataFrame(rows, columns=cols)
+
+
 def by_arm(conn) -> pd.DataFrame:
-    """Arms are randomised per concept. Review answers only (the pilot's comparison); descriptive, not significance."""
-    r = _df(conn, """SELECT arm, correct, was_due, elapsed_days FROM responses r JOIN users u USING(user_id)
-                     WHERE u.role='student' AND mode='review'""")
+    """Arms are randomised per concept. Per arm: how many reviews (one per concept per test), how many answers they hold, and
+    the share answered correctly. Descriptive, not significance."""
+    t = review_tests(conn)
     c = _df(conn, """SELECT c.arm, COUNT(*) AS concepts FROM concepts c JOIN users u USING(user_id)
                      WHERE u.role='student' GROUP BY c.arm""").set_index("arm")["concepts"]
     rows = []
     for arm in ["remem", "sm2", "fixed"]:
-        x = r[r["arm"] == arm]
+        x = t[t["arm"] == arm]
+        n = int(x["n"].sum()) if len(x) else 0
         rows.append({
             "arm": arm,
             "concepts": int(c.get(arm, 0)),
-            "review_answers": len(x),
-            "accuracy": float(x["correct"].mean()) if len(x) else np.nan,
-            "mean_gap_days": float(x["elapsed_days"].mean()) if len(x) else np.nan,
+            "review_tests": len(x),
+            "review_answers": n,
+            "accuracy": float(x["right"].sum() / n) if n else np.nan,
+            "mean_gap_days": float(x["gap_days"].mean()) if len(x) else np.nan,
         })
     return pd.DataFrame(rows)
 
 
 def calibration(conn, bins=(0, .5, .6, .7, .8, .9, 1.0001)) -> pd.DataFrame:
-    """Predicted probability vs observed correctness for review answers (REMEM's own predictions, all arms)."""
-    r = _df(conn, """SELECT pred_R, correct FROM responses r JOIN users u USING(user_id)
-                     WHERE u.role='student' AND mode='review' AND pred_R IS NOT NULL""")
-    if r.empty:
+    """REMEM's predicted chance of a correct answer at the start of each review against the share actually answered correctly
+    in that review (all arms). n counts answers."""
+    t = review_tests(conn)
+    if t.empty:
         return pd.DataFrame(columns=["bin", "n", "predicted", "observed"])
-    r["bin"] = pd.cut(r["pred_R"], bins=list(bins), right=False)
-    g = r.groupby("bin", observed=True)
-    out = pd.DataFrame({"n": g.size(), "predicted": g["pred_R"].mean(), "observed": g["correct"].mean()}).reset_index()
+    t["bin"] = pd.cut(t["pred_R"], bins=list(bins), right=False)
+    t["wp"] = t["pred_R"] * t["n"]
+    g = t.groupby("bin", observed=True)
+    out = pd.DataFrame({"n": g["n"].sum(), "predicted": g["wp"].sum() / g["n"].sum(), "observed": g["right"].sum() / g["n"].sum()}).reset_index()
     out["bin"] = out["bin"].astype(str)
     return out
 

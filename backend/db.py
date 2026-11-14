@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS notes (
   status TEXT NOT NULL DEFAULT 'pending',    -- pending | done | failed
   error TEXT,
   created_at INTEGER NOT NULL,
-  topic_id TEXT
+  topic_id TEXT,
+  last_read INTEGER NOT NULL DEFAULT 0     -- 1 = one last read of a locked topic is still allowed (people who studied before the lock)
 );
 CREATE TABLE IF NOT EXISTS concepts (
   concept_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,6 +165,11 @@ def init_db(path=None) -> None:
         cols = {r[1] for r in c.execute("PRAGMA table_info(notes)")}
         if "topic_id" not in cols:                       # light migration for databases created before topics existed
             c.execute("ALTER TABLE notes ADD COLUMN topic_id TEXT")
+        if "last_read" not in cols:                      # the notes lock arrives: everyone who already studied a topic gets one last read,
+            import time                                  # and people who had answered before now are shown what changed (once)
+            c.execute("ALTER TABLE notes ADD COLUMN last_read INTEGER NOT NULL DEFAULT 0")
+            c.execute("UPDATE notes SET last_read=1 WHERE status='done'")
+            c.execute("INSERT OR IGNORE INTO settings(key,value) VALUES ('whats_new_cutoff', ?)", (str(int(time.time() * 1000)),))
 
 
 @contextmanager
