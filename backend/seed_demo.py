@@ -86,7 +86,7 @@ def seed(conn, password: str | None = None, reset: bool = False, now_ms: int | N
             cid = conn.execute("INSERT INTO concepts(user_id,note_id,name,source_span,arm,created_at) VALUES (?,?,?,?,?,?)",
                                (uid, nid, c.name, c.source_span, "remem", now - 8 * DAY_MS)).lastrowid
             qids = [conn.execute("INSERT INTO questions(concept_id,variant_no,stem,options_json,correct_idx,is_final_test,created_at) VALUES (?,?,?,?,?,?,?)",
-                                 (cid, i, q.stem, json.dumps(q.options), q.correct_index, 1 if i == llm.N_VARIANTS else 0, now - 8 * DAY_MS)).lastrowid
+                                 (cid, i, q.stem, json.dumps(q.options), q.correct_index, 1 if i > llm.N_PRACTICE else 0, now - 8 * DAY_MS)).lastrowid
                     for i, q in enumerate(c.questions, start=1)]
             n_concepts += 1
             if pos >= LEAVE_NEW.get(t["id"], 10 ** 9):

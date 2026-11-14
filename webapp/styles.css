@@ -288,3 +288,52 @@ main:has(.readbar) { padding-bottom: 140px; }                     /* the last li
 /* short landscape phones: keep the bars from eating the screen */
 @media (max-height: 480px) and (orientation: landscape) { :root { --tab-h: 44px; } #nav a { flex-direction: row; gap: 8px; } body { padding-bottom: 4rem; } }
 .brand .mark { width: 28px; height: 28px; border-radius: 8px; margin-right: 8px; }
+
+/* the daily test: a quiet header (close, progress, count), then the question. The bar glides on each answer. */
+.testbar { display: flex; align-items: center; gap: 14px; margin: 2px 0 18px; }
+.testbar .close { flex: none; min-width: 44px; min-height: 44px; padding: 0; justify-content: flex-start; color: var(--muted); }
+.testbar .close svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.progress { flex: 1; height: 8px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.progress i { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width 560ms cubic-bezier(.22, 1, .36, 1); }
+.testbar .count { flex: none; min-width: 4.5ch; text-align: right; font-size: var(--fs-sm); font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums lining-nums; }
+.score { margin: 6px 0 18px; font-size: var(--fs-h2); color: var(--muted); }
+.score b { font-size: 2.75rem; line-height: 1.1; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums lining-nums; }
+.summary li { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name name" "dots when"; row-gap: 8px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+.summary .name { grid-area: name; font-weight: 600; }
+.summary .when { grid-area: when; font-size: var(--fs-sm); color: var(--muted); text-align: right; }
+.dots { grid-area: dots; display: inline-flex; gap: 6px; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--field); }
+.dots i.on { background: var(--green-fill); border-color: var(--green-fill); }
+
+/* sheets: what's new, and "ready for the quiz?" (native dialog: focus stays inside, Esc closes) */
+dialog.sheet { width: min(560px, 100%); max-width: 100%; max-height: 88vh; overflow: auto; margin: auto auto 0; border: 0; border-radius: 20px 20px 0 0;
+  padding: 24px 20px calc(20px + env(safe-area-inset-bottom)); background: var(--surface); color: var(--ink); animation: sheet-up 260ms var(--ease-out); }
+dialog.sheet::backdrop { background: rgba(10, 12, 24, .45); }
+dialog.sheet h2 { margin: 0 0 8px; font-size: var(--fs-h2); }
+dialog.sheet .stack { margin-top: 16px; }
+.wn { padding-left: 1.25em; margin: 8px 0 12px; }
+.wn li { margin: 0 0 10px; }
+@keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (min-width: 700px) { dialog.sheet { margin: auto; border-radius: 20px; } }
+
+/* Sounds on or off: a switch, sized and coloured like the phone's own */
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; }
+.switch input { appearance: none; -webkit-appearance: none; flex: none; width: 51px; height: 31px; margin: 0; border-radius: 999px; background: var(--track); border: 1.5px solid var(--field); position: relative; cursor: pointer; transition: background-color 200ms ease-out, border-color 200ms ease-out; }
+.switch input::before { content: ""; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%; background: #fff; outline: 1px solid var(--field); outline-offset: -1px; transition: transform 220ms var(--ease-out); }
+.switch input:checked { background: var(--green-fill); border-color: var(--green-fill); }
+.switch input:checked::before { transform: translateX(20px); }
+@media (prefers-reduced-motion: reduce) {
+  .progress i, .switch input, .switch input::before { transition: none; }
+  dialog.sheet { animation: none; }
+}
+
+/* end of a test: the questions you missed, with your answer and the right one */
+.misses { list-style: none; margin: 4px 0 20px; padding: 0; }
+.misses .miss { padding: 14px 0; border-bottom: 1px solid var(--rule); }
+.misses .q { margin: 0 0 8px; font-weight: 600; }
+.misses .ans { margin: 4px 0 0; padding: 8px 12px; border-radius: var(--r-sm); border: 1.5px solid; }
+.misses .ans .lab { display: block; font-size: var(--fs-xs); font-weight: 700; margin-bottom: 2px; }
+.misses .ans.bad { border-color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--surface)); }
+.misses .ans.bad .lab { color: var(--red); }
+.misses .ans.good { border-color: var(--green); background: color-mix(in srgb, var(--green-fill) 10%, var(--surface)); }
+.misses .ans.good .lab { color: var(--green); }

@@ -21,7 +21,7 @@ def test_bank_is_complete_valid_and_grounded(topic):
     assert valid is not None and len(valid) == len(raw["concepts"])           # nothing is silently dropped by validation
     names, stems = set(), set()
     for c in valid:
-        assert len(c.questions) == llm.N_VARIANTS == 5
+        assert len(c.questions) == llm.N_VARIANTS == 7                         # 4 practice + 3 for the Remem Test
         assert _norm(c.source_span) in _norm(t["text"])
         assert _norm(c.name) not in names
         names.add(_norm(c.name))
@@ -68,8 +68,9 @@ def test_topic_note_falls_back_when_the_model_fails(client, monkeypatch):
     assert s["status"] == "done" and len(s["concepts"]) == 6
     q = client.get(f"/api/question/next?concept={s['concepts'][0]['concept_id']}", headers=h).json()
     assert len(q["options"]) == 4
-    with db.session() as conn:                                                # the reserved final-test variant exists too
-        assert conn.execute("SELECT COUNT(*) FROM questions WHERE is_final_test=1").fetchone()[0] == 6
+    with db.session() as conn:                                                # three unseen Remem Test questions per concept
+        assert conn.execute("SELECT COUNT(*) FROM questions WHERE is_final_test=1").fetchone()[0] == 6 * 3
+        assert conn.execute("SELECT COUNT(*) FROM questions WHERE is_final_test=0").fetchone()[0] == 6 * 4
 
 
 def test_pasted_notes_still_fail_normally_and_flag_can_turn_fallback_off(client, monkeypatch):

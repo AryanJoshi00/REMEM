@@ -18,7 +18,9 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from backend import config, db
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
-N_VARIANTS = 5
+N_PRACTICE = 4                 # asked in the daily tests
+N_TEST = 3                     # never shown before the Remem Test (the delayed test)
+N_VARIANTS = N_PRACTICE + N_TEST
 
 _lock = threading.Lock()
 _last_call = 0.0
@@ -60,7 +62,12 @@ Read the NOTES below and return ONLY JSON of this shape:
 {{"concepts":[{{"name":"short concept name","source_span":"an exact quote of 8-25 words copied from the notes that this concept is based on","questions":[{{"stem":"question text","options":["A","B","C","D"],"correct_index":0}}]}}]}}
 Rules:
 - 2 to 4 distinct concepts per notes chunk; each concept must be clearly present in the notes.
-- Each concept needs exactly {n} multiple-choice questions with DIFFERENT wording and angle (definition, application, example, contrast).
+- Each concept needs exactly {n} multiple-choice questions with DIFFERENT wording and angle.
+- Questions 1 to 4 are practice: definition, example, application and contrast.
+- Questions 5, 6 and 7 are a later memory test and must test understanding, not recall of wording: 5 puts the idea to use
+  in a NEW situation the notes do not mention; 6 asks why something happens or what follows from it (never "what is X");
+  7 tells the idea apart from a similar one, puts steps in order, or works something out. None of them may repeat a practice
+  question or ask about a detail of an example in the notes (such as a price or a name used only as an illustration).
 - Exactly 4 options per question, only one correct, plausible distractors, correct_index is 0-3 and should vary.
 - Use only facts stated in or directly implied by the notes. No trick questions.
 - source_span must be copied character-for-character from the notes.
@@ -167,7 +174,12 @@ def generate_for_chunk(chunk: str, caller=None) -> list[ConceptOut]:
     with db.session() as conn:
         row = conn.execute("SELECT json FROM llm_cache WHERE chunk_hash=? AND prompt_version=?", (h, config.PROMPT_VERSION)).fetchone()
     if row:
-        return validate_chunk(json.loads(row["json"]), chunk)
+        try:
+            good = validate_chunk(json.loads(row["json"]), chunk)
+        except (ValidationError, json.JSONDecodeError, ValueError):
+            good = []
+        if good:
+            return good                                  # an older or broken entry (too few questions per concept) is made again below
     last_err = None
     for _ in range(2):                                   # one retry on invalid output
         try:

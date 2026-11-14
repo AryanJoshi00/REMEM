@@ -309,16 +309,17 @@ def page_pilot() -> None:
         separator("Results")
         st.header("How the three scheduling methods compare", anchor=False)
         note("Each concept is given one method at random: REMEM (the model), SM-2 (a classic flashcard rule) or a fixed 3-day gap. Students never see which. "
-             "This counts review answers only, and with this few people the differences are not meaningful yet.")
+             "Each review is one concept in one test, after days away: its score is the share of that concept's questions answered correctly "
+             "(right answers are shown only at the end of a test). With this few people the differences are not meaningful yet.")
         arms = pilot.by_arm(conn).replace({"remem": "REMEM", "sm2": "SM-2", "fixed": "Fixed, every 3 days"})
         arms["accuracy"] = arms["accuracy"] * 100                                       # display copy: whole percents, since a few dozen answers cannot carry decimals
-        st.dataframe(arms, hide_index=True, width="stretch", column_order=["arm", "concepts", "review_answers", "accuracy", "mean_gap_days"], column_config={
-            "arm": "Method", "concepts": "Concepts", "review_answers": "Review answers",
+        st.dataframe(arms, hide_index=True, width="stretch", column_order=["arm", "concepts", "review_tests", "review_answers", "accuracy", "mean_gap_days"], column_config={
+            "arm": "Method", "concepts": "Concepts", "review_tests": "Reviews", "review_answers": "Answers in them",
             "accuracy": st.column_config.NumberColumn("Share correct", format="%.0f%%"),
             "mean_gap_days": st.column_config.NumberColumn("Average days since last review", format="%.1f")})
 
         st.header("Are the predictions honest?", anchor=False)
-        note("REMEM predicts the chance of a correct answer before each review. If the predicted and the observed values match, the predictions can be trusted. Points on the dashed line are perfectly calibrated. Bigger points hold more answers.")
+        note("REMEM predicts the chance of a correct answer at the start of each review; the observed value is the share answered correctly in that review. If the predicted and the observed values match, the predictions can be trusted. Points on the dashed line are perfectly calibrated. Bigger points hold more answers.")
         cal = pilot.calibration(conn)
         if cal.empty:
             note("No review answers yet.")

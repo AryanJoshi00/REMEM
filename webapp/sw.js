@@ -1,5 +1,5 @@
 /* Remem service worker: cache the app shell; cache-fallback for the due list and concept list. */
-const SHELL = "remem-shell-v21";
+const SHELL = "remem-shell-v23";
 const API = "remem-api";
 const FILES = ["./", "index.html", "app.js", "styles.css", "manifest.json", "icon-192.png", "icon-512.png", "icon.svg", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-32.png"];
 
@@ -17,7 +17,7 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (url.pathname.includes("/api/")) return;                                                // never cache other API calls
-  e.respondWith(fetch(req).then(r => { if (r.ok) { const copy = r.clone(); caches.open(SHELL).then(c => c.put(req, copy)); } return r; })   // network first so app updates reach phones; cache when offline
+  e.respondWith(fetch(req, { cache: "no-cache" }).then(r => { if (r.ok) { const copy = r.clone(); caches.open(SHELL).then(c => c.put(req, copy)); } return r; })   // network first so app updates reach phones; cache when offline
     .catch(() => caches.match(req)));
 });
 

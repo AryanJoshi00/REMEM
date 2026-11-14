@@ -110,14 +110,19 @@ def main(argv=None) -> int:
     if not a.db.exists():
         print("No database at", a.db, file=sys.stderr)
         return 2
-    db.init_db(a.db)                                       # creates repeat_answers on an older database
-    conn = db.connect(a.db)
+    from backend.remem_test_upgrade import copy_db
+    import shutil, tempfile
+    target = a.db
+    if a.apply:
+        copy = a.db.with_name(a.db.stem + ".before-repair-" + dt.datetime.now().strftime("%Y%m%d_%H%M%S") + ".db")
+        copy_db(a.db, copy)                                # the copy is taken before anything changes
+        print("Copy saved:", copy)
+    else:                                                  # dry run: work on a throwaway copy, so the real file is not touched
+        target = Path(tempfile.mkdtemp()) / a.db.name
+        copy_db(a.db, target)
+    db.init_db(target)                                     # creates repeat_answers on an older database
+    conn = db.connect(target)
     try:
-        if a.apply:
-            copy = a.db.with_name(a.db.stem + ".before-repair-" + dt.datetime.now().strftime("%Y%m%d_%H%M%S") + ".db")
-            with sqlite3.connect(copy) as dst:
-                conn.backup(dst)
-            print("Copy saved:", copy)
         conn.execute("BEGIN IMMEDIATE")
         report = repair(conn)
         total = sum(r["repeats_moved"] for r in report)
@@ -128,6 +133,8 @@ def main(argv=None) -> int:
         conn.commit() if a.apply else conn.rollback()
     finally:
         conn.close()
+        if not a.apply:
+            shutil.rmtree(target.parent, ignore_errors=True)
     return 0
 
 

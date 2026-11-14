@@ -45,14 +45,34 @@
      "correct_index": 3
     },
     {
-     "stem": "What does a GPS satellite broadcast?",
+     "stem": "Why can any number of phones use GPS at the same time?",
      "options": [
-      "Live video of the Earth",
-      "Its position and the exact time the signal was sent",
-      "The weather forecast",
-      "The receiver's name"
+      "Each phone has its own satellite",
+      "The satellites broadcast and receivers only listen, so phones add no load",
+      "Phones take turns every second",
+      "Only a few phones can use it at once"
      ],
      "correct_index": 1
+    },
+    {
+     "stem": "What does a phone need from each satellite to work out its position?",
+     "options": [
+      "A reply to a message the phone sent",
+      "The phone's previous location",
+      "The satellite's position and the exact time its signal was sent",
+      "A mobile network connection"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which of these is NOT needed for GPS to find your position?",
+     "options": [
+      "Radio signals from satellites",
+      "The time each signal was sent",
+      "The satellites' positions",
+      "A mobile network connection"
+     ],
+     "correct_index": 3
     }
    ]
   },
@@ -101,14 +121,34 @@
      "correct_index": 3
     },
     {
-     "stem": "What is the minimum size of the GPS constellation?",
+     "stem": "About how many times does a GPS satellite circle the Earth in one week?",
      "options": [
-      "At least 3 satellites",
-      "At least 24 satellites",
-      "Exactly 100 satellites",
-      "Only 1 satellite"
+      "About 2",
+      "About 7",
+      "About 14",
+      "About 50"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Why does each satellite carry very accurate atomic clocks?",
+     "options": [
+      "To stay in orbit",
+      "Positions depend on knowing exactly when each signal was sent",
+      "To measure the weather",
+      "To save power"
      ],
      "correct_index": 1
+    },
+    {
+     "stem": "Spread evenly, at least how many satellites are in each of the six orbital planes?",
+     "options": [
+      "4",
+      "2",
+      "6",
+      "24"
+     ],
+     "correct_index": 0
     }
    ]
   },
@@ -157,14 +197,34 @@
      "correct_index": 2
     },
     {
-     "stem": "Why does accurate timing matter so much for GPS?",
+     "stem": "A signal takes about 0.07 seconds to arrive. About how far has it travelled?",
      "options": [
-      "Light travels so fast that tiny time errors become big distance errors",
-      "Satellites are very heavy",
-      "Radio signals are loud",
-      "Phones need to know the date"
+      "About 2 100 kilometres",
+      "About 21 000 kilometres",
+      "About 210 000 kilometres",
+      "About 300 000 kilometres"
      ],
-     "correct_index": 0
+     "correct_index": 1
+    },
+    {
+     "stem": "If a signal took twice as long to arrive, how far away would the satellite be?",
+     "options": [
+      "Half as far",
+      "The same distance",
+      "Twice as far",
+      "Four times as far"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Why must the receiver know exactly when each signal was sent?",
+     "options": [
+      "To know the satellite's colour",
+      "To save battery",
+      "To pick the nearest satellite",
+      "Distance comes from travel time, so it needs both the sending and arrival times"
+     ],
+     "correct_index": 3
     }
    ]
   },
@@ -213,14 +273,34 @@
      "correct_index": 3
     },
     {
-     "stem": "Which method does GPS use to find a position?",
+     "stem": "How does the receiver get its distance to each satellite?",
      "options": [
-      "Reading a compass",
-      "Trilateration",
-      "Echo location",
-      "Guessing from a map"
+      "From the signal's travel time",
+      "From the satellite's colour",
+      "From a map",
+      "From mobile towers"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Which list is right, satellite by satellite?",
+     "options": [
+      "One: a circle; two: a sphere; three: one point",
+      "One: a sphere; two: a circle; three: two points",
+      "One: a point; two: a line; three: a sphere",
+      "One: two points; two: a circle; three: a sphere"
      ],
      "correct_index": 1
+    },
+    {
+     "stem": "What does each extra satellite distance do to the possible position?",
+     "options": [
+      "Widens it",
+      "Leaves it the same",
+      "Moves it into space",
+      "Narrows it down"
+     ],
+     "correct_index": 3
     }
    ]
   },
@@ -269,14 +349,34 @@
      "correct_index": 2
     },
     {
-     "stem": "Besides the clock error, what does the receiver solve for?",
+     "stem": "A receiver's clock is 1 millisecond fast. About how wrong would its distances be if nothing corrected it?",
      "options": [
-      "The weather",
-      "The satellite's colour",
-      "Its three position coordinates",
-      "The phone's battery level"
+      "300 metres",
+      "3 kilometres",
+      "300 kilometres",
+      "3 000 kilometres"
      ],
      "correct_index": 2
+    },
+    {
+     "stem": "Why can phones use a cheap clock instead of an atomic one?",
+     "options": [
+      "Phones get atomic time from the mobile network",
+      "Cheap clocks are just as accurate",
+      "The fourth satellite's signal lets the receiver work out its own clock error",
+      "The satellites correct each phone's clock directly"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Which order is right?",
+     "options": [
+      "Satellite sends its position and time, receiver notes the arrival time, works out distances, then solves for position and clock error",
+      "Receiver works out distances, satellite sends time, receiver notes arrival, then solves",
+      "Receiver solves for position, notes arrival time, satellite sends time, then works out distances",
+      "Satellite sends time, receiver solves for position, notes arrival, then works out distances"
+     ],
+     "correct_index": 0
     }
    ]
   },
@@ -325,14 +425,34 @@
      "correct_index": 1
     },
     {
-     "stem": "Compared with clocks on the ground, satellite clocks run:",
+     "stem": "Without any correction, about how much time would a satellite clock gain on ground clocks over 10 days?",
      "options": [
-      "Backwards",
-      "Exactly the same",
-      "Slower",
-      "Faster"
+      "38 microseconds",
+      "380 microseconds",
+      "3.8 seconds",
+      "38 seconds"
+     ],
+     "correct_index": 1
+    },
+    {
+     "stem": "Why does a clock error of only 38 microseconds a day matter for GPS?",
+     "options": [
+      "It changes the satellite's orbit",
+      "It makes the signal weaker",
+      "It only matters at night",
+      "Light travels so far in that time that positions would be off by kilometres"
      ],
      "correct_index": 3
+    },
+    {
+     "stem": "If the relativity correction were switched off, about how far off would positions be after one week?",
+     "options": [
+      "A few centimetres",
+      "A few metres",
+      "Tens of kilometres",
+      "Thousands of kilometres"
+     ],
+     "correct_index": 2
     }
    ]
   },
@@ -381,12 +501,32 @@
      "correct_index": 0
     },
     {
-     "stem": "What can reduce GPS accuracy?",
+     "stem": "Between tall office buildings your map shows you 40 metres from where you really are. What is the likely reason?",
      "options": [
-      "Daylight",
-      "Tall buildings and tunnels",
-      "A charged battery",
-      "Clear open sky"
+      "The buildings block or reflect the satellite signals",
+      "The satellites are switched off in cities",
+      "Your phone's battery is low",
+      "Too many people are using GPS"
+     ],
+     "correct_index": 0
+    },
+    {
+     "stem": "Counting GPS, how many global navigation systems do the notes name?",
+     "options": [
+      "Two",
+      "Three",
+      "Four",
+      "Five"
+     ],
+     "correct_index": 2
+    },
+    {
+     "stem": "Where is a phone's GPS likely to be most accurate?",
+     "options": [
+      "In a tunnel",
+      "In an open field under a clear sky",
+      "Between tall buildings",
+      "In an underground car park"
      ],
      "correct_index": 1
     }

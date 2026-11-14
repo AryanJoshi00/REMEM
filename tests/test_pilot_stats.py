@@ -22,7 +22,8 @@ def build(tmp_path):
                 (1, 1, "k2", NOW - 1 * DAY, 0, 0.4, 3, "review", "remem"),
                 (2, 2, "k3", NOW - 1 * DAY, 1, 0.8, 5, "review", "sm2"),
                 (3, 3, "k4", NOW - 1 * DAY, 1, None, 0, "first", "fixed"),
-                (1, 1, "k5", NOW, 1, 0.95, 3, "review", "remem")]
+                (1, 1, "k5", NOW, 1, 0.95, 3, "review", "remem"),
+                (1, 1, "k6", NOW + 20_000, 1, 0.99, 0.0002, "review", "remem")]      # 20 seconds later, same test: practice
         for cid, qid, k, ts, ok, pr, el, mode, arm in rows:
             c.execute("INSERT INTO responses(user_id,concept_id,question_id,idem_key,ts,correct,pred_R,elapsed_days,mode,arm) VALUES (?,?,?,?,?,?,?,?,?,?)",
                       (u, cid, qid, k, ts, ok, pr, el, mode, arm))
@@ -37,18 +38,20 @@ def build(tmp_path):
 def test_pilot_stats(tmp_path):
     c = build(tmp_path)
     arm = pilot.by_arm(c).set_index("arm")
-    assert arm.loc["remem", "review_answers"] == 3          # admin excluded
-    assert abs(arm.loc["remem", "accuracy"] - 2 / 3) < 1e-9
-    assert arm.loc["sm2", "review_answers"] == 1 and arm.loc["fixed", "review_answers"] == 0
+    assert arm.loc["remem", "review_tests"] == 3 and arm.loc["remem", "review_answers"] == 4    # admin excluded; k5 and k6 are one test
+    assert abs(arm.loc["remem", "accuracy"] - 3 / 4) < 1e-9
+    assert arm.loc["sm2", "review_tests"] == 1 and arm.loc["fixed", "review_tests"] == 0          # a first quiz is learning, not memory
+    t = pilot.review_tests(c)
+    assert sorted(t["n"].tolist()) == [1, 1, 1, 2] and t.loc[t["n"] == 2, "pred_R"].item() == 0.95  # predicted from the test's first answer
     assert arm["concepts"].tolist() == [1, 1, 1]
     ad = pilot.adherence(c, NOW)
     assert ad["tracked"] == 2 and ad["overdue"] == 1 and abs(ad["median_days_late"] - 2) < 1e-9
     h = pilot.llm_health(c)
     assert h["notes_failed"] == 1 and h["note_fail_rate"] == 0.5 and h["flag_rate"] == 1 / 3
     cal = pilot.calibration(c)
-    assert cal["n"].sum() == 4                              # pred_R present, student, review
+    assert cal["n"].sum() == 5                              # answers in student reviews (the first quiz is left out)
     da = pilot.daily_activity(c)
-    assert da["answers"].sum() == 5 and da["active_users"].max() == 1
+    assert da["answers"].sum() == 6 and da["active_users"].max() == 1
     u = pilot.users_table(c, NOW).set_index("username")
     assert u.loc["user01", "n_answers"] == 0 and u.loc["user01", "notes"] == 2
     assert not pilot.final_test_open(c)
@@ -90,3 +93,20 @@ def test_test_accounts_are_invisible_to_the_dashboard(tmp_path):
                        CREATE TABLE notes(user_id INTEGER); CREATE TABLE concepts(user_id INTEGER); CREATE TABLE responses(user_id INTEGER, ts INTEGER);
                        INSERT INTO users VALUES (1,'user01','student',1,1,0,0),(2,'guest','demo',1,1,5,0),(3,'boss','admin',1,1,0,0);""")
     assert pilot.users_table(c, 10**12)["username"].tolist() == ["user01", "boss"]
+
+
+def test_reviews_before_the_feedback_change_count_their_first_answer_only(tmp_path):
+    """Before the cut-off the right answer was shown after each question, so only a review's first answer is clean."""
+    p = tmp_path / "f.db"
+    db.init_db(p)
+    with db.session(p) as c:
+        u = auth.create_user(c, "user01", "x", "student")
+        c.execute("INSERT INTO notes(user_id,title,text,status,created_at) VALUES (?,?,?,?,?)", (u, "n", "t", "done", NOW))
+        c.execute("INSERT INTO concepts(user_id,note_id,name,arm,created_at) VALUES (?,?,?,?,?)", (u, 1, "c", "remem", NOW))
+        c.execute("INSERT INTO questions(concept_id,variant_no,stem,options_json,correct_idx,created_at) VALUES (1,1,'s','[]',0,?)", (NOW,))
+        c.execute("INSERT OR REPLACE INTO settings VALUES ('whats_new_cutoff', ?)", (str(NOW),))
+        for k, ts, ok in (("a", NOW - 3 * DAY, 0), ("b", NOW - 3 * DAY + 20_000, 1), ("c", NOW + DAY, 0), ("d", NOW + DAY + 20_000, 1)):
+            c.execute("INSERT INTO responses(user_id,concept_id,question_id,idem_key,ts,correct,pred_R,elapsed_days,mode,arm) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                      (u, 1, 1, k, ts, ok, 0.8, 2 if k in "ac" else 0.0002, "review", "remem"))
+    t = pilot.review_tests(pilot.open_ro(p))
+    assert t["n"].tolist() == [1, 2] and t["right"].tolist() == [0, 1]

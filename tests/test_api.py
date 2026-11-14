@@ -14,7 +14,7 @@ PROFILE = {"full_name": "Test Person", "contact": "test@example.com", "age": 21,
 
 
 def fake_llm(prompt):
-    qs = [{"stem": f"Question number {i} about the concept?", "options": ["alpha", "beta", "gamma", "delta"], "correct_index": i % 4} for i in range(5)]
+    qs = [{"stem": f"Question number {i} about the concept?", "options": ["alpha", "beta", "gamma", "delta"], "correct_index": i % 4} for i in range(7)]
     return json.dumps({"concepts": [
         {"name": "Photosynthesis", "source_span": "plants convert light energy into chemical energy", "questions": qs},
         {"name": "Chlorophyll", "source_span": "the green pigment in chloroplasts that absorbs light", "questions": [dict(q, stem=q["stem"] + " (chl)") for q in qs]}]})
@@ -95,7 +95,7 @@ def test_notes_to_quiz_flow_and_variants(client):
     with db.session() as conn:
         n = conn.execute("SELECT COUNT(*) FROM questions").fetchone()[0]
         finals = conn.execute("SELECT COUNT(*) FROM questions WHERE is_final_test=1").fetchone()[0]
-    assert n == 10 and finals == 2
+    assert n == 14 and finals == 6                                       # per concept: 4 practice + 3 for the Remem Test
     due = client.get("/api/due", headers=h).json()
     assert len(due["new"]) == 2 and due["due"] == []
 
@@ -178,7 +178,7 @@ def test_state_survives_restart(client):
 
 # ------------------------------------------------------------------ LLM validation (spec 21.2)
 def _concept(**kw):
-    q = [{"stem": f"Question number {i} here?", "options": ["a1", "b1", "c1", "d1"], "correct_index": 0} for i in range(5)]
+    q = [{"stem": f"Question number {i} here?", "options": ["a1", "b1", "c1", "d1"], "correct_index": 0} for i in range(7)]
     base = {"name": "Topic", "source_span": "plants convert light energy", "questions": q}
     base.update(kw)
     return {"concepts": [base]}
@@ -228,7 +228,7 @@ def test_topics_balanced_suggestions_and_creation(client, monkeypatch):
     def fake_topic_llm(prompt):
         chunk = prompt.split('NOTES:')[-1].split('"""')[1]
         words = chunk.split()
-        qs = [{"stem": f"Question number {i} about it?", "options": ["alpha", "beta", "gamma", "delta"], "correct_index": i % 4} for i in range(5)]
+        qs = [{"stem": f"Question number {i} about it?", "options": ["alpha", "beta", "gamma", "delta"], "correct_index": i % 4} for i in range(7)]
         return json.dumps({"concepts": [{"name": "Idea " + words[0], "source_span": " ".join(words[:8]), "questions": qs}]})
     monkeypatch.setattr(llm, "_call_gemini", fake_topic_llm)
     ha = login(client, "p01", "pw-for-p01!")
@@ -247,9 +247,13 @@ def test_topics_balanced_suggestions_and_creation(client, monkeypatch):
     ta2 = client.get("/api/topics", headers=ha).json()
     assert [t["done"] for t in ta2["topics"] if t["id"] == sug_a] == [True] and ta2["suggested"] != sug_a
     assert client.post("/api/notes/topic", json={"topic_id": "nope"}, headers=ha).status_code == 404
-    # the reading page gets the full text before any quiz exists; the practice page learns which topic a concept came from
-    full = client.get(f"/api/topics/{sug_a}", headers=ha).json()
-    assert full["id"] == sug_a and len(full["text"]) > 500 and full["done"] is True
+    # the reading page gets the full text before any quiz exists, and is locked once the quiz is made
+    other = next(t["id"] for t in ta2["topics"] if not t["done"])
+    full = client.get(f"/api/topics/{other}", headers=ha).json()
+    assert full["id"] == other and len(full["text"]) > 500 and full["done"] is False and full["last_read"] is False
+    locked = client.get(f"/api/topics/{sug_a}", headers=ha)
+    assert locked.status_code == 403 and "Remem Test" in locked.json()["detail"]
+    assert [t["reading"] for t in ta2["topics"] if t["id"] == sug_a] == ["locked"]
     assert client.get("/api/topics/nope", headers=ha).status_code == 404
     assert client.get(f"/api/topics/{sug_a}").status_code in (401, 403)
     cid = client.get(f"/api/notes/{r.json()['note_id']}", headers=ha).json()["concepts"][0]["concept_id"]
@@ -354,11 +358,11 @@ def test_admin_snapshot_reset_final_switch_and_access(client):
     assert client.post("/api/admin/final-test", json={"open": True}, headers=ha).json() == {"open": True}
     fin = client.get("/api/final", headers=hs).json()
     assert fin["open"] and len(fin["items"]) == 2
-    assert client.get("/api/due", headers=hs).json()["final"] == {"open": True, "remaining": 2}
+    assert client.get("/api/due", headers=hs).json()["final"] == {"open": True, "total": 6, "answered": 0, "finished": False, "remaining": 6}
     q = client.get(f"/api/question/next?concept={fin['items'][0]['concept_id']}&final=1", headers=hs).json()
     r = client.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": 0, "rt_ms": 5000, "idem_key": "final-key-1"}, headers=hs)
     assert r.status_code == 200 and "correct" in r.json()
-    assert len(client.get("/api/final", headers=hs).json()["items"]) == 1
+    assert len(client.get("/api/final", headers=hs).json()["items"]) == 2               # that concept still has two unseen questions
     again = client.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": 1, "rt_ms": 5000, "idem_key": "final-key-2"}, headers=hs)
     assert again.status_code == 409                                                   # a final question cannot be answered twice
     assert client.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": 0, "rt_ms": 5000, "idem_key": "final-key-1"}, headers=hs).status_code == 200   # same key = replay
@@ -514,7 +518,7 @@ def test_repair_moves_repeats_and_rebuilds_the_schedule(client, monkeypatch, tmp
     _set_arm(c1, "sm2"); _set_arm(c2, "sm2")
     pattern = [True, True, False, True, True, True, True, True, False, True, True]     # 11 taps, like the report: 4 questions cycling
     with monkeypatch.context() as m:                                # the old behaviour: no memory of the sitting
-        m.setattr(main, "sitting_question_ids", lambda *a: [])
+        m.setattr(main, "sitting_question_ids", lambda *a: [-1])          # never "already answered", and never "not due yet"
         for ok in pattern:
             answer(client, h1, c1, ok); client.clock["t"] += 10_000
     client.clock["t"] -= 10_000 * len(pattern)
