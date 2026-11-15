@@ -788,23 +788,182 @@ async function viewCurve(cid, theta, keep) {
   if (keep) remount(nodes, 'input[type="range"]'); else mount(nodes);
 }
 
+// ---------------------------------------------------------------- theme switch (owner's reference design, ported 1:1)
+// The motion is the reference's own: values sampled frame by frame from its animation (25 fps source, played at 34 fps),
+// Catmull-Rom between frames, the exit replays the first frames backwards, and a 50 ms blend smooths a reversal mid-way.
+const TS = (() => {
+  const F0 = 48, N = 23, END = N - 1, SETTLE = 10, FPS = 34, BLEND = 0.05;
+  function track(sp) {
+    const keys = Object.keys(sp).map(Number).sort((a, b) => a - b), out = [];
+    for (let i = 0; i < N; i++) {
+      const f = F0 + i; let v;
+      if (f <= keys[0]) v = sp[keys[0]];
+      else if (f >= keys[keys.length - 1]) v = sp[keys[keys.length - 1]];
+      else for (let k = 0; k < keys.length - 1; k++) if (f >= keys[k] && f <= keys[k + 1]) { const t = (f - keys[k]) / (keys[k + 1] - keys[k]); v = sp[keys[k]] + (sp[keys[k + 1]] - sp[keys[k]]) * t; break; }
+      out.push(v);
+    }
+    return out;
+  }
+  const F = {
+    b: track({48:0,49:.005,50:.03,51:.08,52:.19,53:.5,54:.81,55:.92,56:.97,57:.995,58:1}),
+    pd: track({48:0,49:0,50:.01,51:.055,52:.15,53:.55,54:.9,55:.97,56:.995,57:1}),
+    xc: track({48:388,49:389.2,50:392.3,51:396.75,52:399.5,53:405.7,54:412.5,55:419.75,56:427.2,57:434.75,58:441.5,59:445.7,60:446.1,61:444.9,62:443.3,63:442.15,64:441.5}),
+    ad: track({48:1,50:1,51:.85,52:.65,53:.36,54:.11,55:0}),
+    ac: track({48:0,51:0,52:.34,53:.64,54:.89,55:1}),
+    bx: track({48:0,49:-.5,50:-1.5,51:-3.5,52:-8.2,53:-16,54:-24}),
+    ba: track({48:1,50:1,51:.85,52:.65,53:0}),
+    xd: track({48:0,51:0,52:2.7,53:2.65,54:2.76,55:2.8}),
+    yd: track({48:0}),
+    sx: track({48:0,49:-.2,50:-.8,51:-2.6,52:-14,53:-25.7,54:-35}),
+    sa: track({48:1,50:1,51:.85,52:.65,53:.4,54:0}),
+    Ax: track({56:58,57:36,58:15.3,59:0,60:-13,61:-14.2,62:-10.4,63:-5.6,64:-2,65:0,66:.9,67:.9,68:.6,69:.4,70:0}),
+    Ay: track({56:9,57:5.8,58:2.4,59:0,60:-1.9,61:-2.1,62:-1.5,63:-.9,64:-.1,65:0}),
+    Aa: track({55:0,56:0,57:1}),
+    Bx: track({56:0,57:0,58:-11,59:-12.1,60:-8.7,61:-4.7,62:-1.6,63:0,64:.9,65:.9,66:.8,67:.4,68:.2,69:0}),
+    By: track({57:0,58:3.9,59:4.2,60:3.1,61:1.7,62:.6,63:0,64:-.1,65:-.1,66:-.1,67:0}),
+    Ba: track({55:0,56:0,57:1}),
+    D1x: track({56:0,57:-9.1,58:-9.8,59:-7.2,60:-4,61:-1.3,62:0,63:.7,64:.7,65:.7,66:.6,67:.4,68:0}),
+    D1y: track({56:.3,57:-3.2,58:-3.2,59:-2.3,60:-1.2,61:-.4,62:0,63:.3,64:.3,65:.3,66:.2,67:.1,68:0}),
+    D1a: track({55:0,56:.75,57:1}),
+    D2x: track({56:46,57:34.2,58:24.1,59:9.5,60:0,61:-8.7,62:-9.7,63:-6.9,64:-3.9,65:-1.7,66:0,67:.3,68:0}),
+    D2y: track({56:2,57:1.4,58:1.1,59:.7,60:0,61:-.1,62:-.1,63:-.1,64:.1,65:.1,66:0}),
+    D2a: track({55:0,56:0,57:1}),
+    D3x: track({55:65,56:45.1,57:20.1,58:0,59:-16.7,60:-18.1,61:-13.2,62:-7.2,63:-2.9,64:0,65:.9,66:1,67:.9,68:.3,69:0}),
+    D3y: track({56:-5.1,57:-2.1,58:0,59:1.9,60:1.9,61:1.6,62:.9,63:.1,64:0,65:-.1,66:-.2,67:-.1,68:0}),
+    D3a: track({55:0,56:1}),
+  };
+  const R = Object.assign({}, F, { Bx: track({48:0}), By: track({48:0}), D1x: track({48:0}), D1y: track({48:0}) });   // on the way out star B and dot 1 stay put
+  const KEYS = Object.keys(F);
+  function sample(arr, u) {
+    if (u <= 0) return arr[0];
+    if (u >= END) return arr[END];
+    const i = Math.floor(u), t = u - i, p0 = arr[Math.max(i - 1, 0)], p1 = arr[i], p2 = arr[i + 1], p3 = arr[Math.min(i + 2, END)], t2 = t * t, t3 = t2 * t;
+    return 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+  }
+  function values(u, mode) {
+    const src = mode === "R" ? R : F, uu = mode === "R" ? Math.min(u, SETTLE) : u, v = {};
+    for (const k of KEYS) v[k] = sample(src[k], uu);
+    return v;
+  }
+  return { END, SETTLE, FPS, BLEND, KEYS, values };
+})();
+
+function themeSwitch(startDark, onToggle) {
+  const NS = "http://www.w3.org/2000/svg";
+  const s = (tag, attrs, ...kids) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v); el.append(...kids); return el; };
+  const grad = (id, stops) => s("linearGradient", { id, x1: 0, y1: 0, x2: 0, y2: 1 }, ...stops.map(([o, c]) => s("stop", { offset: o, "stop-color": c })));
+  // day pill: the reference's sky blue moved into Remem's indigo; night pill: the reference's near-black navy (close to the app's dark paper)
+  const day = [[0, "rgb(84,89,226)"], [.1, "rgb(98,103,231)"], [.2, "rgb(114,119,236)"], [.3, "rgb(124,129,240)"], [.4, "rgb(121,126,239)"], [.6, "rgb(117,122,238)"],
+               [.7, "rgb(113,118,236)"], [.8, "rgb(103,108,233)"], [.9, "rgb(93,98,229)"], [1, "rgb(84,89,226)"]];
+  const night = [[0, "rgb(3,4,6)"], [.11, "rgb(9,11,17)"], [.19, "rgb(12,16,25)"], [.29, "rgb(18,22,36)"], [.41, "rgb(19,24,38)"], [.56, "rgb(20,25,40)"],
+                 [.66, "rgb(19,24,38)"], [.71, "rgb(16,21,32)"], [.76, "rgb(12,16,25)"], [.84, "rgb(9,11,17)"], [.91, "rgb(4,5,7)"], [1, "rgb(3,4,6)"]];
+  const star = "M0,-1 L.2245,-.309 .951,-.309 .363,.118 .588,.809 0,.382 -.588,.809 -.363,.118 -.951,-.309 -.2245,-.309Z";
+  const pill = fill => s("rect", { x: 0, y: .45, width: 139, height: 79.55, rx: 39.775, fill });
+  const pillDark = pill("url(#ts-night)"); pillDark.setAttribute("opacity", 0);
+  const g = (...kids) => s("g", {}, ...kids);
+  const bigDot = g(s("circle", { cx: 102.55, cy: 20.4, r: 6.8, fill: "#fff" })), smDot = g(s("circle", { cx: 86.68, cy: 36.24, r: 2.78, fill: "#fff" }));
+  const starAt = (x, y, k, w) => g(s("path", { d: star, transform: "translate(" + x + " " + y + ") scale(" + k + ")", fill: "#fff", stroke: "#fff", "stroke-width": w, "stroke-linejoin": "round" }));
+  const gA = starAt(34, 25.55, 5.35, .57), gB = starAt(56.19, 54.78, 3.93, .61);
+  const dot = (cx, cy, r) => g(s("circle", { cx, cy, r, fill: "#fff" }));
+  const g1 = dot(69.39, 22.3, 2.17), g2 = dot(53.6, 34.24, 2.16), g3 = dot(21.81, 46.08, 2.19);
+  const disc = s("circle", { cx: 43, cy: 40.18, r: 26.74, fill: "#fff" });
+  const moon = s("g", { opacity: 0, transform: "translate(96.24 40.4)" }, s("circle", { r: 27.12, fill: "#fff", mask: "url(#ts-moon)" }));
+  const svg = s("svg", { viewBox: "0 0 139 80", "aria-hidden": "true", focusable: "false" },
+    s("defs", {}, grad("ts-day", day), grad("ts-night", night),
+      s("clipPath", { id: "ts-clip" }, s("rect", { x: 0, y: .45, width: 139, height: 79.55, rx: 39.775 })),
+      s("mask", { id: "ts-moon", maskUnits: "userSpaceOnUse", x: -60, y: -60, width: 120, height: 120 },
+        s("rect", { x: -60, y: -60, width: 120, height: 120, fill: "#fff" }), s("circle", { cx: -14.64, cy: -7.63, r: 19.96, fill: "#000" }))),
+    s("g", { "clip-path": "url(#ts-clip)" }, pill("url(#ts-day)"), pillDark, bigDot, smDot, gA, gB, g1, g2, g3, disc, moon));
+  const btn = h("button", { class: "theme-switch", type: "button", role: "switch", "aria-checked": String(!!startDark), "aria-label": "Dark mode" }, svg);
+  const lblL = h("span", { class: "ts-label", "aria-hidden": "true" }, "Light"), lblD = h("span", { class: "ts-label", "aria-hidden": "true" }, "Dark");
+  const el = h("div", { class: "ts" }, lblL, btn, lblD);
+
+  const tr = (dx, dy) => "translate(" + dx.toFixed(2) + " " + dy.toFixed(2) + ")";
+  const mixSh = b => "rgba(" + Math.round(84 * (1 - b)) + "," + Math.round(89 * (1 - b)) + "," + Math.round(226 * (1 - b)) + "," + (0.45 + 0.1 * b).toFixed(2) + ")";
+  let last = null;
+  function paint(v) {
+    pillDark.setAttribute("opacity", v.pd.toFixed(3));
+    disc.setAttribute("cx", (v.xc + v.xd - 345).toFixed(2)); disc.setAttribute("cy", (40.18 + v.yd).toFixed(2)); disc.setAttribute("opacity", v.ad.toFixed(3));
+    moon.setAttribute("transform", "translate(" + (v.xc - 345.26).toFixed(2) + " 40.4)"); moon.setAttribute("opacity", v.ac.toFixed(3));
+    bigDot.setAttribute("transform", tr(v.bx, 0)); bigDot.setAttribute("opacity", v.ba.toFixed(3));
+    smDot.setAttribute("transform", tr(v.sx, 0)); smDot.setAttribute("opacity", v.sa.toFixed(3));
+    gA.setAttribute("transform", tr(v.Ax, v.Ay)); gA.setAttribute("opacity", v.Aa.toFixed(3));
+    gB.setAttribute("transform", tr(v.Bx, v.By)); gB.setAttribute("opacity", v.Ba.toFixed(3));
+    g1.setAttribute("transform", tr(v.D1x, v.D1y)); g1.setAttribute("opacity", v.D1a.toFixed(3));
+    g2.setAttribute("transform", tr(v.D2x, v.D2y)); g2.setAttribute("opacity", v.D2a.toFixed(3));
+    g3.setAttribute("transform", tr(v.D3x, v.D3y)); g3.setAttribute("opacity", v.D3a.toFixed(3));
+    btn.style.setProperty("--sh", mixSh(v.b));
+    last = v;
+  }
+  // state machine, as in the reference: u runs 0..END forwards (to dark) or back (to light); a reversal blends from where it was
+  let dark = !!startDark, u = dark ? TS.END : 0, mode = dark ? "F" : "R", snap = null, blendT = 1, raf = 0, prev = 0;
+  const still = matchMedia("(prefers-reduced-motion: reduce)");
+  function render() {
+    let v = TS.values(u, mode);
+    if (snap && blendT < 1) { const o = {}; for (const k of TS.KEYS) o[k] = snap[k] + (v[k] - snap[k]) * blendT; v = o; }
+    paint(v);
+  }
+  function frame(now) {
+    const dt = Math.min((now - prev) / 1000, 0.1); prev = now;
+    let moving = false;
+    if (dark) { if (u < TS.END) { u = Math.min(TS.END, u + TS.FPS * dt); moving = true; } }
+    else if (u > 0) { u = Math.max(0, u - TS.FPS * dt); moving = true; }
+    if (blendT < 1) { blendT = Math.min(1, blendT + dt / TS.BLEND); moving = true; }
+    render();
+    raf = moving && btn.isConnected ? requestAnimationFrame(frame) : 0;
+  }
+  function labels() { lblL.classList.toggle("on", !dark); lblD.classList.toggle("on", dark); }
+  function set(next, user) {
+    if (next === dark) return;
+    snap = last; blendT = 0; dark = next;
+    if (dark) mode = "F"; else { mode = "R"; if (u > TS.SETTLE) u = TS.SETTLE; }
+    btn.setAttribute("aria-checked", String(dark)); labels();
+    if (user) onToggle(dark);
+    if (still.matches) { u = dark ? TS.END : 0; snap = null; blendT = 1; render(); return; }
+    if (!raf) { prev = performance.now(); raf = requestAnimationFrame(frame); }
+  }
+  btn.addEventListener("click", () => set(!dark, true));
+  lblL.addEventListener("click", () => set(false, true));
+  lblD.addEventListener("click", () => set(true, true));
+  labels(); render();
+  return { el, set: next => set(next, false) };
+}
+
 function viewMe() {
   const old = h("input", { id: "op", type: "password", autocomplete: "current-password" }), nw = h("input", { id: "np", type: "password", autocomplete: "new-password" });
   const msg = h("div", { class: "muted", role: "status" });
   const reminders = h("div", { class: "stack" }, h("p", { class: "muted" }, "Checking..."));
   fillReminderSettings(reminders);
-  mount(h("h1", {}, "Me"), h("p", { class: "muted" }, S.user || "", S.role !== "student" ? " (role: " + S.role + ")" : ""),
-    h("h2", {}, "Reminders"), reminders,
-    h("h2", {}, "Sounds"),
-    h("label", { class: "switch" }, h("span", {}, "Play a sound for right and wrong answers"),
-      h("input", { type: "checkbox", role: "switch", checked: soundOn(), onchange: e => { store.set("remem_sound", e.target.checked ? "1" : "0"); if (e.target.checked) play("right"); } })),
-    h("h2", {}, "Change password"),
-    h("form", { class: "stack", onsubmit: async (e) => { e.preventDefault(); try { await api("/auth/password", { method: "POST", body: { old_password: old.value, new_password: nw.value } }); msg.className = "ok"; msg.textContent = "Password changed."; old.value = nw.value = ""; } catch (ex) { msg.className = "err"; msg.textContent = errText(ex); } } },
-      h("input", { type: "text", autocomplete: "username", value: S.user || "", hidden: true, "aria-hidden": "true", tabindex: "-1" }),
-      h("div", {}, h("label", { for: "op" }, "Current password"), old), h("div", {}, h("label", { for: "np" }, "New password (8 or more characters)"), nw), msg,
-      h("button", { type: "submit" }, "Update password")),
-    env().standalone ? null : h("p", {}, h("a", { class: "btn block", href: "#/install" }, "Add to home screen")),
-    h("p", {}, h("button", { class: "block", onclick: () => signOut() }, "Sign out")));
+  const T = window.remTheme;
+  const hint = h("div", { class: "hint" });
+  const sw = themeSwitch(T.effective() === "dark", dark => { T.set(dark ? "dark" : "light"); showHint(); });
+  function showHint() {                  // say what is in use; once overridden, offer the way back to the phone's own setting
+    hint.replaceChildren(...(T.saved()
+      ? [h("span", {}, "Chosen here."), h("button", { class: "link", type: "button", onclick: () => { T.clear(); sw.set(T.effective() === "dark"); showHint(); } }, "Match my phone")]
+      : [h("span", {}, "Following your phone's setting.")]));
+  }
+  showHint();
+  if (T.phone) {                          // the phone switches light/dark (e.g. at sunset) while Me is open
+    const follow = () => { if (!sw.el.isConnected) return T.phone.removeEventListener("change", follow); if (!T.saved()) sw.set(T.phone.matches); };
+    T.phone.addEventListener("change", follow);
+  }
+  const chev = () => icon("M9 5l7 7-7 7", "chev");
+  mount(h("h1", {}, "Me"), h("p", { class: "me-who" }, S.user || "", S.role !== "student" ? " (" + S.role + ")" : ""),
+    h("h2", {}, "Reminders"), h("div", { class: "me-group" }, reminders),
+    h("h2", {}, "Sound"),
+    h("div", { class: "me-group" }, h("label", { class: "switch" }, h("span", {}, "Sounds for right and wrong answers"),
+      h("input", { type: "checkbox", role: "switch", checked: soundOn(), onchange: e => { store.set("remem_sound", e.target.checked ? "1" : "0"); if (e.target.checked) play("right"); } }))),
+    h("h2", {}, "Appearance"),
+    h("div", { class: "me-group" }, h("div", { class: "me-theme" }, h("div", { class: "row" }, h("span", {}, "Theme"), sw.el), hint)),
+    h("h2", {}, "Account"),
+    h("div", { class: "me-group" },
+      h("details", {}, h("summary", {}, h("span", {}, "Change password"), chev()),
+        h("form", { class: "stack", onsubmit: async (e) => { e.preventDefault(); try { await api("/auth/password", { method: "POST", body: { old_password: old.value, new_password: nw.value } }); msg.className = "ok"; msg.textContent = "Password changed."; old.value = nw.value = ""; } catch (ex) { msg.className = "err"; msg.textContent = errText(ex); } } },
+          h("input", { type: "text", autocomplete: "username", value: S.user || "", hidden: true, "aria-hidden": "true", tabindex: "-1" }),
+          h("div", {}, h("label", { for: "op" }, "Current password"), old), h("div", {}, h("label", { for: "np" }, "New password (8 or more characters)"), nw), msg,
+          h("button", { type: "submit" }, "Update password"))),
+      env().standalone ? null : h("a", { class: "me-row", href: "#/install" }, h("span", {}, "Add to home screen"), chev())),
+    h("p", { class: "me-signout" }, h("button", { class: "block", onclick: () => signOut() }, "Sign out")));
 }
 
 // ---------------------------------------------------------------- router

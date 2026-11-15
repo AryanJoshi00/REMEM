@@ -17,6 +17,13 @@
   --serif: "Iowan Old Style", "Charter", "Sitka Text", Cambria, Georgia, "Noto Serif", serif;     /* only for the material being studied */
 }
 :root[data-theme="light"] { color-scheme: light; }
+/* Me > Appearance can force dark on a phone set to light: the same dark tokens, chosen by data-theme (theme.js) */
+:root[data-theme="dark"] { color-scheme: dark;
+    --paper: #121318; --surface: #1b1c23; --ink: #ecebe6; --muted: #a9abb6; --rule: #2f3139; --field: #73778a; --tint: #24263b;
+    --accent: #a2a6ff; --on-accent: #121318; --hero: #262a5c; --hero-edge: #3a3f80; --on-hero: #ffffff;
+    --amber: #f2b25c; --amber-fill: #f2b25c; --green: #5ed39b; --green-fill: #5ed39b; --track: #3a3c47; --red: #ff8a80;
+    --badge: #ff6b61; --on-badge: #121318; --placeholder: #9a9db0;
+}
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #121318; --surface: #1b1c23; --ink: #ecebe6; --muted: #a9abb6; --rule: #2f3139; --field: #73778a; --tint: #24263b;
@@ -28,6 +35,7 @@
 @media (prefers-contrast: more) {
   :root { --muted: #2f3342; --rule: #8a8d9a; --field: #5d6175; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --muted: #d4d6de; --rule: #6d7080; --field: #9a9eb0; } }
+  :root[data-theme="dark"] { --muted: #d4d6de; --rule: #6d7080; --field: #9a9eb0; }
 }
 * { box-sizing: border-box; }
 html { font-size: 106.25%; font: -apple-system-body; font-family: var(--sans); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overscroll-behavior-y: contain; }
@@ -197,6 +205,7 @@ svg.chart .now { fill: var(--ink); stroke: var(--paper); stroke-width: 3; }
 svg.chart text.lab { fill: var(--ink); font-weight: 700; }
 svg.chart .halo { paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) svg.chart .area { opacity: .14; } }
+:root[data-theme="dark"] svg.chart .area { opacity: .14; }
 input[type="range"] { accent-color: var(--accent); padding: 0; min-height: 44px; }
 
 /* loading + toast */
@@ -337,3 +346,45 @@ dialog.sheet .stack { margin-top: 16px; }
 .misses .ans.bad .lab { color: var(--red); }
 .misses .ans.good { border-color: var(--green); background: color-mix(in srgb, var(--green-fill) 10%, var(--surface)); }
 .misses .ans.good .lab { color: var(--green); }
+
+/* Light and dark switching: every colour cross-fades for 300 ms while the theme switch moves (theme.js adds the class) */
+html.theme-fade, html.theme-fade *:not(.theme-switch):not(.theme-switch *) {
+  transition: background-color 300ms cubic-bezier(.65, 0, .35, 1), color 300ms cubic-bezier(.65, 0, .35, 1), border-color 300ms cubic-bezier(.65, 0, .35, 1),
+              fill 300ms cubic-bezier(.65, 0, .35, 1), stroke 300ms cubic-bezier(.65, 0, .35, 1) !important;
+}
+
+/* Me: grouped settings. Each section is one panel of hairline-separated rows; long parts (password) stay closed until asked for */
+.me-who { margin: 2px 0 0; color: var(--muted); }
+.me-group { border: 1.5px solid var(--rule); background: var(--surface); border-radius: var(--r-block); margin: 8px 0 0; }
+.me-group > * { padding: 12px 16px; }
+.me-group > * + * { border-top: 1px solid var(--rule); }
+.me-group p { margin: 0; }
+.me-group .stack > p:first-child { margin-top: 0; }
+.me-group .switch { min-height: 52px; padding-top: 6px; padding-bottom: 6px; }
+.me-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; color: var(--ink); text-decoration: none; }
+.me-row .chev { color: var(--muted); flex: none; }
+a.me-row:focus-visible { outline-offset: -3px; }
+.me-group details > summary { justify-content: space-between; gap: 16px; min-height: 52px; margin: -12px -16px; padding: 12px 16px; font-weight: 400; list-style: none; }
+.me-group details > summary::-webkit-details-marker { display: none; }
+.me-group details > summary .chev { color: var(--muted); transition: transform 200ms var(--ease-out); }
+.me-group details[open] > summary .chev { transform: rotate(90deg); }
+.me-group details[open] > summary { margin-bottom: 4px; }
+.me-group details form { padding-top: 8px; }
+.me-group summary:focus-visible { outline-offset: -3px; }
+.me-theme { display: flex; flex-direction: column; gap: 4px; }
+.me-theme .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; min-height: 60px; }      /* large text: the switch drops under the label */
+.me-theme .hint { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--fs-sm); color: var(--muted); }
+.me-signout { margin-top: 32px; }
+
+/* The theme switch (owner's reference design, 0.6 scale): a sky pill with a sun-disc by day, a night pill with a crescent and stars.
+   The one deliberate exception to "no gradients": the owner asked for this control to look and move exactly like the reference. */
+.ts { display: inline-flex; align-items: center; gap: 12px; }
+.ts-label { font-weight: 600; color: var(--muted); cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; -webkit-user-select: none; user-select: none; }
+.ts-label.on { color: var(--ink); }
+.theme-switch { position: relative; flex: none; width: 84px; height: 48.35px; padding: 0; margin: 0; border: 0; min-height: 0; background: none; border-radius: 24.2px; cursor: pointer;
+  --sh: rgba(84, 89, 226, .45); box-shadow: 0 0 0 0 transparent; transition: transform .22s cubic-bezier(.34, 1.56, .64, 1), box-shadow .25s ease; will-change: transform; }
+.theme-switch svg { display: block; width: 84px; height: 48.35px; overflow: visible; pointer-events: none; }
+@media (hover: hover) { .theme-switch:hover { transform: scale(1.04); box-shadow: 0 6px 16px -3px var(--sh); } }
+.theme-switch:active { transform: scale(.95); transition-duration: .08s; box-shadow: 0 3px 8px -3px var(--sh); opacity: 1; }
+.theme-switch:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) { .theme-switch { transition: none; } .me-group details > summary .chev { transition: none; } }
