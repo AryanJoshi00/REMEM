@@ -18,13 +18,16 @@
       metas[i].setAttribute("content", PAPER[s || own]);
     }
   }
-  function fade() {                       // every colour cross-fades while the switch moves, like the reference page's background
-    if (still && still.matches) return;
-    root.classList.add("theme-fade"); void root.offsetWidth;
-    clearTimeout(fadeTimer); fadeTimer = setTimeout(function () { root.classList.remove("theme-fade"); }, 420);
+  function change(write) {                // the whole page cross-fades as one image where the browser can; elsewhere colours fade
+    write();                              // saved at once (the page reads it straight away); only the redraw is animated
+    var go = apply;
+    if (still && still.matches) return go();
+    if (document.startViewTransition) { document.startViewTransition(go); return; }
+    root.classList.add("theme-fade"); void root.offsetWidth; go();
+    clearTimeout(fadeTimer); fadeTimer = setTimeout(function () { root.classList.remove("theme-fade"); }, 480);
   }
-  function set(theme) { fade(); try { localStorage.setItem(KEY, theme); } catch (e) {} apply(); }
-  function clear() { fade(); try { localStorage.removeItem(KEY); } catch (e) {} apply(); }
+  function set(theme) { change(function () { try { localStorage.setItem(KEY, theme); } catch (e) {} }); }
+  function clear() { change(function () { try { localStorage.removeItem(KEY); } catch (e) {} }); }
 
   apply();
   window.remTheme = { saved: saved, effective: effective, set: set, clear: clear, phone: mq };

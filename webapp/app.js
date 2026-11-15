@@ -848,8 +848,9 @@ const TS = (() => {
   return { END, SETTLE, FPS, BLEND, KEYS, values };
 })();
 
-function themeSwitch(startDark, onToggle) {
-  const NS = "http://www.w3.org/2000/svg";
+let tsCount = 0;
+function themeSwitch(startDark, onToggle, width) {
+  const NS = "http://www.w3.org/2000/svg", id = "ts" + (++tsCount);   // own ids, so several switches can share a page
   const s = (tag, attrs, ...kids) => { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v); el.append(...kids); return el; };
   const grad = (id, stops) => s("linearGradient", { id, x1: 0, y1: 0, x2: 0, y2: 1 }, ...stops.map(([o, c]) => s("stop", { offset: o, "stop-color": c })));
   // day pill: the reference's sky blue moved into Remem's indigo; night pill: the reference's near-black navy (close to the app's dark paper)
@@ -859,7 +860,7 @@ function themeSwitch(startDark, onToggle) {
                  [.66, "rgb(19,24,38)"], [.71, "rgb(16,21,32)"], [.76, "rgb(12,16,25)"], [.84, "rgb(9,11,17)"], [.91, "rgb(4,5,7)"], [1, "rgb(3,4,6)"]];
   const star = "M0,-1 L.2245,-.309 .951,-.309 .363,.118 .588,.809 0,.382 -.588,.809 -.363,.118 -.951,-.309 -.2245,-.309Z";
   const pill = fill => s("rect", { x: 0, y: .45, width: 139, height: 79.55, rx: 39.775, fill });
-  const pillDark = pill("url(#ts-night)"); pillDark.setAttribute("opacity", 0);
+  const pillDark = pill("url(#" + id + "-night)"); pillDark.setAttribute("opacity", 0);
   const g = (...kids) => s("g", {}, ...kids);
   const bigDot = g(s("circle", { cx: 102.55, cy: 20.4, r: 6.8, fill: "#fff" })), smDot = g(s("circle", { cx: 86.68, cy: 36.24, r: 2.78, fill: "#fff" }));
   const starAt = (x, y, k, w) => g(s("path", { d: star, transform: "translate(" + x + " " + y + ") scale(" + k + ")", fill: "#fff", stroke: "#fff", "stroke-width": w, "stroke-linejoin": "round" }));
@@ -867,14 +868,15 @@ function themeSwitch(startDark, onToggle) {
   const dot = (cx, cy, r) => g(s("circle", { cx, cy, r, fill: "#fff" }));
   const g1 = dot(69.39, 22.3, 2.17), g2 = dot(53.6, 34.24, 2.16), g3 = dot(21.81, 46.08, 2.19);
   const disc = s("circle", { cx: 43, cy: 40.18, r: 26.74, fill: "#fff" });
-  const moon = s("g", { opacity: 0, transform: "translate(96.24 40.4)" }, s("circle", { r: 27.12, fill: "#fff", mask: "url(#ts-moon)" }));
+  const moon = s("g", { opacity: 0, transform: "translate(96.24 40.4)" }, s("circle", { r: 27.12, fill: "#fff", mask: "url(#" + id + "-moon)" }));
   const svg = s("svg", { viewBox: "0 0 139 80", "aria-hidden": "true", focusable: "false" },
-    s("defs", {}, grad("ts-day", day), grad("ts-night", night),
-      s("clipPath", { id: "ts-clip" }, s("rect", { x: 0, y: .45, width: 139, height: 79.55, rx: 39.775 })),
-      s("mask", { id: "ts-moon", maskUnits: "userSpaceOnUse", x: -60, y: -60, width: 120, height: 120 },
+    s("defs", {}, grad(id + "-day", day), grad(id + "-night", night),
+      s("clipPath", { id: id + "-clip" }, s("rect", { x: 0, y: .45, width: 139, height: 79.55, rx: 39.775 })),
+      s("mask", { id: id + "-moon", maskUnits: "userSpaceOnUse", x: -60, y: -60, width: 120, height: 120 },
         s("rect", { x: -60, y: -60, width: 120, height: 120, fill: "#fff" }), s("circle", { cx: -14.64, cy: -7.63, r: 19.96, fill: "#000" }))),
-    s("g", { "clip-path": "url(#ts-clip)" }, pill("url(#ts-day)"), pillDark, bigDot, smDot, gA, gB, g1, g2, g3, disc, moon));
+    s("g", { "clip-path": "url(#" + id + "-clip)" }, pill("url(#" + id + "-day)"), pillDark, bigDot, smDot, gA, gB, g1, g2, g3, disc, moon));
   const btn = h("button", { class: "theme-switch", type: "button", role: "switch", "aria-checked": String(!!startDark), "aria-label": "Dark mode" }, svg);
+  if (width) btn.style.setProperty("--tsw", width + "px");
   const lblL = h("span", { class: "ts-label", "aria-hidden": "true" }, "Light"), lblD = h("span", { class: "ts-label", "aria-hidden": "true" }, "Dark");
   const el = h("div", { class: "ts" }, lblL, btn, lblD);
 
@@ -935,16 +937,19 @@ function viewMe() {
   const reminders = h("div", { class: "stack" }, h("p", { class: "muted" }, "Checking..."));
   fillReminderSettings(reminders);
   const T = window.remTheme;
-  const hint = h("div", { class: "hint" });
-  const sw = themeSwitch(T.effective() === "dark", dark => { T.set(dark ? "dark" : "light"); showHint(); });
-  function showHint() {                  // say what is in use; once overridden, offer the way back to the phone's own setting
-    hint.replaceChildren(...(T.saved()
-      ? [h("span", {}, "Chosen here."), h("button", { class: "link", type: "button", onclick: () => { T.clear(); sw.set(T.effective() === "dark"); showHint(); } }, "Match my phone")]
-      : [h("span", {}, "Following your phone's setting.")]));
+  const switches = [];
+  const toggle = dark => { T.set(dark ? "dark" : "light"); switches.forEach(x => x.set(dark)); showState(); };
+  const make = w => { const x = themeSwitch(T.effective() === "dark", toggle, w); switches.push(x); return x; };
+  const sw = make(60);                    // 60 x 35: next to the 51 x 31 sound switch, so the two read as one family
+  const sub = h("span", { class: "sub" });
+  const matchRow = h("button", { class: "me-act", type: "button", onclick: () => { T.clear(); switches.forEach(x => x.set(T.effective() === "dark")); showState(); } }, "Match my phone");
+  function showState() {                 // say what is in use; once overridden, offer the way back to the phone's own setting
+    sub.textContent = T.saved() ? "Set on this phone" : "Same as your phone";
+    matchRow.hidden = !T.saved();
   }
-  showHint();
+  showState();
   if (T.phone) {                          // the phone switches light/dark (e.g. at sunset) while Me is open
-    const follow = () => { if (!sw.el.isConnected) return T.phone.removeEventListener("change", follow); if (!T.saved()) sw.set(T.phone.matches); };
+    const follow = () => { if (!sw.el.isConnected) return T.phone.removeEventListener("change", follow); if (!T.saved()) switches.forEach(x => x.set(T.phone.matches)); };
     T.phone.addEventListener("change", follow);
   }
   const chev = () => icon("M9 5l7 7-7 7", "chev");
@@ -954,7 +959,7 @@ function viewMe() {
     h("div", { class: "me-group" }, h("label", { class: "switch" }, h("span", {}, "Sounds for right and wrong answers"),
       h("input", { type: "checkbox", role: "switch", checked: soundOn(), onchange: e => { store.set("remem_sound", e.target.checked ? "1" : "0"); if (e.target.checked) play("right"); } }))),
     h("h2", {}, "Appearance"),
-    h("div", { class: "me-group" }, h("div", { class: "me-theme" }, h("div", { class: "row" }, h("span", {}, "Theme"), sw.el), hint)),
+    h("div", { class: "me-group" }, h("div", { class: "me-theme" }, h("span", {}, "Theme", sub), sw.el), matchRow),
     h("h2", {}, "Account"),
     h("div", { class: "me-group" },
       h("details", {}, h("summary", {}, h("span", {}, "Change password"), chev()),
