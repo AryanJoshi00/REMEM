@@ -387,9 +387,6 @@ html.theme-fade, html.theme-fade *:not(.theme-switch):not(.theme-switch *) {
 /* The theme switch (owner's reference design): a sky pill with a sun-disc by day, a night pill with a crescent and stars.
    The one deliberate exception to "no gradients": the owner asked for this control to look and move exactly like the reference.
    --tsw sets the width; the height keeps the reference's 139:80 shape. Small sizes keep a 44px tap area. */
-.ts { display: inline-flex; align-items: center; gap: 10px; }
-.ts-label { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; -webkit-user-select: none; user-select: none; }
-.ts-label.on { color: var(--ink); }
 .theme-switch { --tsw: 60px; position: relative; flex: none; width: var(--tsw); height: calc(var(--tsw) * .5755); padding: 0; margin: 0; border: 0; min-height: 0; background: none;
   border-radius: 999px; cursor: pointer; view-transition-name: theme-switch;
   --sh: rgba(84, 89, 226, .45); box-shadow: 0 0 0 0 transparent; transition: transform .22s cubic-bezier(.34, 1.56, .64, 1), box-shadow .25s ease; will-change: transform; }
