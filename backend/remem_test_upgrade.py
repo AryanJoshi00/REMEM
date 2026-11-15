@@ -37,7 +37,7 @@ def load_questions() -> tuple[dict, dict, dict]:
     banks, bank_first = {}, {}
     for t in topics.all_topics():
         bank = json.loads((config.ARTIFACTS / "fallback" / f"{t['id']}.json").read_text(encoding="utf-8"))
-        banks[t["id"]] = {c["name"]: c["questions"][llm.N_PRACTICE:llm.N_VARIANTS] for c in bank["concepts"] if len(c["questions"]) == llm.N_VARIANTS}
+        banks[t["id"]] = {c["name"]: c["questions"][-llm.N_TEST:] for c in bank["concepts"] if len(c["questions"]) >= llm.N_EASY + llm.N_TEST}
         bank_first[t["id"]] = {c["name"]: c["questions"][0]["stem"] for c in bank["concepts"]}
     return written, banks, bank_first
 
@@ -50,7 +50,7 @@ def upgrade(conn, now: int | None = None) -> dict:
                              ORDER BY c.concept_id""").fetchall():
         qs = conn.execute("SELECT question_id, variant_no, is_final_test, stem, options_json, correct_idx FROM questions WHERE concept_id=? ORDER BY variant_no",
                           (c["concept_id"],)).fetchall()
-        if [q["variant_no"] for q in qs][:llm.N_PRACTICE] != list(range(1, llm.N_PRACTICE + 1)) or any(q["is_final_test"] for q in qs[:llm.N_PRACTICE]):
+        if [q["variant_no"] for q in qs][:llm.N_EASY] != list(range(1, llm.N_EASY + 1)) or any(q["is_final_test"] for q in qs[:llm.N_EASY]):
             missing.append((c["concept_id"], c["topic_id"], c["name"], "unexpected question layout"))
             continue
         tid = c["topic_id"] or ""
@@ -63,19 +63,20 @@ def upgrade(conn, now: int | None = None) -> dict:
                         (c["concept_id"],)).fetchone():
             started.append((c["concept_id"], c["topic_id"], c["name"]))       # never change a test someone has begun
             continue
-        old = {q["variant_no"]: q for q in qs if q["variant_no"] > llm.N_PRACTICE}
-        if len(old) == llm.N_TEST and all(old[llm.N_PRACTICE + i]["stem"] == q["stem"] and json.loads(old[llm.N_PRACTICE + i]["options_json"]) == q["options"]
-                                          and old[llm.N_PRACTICE + i]["correct_idx"] == q["correct_index"] for i, q in enumerate(new, start=1)):
+        old = [q for q in qs if q["is_final_test"]]                         # the Remem Test questions, in variant order
+        if len(old) == llm.N_TEST and all(o["stem"] == q["stem"] and json.loads(o["options_json"]) == q["options"] and o["correct_idx"] == q["correct_index"]
+                                          for o, q in zip(old, new)):
             same += 1
             continue
-        for i, q in enumerate(new, start=1):
-            v = llm.N_PRACTICE + i
-            if v in old:
-                conn.execute("UPDATE questions SET stem=?, options_json=?, correct_idx=?, is_final_test=1, flagged=0 WHERE question_id=?",
-                             (q["stem"], json.dumps(q["options"]), q["correct_index"], old[v]["question_id"]))
+        top = max(q["variant_no"] for q in qs)
+        for i, q in enumerate(new):
+            if i < len(old):
+                conn.execute("UPDATE questions SET stem=?, options_json=?, correct_idx=?, is_final_test=1, level=0, flagged=0 WHERE question_id=?",
+                             (q["stem"], json.dumps(q["options"]), q["correct_index"], old[i]["question_id"]))
             else:
-                conn.execute("INSERT INTO questions(concept_id,variant_no,stem,options_json,correct_idx,is_final_test,created_at) VALUES (?,?,?,?,?,1,?)",
-                             (c["concept_id"], v, q["stem"], json.dumps(q["options"]), q["correct_index"], now))
+                top += 1
+                conn.execute("INSERT INTO questions(concept_id,variant_no,stem,options_json,correct_idx,is_final_test,level,created_at) VALUES (?,?,?,?,?,1,0,?)",
+                             (c["concept_id"], top, q["stem"], json.dumps(q["options"]), q["correct_index"], now))
         done.append((c["concept_id"], c["topic_id"], c["name"]))
     cache_rows = 0
     for t in topics.all_topics():
@@ -89,11 +90,14 @@ def upgrade(conn, now: int | None = None) -> dict:
             changed = False
             for con in d["concepts"]:
                 new = written.get(t["id"], {}).get(con["name"])
-                if new and len(con["questions"]) >= llm.N_PRACTICE + 1 and con["questions"][llm.N_PRACTICE:] != new:
-                    con["questions"] = con["questions"][:llm.N_PRACTICE] + new
+                if not new or len(con["questions"]) < llm.N_EASY + 1:
+                    continue
+                keep = con["questions"][:llm.N_EASY] if len(con["questions"]) <= llm.N_EASY + llm.N_TEST else con["questions"][:-llm.N_TEST]
+                if keep + new != con["questions"]:
+                    con["questions"] = keep + new                        # practice kept, the Remem Test (always last) replaced
                     changed = True
             if changed:
-                after = [x.name for x in llm.validate_chunk(d, chunk)]
+                after = [x.name for x in llm.validate_chunk(d, chunk, n=min(len(x["questions"]) for x in d["concepts"] if x["name"] in before))]
                 assert after == before, (t["id"], before, after)    # the same concepts come out as before, now with 7 questions each
                 conn.execute("UPDATE llm_cache SET json=? WHERE chunk_hash=?", (json.dumps(d), h))
                 cache_rows += 1
@@ -104,7 +108,7 @@ def _validated(d: dict, chunk: str):
     """The concepts that validated before the upgrade: judged on their first 5 questions, the old rule."""
     old = llm.N_VARIANTS
     try:
-        llm.N_VARIANTS = llm.N_PRACTICE + 1
+        llm.N_VARIANTS = llm.N_EASY + 1
         return llm.validate_chunk({"concepts": [dict(c, questions=c["questions"][:llm.N_VARIANTS]) for c in d["concepts"]]}, chunk)
     finally:
         llm.N_VARIANTS = old

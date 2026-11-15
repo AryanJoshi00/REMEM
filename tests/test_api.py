@@ -14,7 +14,7 @@ PROFILE = {"full_name": "Test Person", "contact": "test@example.com", "age": 21,
 
 
 def fake_llm(prompt):
-    qs = [{"stem": f"Question number {i} about the concept?", "options": ["alpha", "beta", "gamma", "delta"], "correct_index": i % 4} for i in range(7)]
+    qs = [{"stem": f"Question number {i} about the concept?", "options": ["alpha", "beta", "gamma", "delta"], "correct_index": i % 4} for i in range(11)]
     return json.dumps({"concepts": [
         {"name": "Photosynthesis", "source_span": "plants convert light energy into chemical energy", "questions": qs},
         {"name": "Chlorophyll", "source_span": "the green pigment in chloroplasts that absorbs light", "questions": [dict(q, stem=q["stem"] + " (chl)") for q in qs]}]})
@@ -95,7 +95,7 @@ def test_notes_to_quiz_flow_and_variants(client):
     with db.session() as conn:
         n = conn.execute("SELECT COUNT(*) FROM questions").fetchone()[0]
         finals = conn.execute("SELECT COUNT(*) FROM questions WHERE is_final_test=1").fetchone()[0]
-    assert n == 14 and finals == 6                                       # per concept: 4 practice + 3 for the Remem Test
+    assert n == 22 and finals == 6                                       # per concept: 4 easier + 4 harder practice + 3 for the Remem Test
     due = client.get("/api/due", headers=h).json()
     assert len(due["new"]) == 2 and due["due"] == []
 
@@ -178,7 +178,7 @@ def test_state_survives_restart(client):
 
 # ------------------------------------------------------------------ LLM validation (spec 21.2)
 def _concept(**kw):
-    q = [{"stem": f"Question number {i} here?", "options": ["a1", "b1", "c1", "d1"], "correct_index": 0} for i in range(7)]
+    q = [{"stem": f"Question number {i} here?", "options": ["a1", "b1", "c1", "d1"], "correct_index": 0} for i in range(11)]
     base = {"name": "Topic", "source_span": "plants convert light energy", "questions": q}
     base.update(kw)
     return {"concepts": [base]}
@@ -228,7 +228,7 @@ def test_topics_balanced_suggestions_and_creation(client, monkeypatch):
     def fake_topic_llm(prompt):
         chunk = prompt.split('NOTES:')[-1].split('"""')[1]
         words = chunk.split()
-        qs = [{"stem": f"Question number {i} about it?", "options": ["alpha", "beta", "gamma", "delta"], "correct_index": i % 4} for i in range(7)]
+        qs = [{"stem": f"Question number {i} about it?", "options": ["alpha", "beta", "gamma", "delta"], "correct_index": i % 4} for i in range(11)]
         return json.dumps({"concepts": [{"name": "Idea " + words[0], "source_span": " ".join(words[:8]), "questions": qs}]})
     monkeypatch.setattr(llm, "_call_gemini", fake_topic_llm)
     ha = login(client, "p01", "pw-for-p01!")
@@ -478,19 +478,19 @@ def test_sitting_asks_each_practice_question_once_then_stops(client):
     h = login(client, "p01", "pw-for-p01!")
     cid = make_concepts(client, h)[0]["concept_id"]
     seen = []
-    for i in range(4):                                              # 5 variants, 1 kept for the final check: 4 practice questions
+    for i in range(llm.N_PRACTICE):                                 # the older per-concept route: every practice question once
         q = client.get(f"/api/question/next?concept={cid}", headers=h).json()
-        assert q["done"] is False and (q["position"], q["total"]) == (i + 1, 4)
+        assert q["done"] is False and (q["position"], q["total"]) == (i + 1, llm.N_PRACTICE)
         seen.append(q["question_id"])
         assert answer(client, h, cid, True).status_code == 200
         client.clock["t"] += 20_000
-    assert len(set(seen)) == 4
+    assert len(set(seen)) == llm.N_PRACTICE
     end = client.get(f"/api/question/next?concept={cid}", headers=h).json()
-    assert end["done"] is True and end["answered"] == 4 and end["next_due_in_days"] > 0
+    assert end["done"] is True and end["answered"] == llm.N_PRACTICE and end["next_due_in_days"] > 0
     again = client.post("/api/respond", json={"question_id": seen[0], "chosen_index": 0, "rt_ms": 5000, "idem_key": "repeat-1"}, headers=h)
     assert again.status_code == 409                                 # a stale second tab cannot sneak a repeat in either
     with db.session() as conn:
-        assert conn.execute("SELECT COUNT(*) FROM responses").fetchone()[0] == 4
+        assert conn.execute("SELECT COUNT(*) FROM responses").fetchone()[0] == llm.N_PRACTICE
     client.clock["t"] += config.SESSION_GAP_MS + 1                  # a later sitting may ask them again
     assert client.get(f"/api/question/next?concept={cid}", headers=h).json()["position"] == 1
 
@@ -523,7 +523,7 @@ def test_repair_moves_repeats_and_rebuilds_the_schedule(client, monkeypatch, tmp
             answer(client, h1, c1, ok); client.clock["t"] += 10_000
     client.clock["t"] -= 10_000 * len(pattern)
     for i, ok in enumerate(pattern):                                 # the same taps with the fix: only the first pass is accepted
-        if i < 4:
+        if i < llm.N_PRACTICE:
             answer(client, h2, c2, ok)
         client.clock["t"] += 10_000
     with db.session() as conn:
@@ -533,13 +533,13 @@ def test_repair_moves_repeats_and_rebuilds_the_schedule(client, monkeypatch, tmp
         rows = {r["user_id"]: dict(r) for r in conn.execute("SELECT * FROM state")}
         users = {r["user_id"]: (r["ability"], r["n_answers"]) for r in conn.execute("SELECT * FROM users")}
         kept = [tuple(r) for r in conn.execute("SELECT user_id, correct, pred_R, mastery_after, stability_after, mode FROM responses ORDER BY user_id, ts")]
-        assert conn.execute("SELECT COUNT(*) FROM repeat_answers").fetchone()[0] == len(pattern) - 4
+        assert conn.execute("SELECT COUNT(*) FROM repeat_answers").fetchone()[0] == len(pattern) - llm.N_PRACTICE
     u1, u2 = rows[min(rows)], rows[max(rows)]
     for k in ("mastery", "n_sessions", "n_responses", "stability_days", "sm2_ef", "sm2_reps", "sm2_interval", "due_at"):
         assert u1[k] == pytest.approx(u2[k]), k                      # repaired account == an account that never saw the bug
     assert users[u1["user_id"]] == pytest.approx(users[u2["user_id"]])
     assert [r[1:] for r in kept if r[0] == u1["user_id"]] == [r[1:] for r in kept if r[0] == u2["user_id"]]
-    assert sum(r["repeats_moved"] for r in report) == len(pattern) - 4
+    assert sum(r["repeats_moved"] for r in report) == len(pattern) - llm.N_PRACTICE
     with db.session() as conn:                                       # running it again changes nothing
         assert sum(r["repeats_moved"] for r in repair_repeats.repair(conn, main.get_models())) == 0
         assert dict(conn.execute("SELECT * FROM state WHERE concept_id=?", (c1,)).fetchone()) == pytest.approx(u1)

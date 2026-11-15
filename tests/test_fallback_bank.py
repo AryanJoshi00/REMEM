@@ -21,7 +21,7 @@ def test_bank_is_complete_valid_and_grounded(topic):
     assert valid is not None and len(valid) == len(raw["concepts"])           # nothing is silently dropped by validation
     names, stems = set(), set()
     for c in valid:
-        assert len(c.questions) == llm.N_VARIANTS == 7                         # 4 practice + 3 for the Remem Test
+        assert len(c.questions) == llm.N_BANK == 7                            # 4 practice + 3 for the Remem Test
         assert _norm(c.source_span) in _norm(t["text"])
         assert _norm(c.name) not in names
         names.add(_norm(c.name))

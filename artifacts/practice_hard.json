@@ -1,0 +1,983 @@
+{
+  "about": "Four harder practice questions per concept (a new situation, why it happens, telling it apart, or working something out), added beside the four easier ones the question generator wrote. Each review asks one easier and one harder question per concept. None of them gives away an answer to the concept's Remem Test. Applied by backend.practice_upgrade.",
+  "topics": {
+    "korean_hangul": {
+      "Origin of Hangul": [
+        {
+          "stem": "Which pair of years is right for Hangul?",
+          "options": [
+            "Created 1446, announced 1443",
+            "Created 1443, announced 1446",
+            "Created and announced in 1443",
+            "Created 1443, announced 1543"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "A historian finds a Korean letter written in 1430. Which script is it most likely written in?",
+          "options": [
+            "Hangul",
+            "Latin letters",
+            "Chinese characters",
+            "Japanese kana"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which statement is supported by the notes?",
+          "options": [
+            "King Sejong invented Chinese characters",
+            "Hangul was created under King Sejong the Great",
+            "Hangul was banned by King Sejong",
+            "Hangul was created in the 1900s"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "About how many years after Hangul was announced did the year 1500 come?",
+          "options": [
+            "About 5",
+            "About 150",
+            "About 500",
+            "About 50"
+          ],
+          "correct_index": 3
+        }
+      ],
+      "Hangul Structure": [
+        {
+          "stem": "A word is written in 3 syllable blocks. What is the smallest number of letters it can contain?",
+          "options": [
+            "3",
+            "6",
+            "9",
+            "12"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Hangul has only 24 basic letters. How can it write thousands of different syllables?",
+          "options": [
+            "Each letter has a thousand shapes",
+            "Letters combine in many ways inside syllable blocks",
+            "Chinese characters fill the gaps",
+            "Most syllables use no vowels"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Which is NOT true about the basic Hangul letters?",
+          "options": [
+            "There are 24 in all",
+            "There are 14 consonants",
+            "There are more vowels than consonants",
+            "There are 10 vowels"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "A learner knows all the basic consonants. How many more basic letters must they learn to know all 24?",
+          "options": [
+            "4",
+            "14",
+            "24",
+            "10"
+          ],
+          "correct_index": 3
+        }
+      ],
+      "Functions of the Silent ㅇ": [
+        {
+          "stem": "How is 어 read?",
+          "options": [
+            "a",
+            "eo",
+            "o",
+            "ng"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "In 강, what sound ends the syllable?",
+          "options": [
+            "g",
+            "a",
+            "ng",
+            "nothing"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which syllable contains a silent ㅇ?",
+          "options": [
+            "우",
+            "강",
+            "방",
+            "상"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "Why is 가 never written with ㅇ in front of it?",
+          "options": [
+            "ㅇ is only used in names",
+            "ㅇ would make it sound like ng",
+            "Blocks can hold only two letters",
+            "It already starts with a consonant sound, ㄱ"
+          ],
+          "correct_index": 3
+        }
+      ],
+      "Double Consonants": [
+        {
+          "stem": "How many double consonants do the notes list?",
+          "options": [
+            "Three",
+            "Five",
+            "Four",
+            "Fourteen"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Which letter is NOT a double consonant?",
+          "options": [
+            "ㄲ",
+            "ㅆ",
+            "ㅊ",
+            "ㅉ"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "How does 싸 differ from 사 in sound?",
+          "options": [
+            "Its s is said tighter and stronger",
+            "It has a puff of breath",
+            "It is silent",
+            "It ends in ng"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "Which pair are both double consonants?",
+          "options": [
+            "ㅃ and ㅂ",
+            "ㅍ and ㅉ",
+            "ㅂ and ㅈ",
+            "ㅃ and ㅉ"
+          ],
+          "correct_index": 3
+        }
+      ]
+    },
+    "photography_basics": {
+      "Aperture and Depth of Field": [
+        {
+          "stem": "A group photo has people standing at very different distances. Which aperture keeps them all sharp?",
+          "options": [
+            "f/1.4",
+            "f/2",
+            "f/11",
+            "f/2.8"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which f-number lets in the least light?",
+          "options": [
+            "f/1.8",
+            "f/4",
+            "f/8",
+            "f/16"
+          ],
+          "correct_index": 3
+        },
+        {
+          "stem": "A product photo has the whole watch sharp but is too dark. Which change brightens it without changing the depth of field?",
+          "options": [
+            "Use a wider aperture",
+            "Raise the ISO or use a slower shutter speed",
+            "Use a narrower aperture",
+            "Change the white balance"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Which list goes from the widest to the narrowest aperture?",
+          "options": [
+            "f/1.8, f/4, f/16",
+            "f/16, f/4, f/1.8",
+            "f/4, f/1.8, f/16",
+            "f/1.8, f/16, f/4"
+          ],
+          "correct_index": 0
+        }
+      ],
+      "Shutter Speed and Motion": [
+        {
+          "stem": "Which shutter speed is best for a sharp photo of a running dog?",
+          "options": [
+            "1/4 second",
+            "1/15 second",
+            "1/2000 second",
+            "1/60 second"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "A night photo of a road shows long streaks of car lights. What does that tell you about the shutter speed?",
+          "options": [
+            "It was very fast",
+            "It was slow",
+            "The ISO was low",
+            "The aperture was narrow"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Which shutter speed lets the most light reach the sensor?",
+          "options": [
+            "1/1000 second",
+            "1/500 second",
+            "1/125 second",
+            "1/15 second"
+          ],
+          "correct_index": 3
+        },
+        {
+          "stem": "You change from 1/250 to 1/1000 second. To keep the same brightness, what could you do?",
+          "options": [
+            "Use a wider aperture",
+            "Use a narrower aperture",
+            "Lower the ISO",
+            "Nothing"
+          ],
+          "correct_index": 0
+        }
+      ],
+      "ISO and Image Noise": [
+        {
+          "stem": "Two photos of a night street: one at ISO 400, one at ISO 6400, all else the same. Which is brighter?",
+          "options": [
+            "ISO 400",
+            "ISO 6400",
+            "They are the same",
+            "It depends on the lens"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "In a dim gym you need a fast shutter and your lens is already at its widest aperture. What is left to brighten the photo?",
+          "options": [
+            "Lower the ISO",
+            "Use a slower shutter",
+            "Raise the ISO",
+            "Use a narrower aperture"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which situation suits ISO 100 best?",
+          "options": [
+            "A sunny beach at noon",
+            "A dark concert hall",
+            "A candle-lit dinner",
+            "A night sky"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "Why can a photo taken at ISO 3200 in a dark room still look bright?",
+          "options": [
+            "More light enters the lens",
+            "The shutter stays open longer",
+            "The aperture opens wider",
+            "The sensor is made more sensitive to light"
+          ],
+          "correct_index": 3
+        }
+      ],
+      "Exposure Balancing": [
+        {
+          "stem": "You raise the ISO from 200 to 400. To keep the same exposure, what could you change?",
+          "options": [
+            "Use a wider aperture by one stop",
+            "Use a narrower aperture by one stop",
+            "Use a slower shutter",
+            "Nothing"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Why can't you simply use the fastest shutter speed for every photo?",
+          "options": [
+            "It always blurs the photo",
+            "It changes the colours",
+            "Less light reaches the sensor, so the photo darkens unless something else changes",
+            "It only works at night"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which pair of changes keeps the exposure the same?",
+          "options": [
+            "A one-stop faster shutter and a one-stop wider aperture",
+            "A faster shutter and a narrower aperture",
+            "A lower ISO and a narrower aperture",
+            "A slower shutter and a higher ISO"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "Compared with 1/125 second, how many stops less light does 1/500 second let in?",
+          "options": [
+            "One",
+            "Four",
+            "Three",
+            "Two"
+          ],
+          "correct_index": 3
+        }
+      ],
+      "Composition and Light": [
+        {
+          "stem": "A portrait places the person's eyes where two dividing lines cross. Which idea is this?",
+          "options": [
+            "Golden hour",
+            "White balance",
+            "The rule of thirds",
+            "Depth of field"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Why do many photographers avoid shooting landscapes at noon?",
+          "options": [
+            "The light is harsher than the soft, warm light of golden hour",
+            "Cameras overheat at noon",
+            "White balance stops working",
+            "The rule of thirds cannot be used"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "To divide a frame into thirds both ways, how many lines do you need in all?",
+          "options": [
+            "Two",
+            "Three",
+            "Four",
+            "Nine"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which placement breaks the rule of thirds?",
+          "options": [
+            "A tree on the left third line",
+            "A face where two lines cross",
+            "A horizon on the lower third line",
+            "A small boat exactly in the centre of an empty sea"
+          ],
+          "correct_index": 3
+        }
+      ]
+    },
+    "central_asia": {
+      "Uzbekistan's Geography and Culture": [
+        {
+          "stem": "Which description fits Uzbekistan?",
+          "options": [
+            "Currency tenge, language Kazakh, has the steppe",
+            "Currency som, language Uzbek, has Samarkand",
+            "Currency somoni, language Tajik, has the Pamirs",
+            "Currency manat, language Turkmen, has the Karakum"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "A traveller wants to see ancient Silk Road cities and pay in som. Which country fits?",
+          "options": [
+            "Kazakhstan",
+            "Tajikistan",
+            "Uzbekistan",
+            "Turkmenistan"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which statement about Uzbekistan is FALSE?",
+          "options": [
+            "Its language is Uzbek",
+            "Samarkand is there",
+            "Part of the Aral Sea is there",
+            "Its currency is the tenge"
+          ],
+          "correct_index": 3
+        },
+        {
+          "stem": "Which language is spoken in the country where Bukhara is?",
+          "options": [
+            "Uzbek",
+            "Kazakh",
+            "Tajik",
+            "Turkmen"
+          ],
+          "correct_index": 0
+        }
+      ],
+      "Tajikistan's Geography and Language": [
+        {
+          "stem": "What is the capital of the country where the Pamir Mountains are?",
+          "options": [
+            "Bishkek",
+            "Dushanbe",
+            "Tashkent",
+            "Ashgabat"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Tajik is closely related to Persian. Which other fact in the notes also points to Persian influence in the region?",
+          "options": [
+            "Most countries use the som",
+            "The region was part of the Soviet Union",
+            "The ending -stan comes from a Persian word",
+            "Kazakhstan is the largest landlocked country"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which is NOT true of Tajikistan?",
+          "options": [
+            "Its capital is Bishkek",
+            "It has the Pamir Mountains",
+            "Its language is close to Persian",
+            "It is mostly mountains"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "About what share of Tajikistan is NOT mountainous?",
+          "options": [
+            "About 30 percent",
+            "About half",
+            "About 70 percent",
+            "Less than 10 percent"
+          ],
+          "correct_index": 3
+        }
+      ],
+      "Turkmenistan's Features": [
+        {
+          "stem": "What is the capital of the country with the Karakum Desert?",
+          "options": [
+            "Astana",
+            "Dushanbe",
+            "Ashgabat",
+            "Bishkek"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "About how much of Turkmenistan is NOT covered by the Karakum Desert?",
+          "options": [
+            "About 30 percent",
+            "About 10 percent",
+            "About 50 percent",
+            "About 70 percent"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "Which is NOT true of Turkmenistan?",
+          "options": [
+            "Its capital is Ashgabat",
+            "Its currency is the som",
+            "It has the Darvaza gas crater",
+            "Its language is Turkmen"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Which language is spoken in the country whose capital is Ashgabat?",
+          "options": [
+            "Uzbek",
+            "Persian",
+            "Kazakh",
+            "Turkmen"
+          ],
+          "correct_index": 3
+        }
+      ]
+    },
+    "cognitive_biases": {
+      "Confirmation bias": [
+        {
+          "stem": "Kiran believes he is weak at maths, so he notices every mistake and ignores the questions he got right. Which bias is this?",
+          "options": [
+            "Anchoring bias",
+            "Confirmation bias",
+            "Availability heuristic",
+            "Framing effect"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "A researcher only runs tests that could support her theory, never ones that could disprove it. What is the risk?",
+          "options": [
+            "Her tests will take longer",
+            "She may keep a wrong theory because evidence against it is never collected",
+            "She will anchor on the first result",
+            "Nothing, this is good practice"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Which of these is confirmation bias rather than anchoring?",
+          "options": [
+            "Thinking a price is fair because of the first price you heard",
+            "Fearing planes after a crash in the news",
+            "Searching only for reviews that praise the phone you already chose",
+            "Finishing a course because of the fees paid"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Two friends read the same mixed news about a cricket team. One remembers only the good parts, the other only the bad. What does this show?",
+          "options": [
+            "Each remembers what supports what they already believe",
+            "One of them has a better memory",
+            "The news was framed badly",
+            "They anchored on the headline"
+          ],
+          "correct_index": 0
+        }
+      ],
+      "Sunk cost fallacy": [
+        {
+          "stem": "Meena has queued for an hour and learns the wait is two more hours. She stays because 'I've already waited an hour'. Which bias is this?",
+          "options": [
+            "Framing effect",
+            "Availability heuristic",
+            "Confirmation bias",
+            "Sunk cost fallacy"
+          ],
+          "correct_index": 3
+        },
+        {
+          "stem": "Why is money already spent called 'sunk'?",
+          "options": [
+            "It was spent on something useless",
+            "It cannot be got back whatever you decide next",
+            "It was spent long ago",
+            "It was a small amount"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "A student has paid for a coaching course that turns out to be unhelpful. Which thought shows the sunk cost fallacy?",
+          "options": [
+            "I'll compare it with free resources",
+            "I'll stop if it won't help me from now on",
+            "I've paid so much, I must finish it",
+            "I'll ask whether next month will help"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which of these is the sunk cost fallacy rather than framing?",
+          "options": [
+            "Staying in a dull job only because of the years already spent there",
+            "Preferring '95 percent fat-free' to '5 percent fat'",
+            "Judging a price by the first number heard",
+            "Remembering only news that agrees with you"
+          ],
+          "correct_index": 0
+        }
+      ],
+      "Availability heuristic": [
+        {
+          "stem": "After two burglaries in her area were on the news, Lata thinks burglaries are very common. Which idea explains this?",
+          "options": [
+            "Anchoring bias",
+            "Availability heuristic",
+            "Sunk cost fallacy",
+            "Framing effect"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Which of these is the availability heuristic rather than confirmation bias?",
+          "options": [
+            "Remembering only facts that support your view",
+            "Thinking floods are common right after one was on the news",
+            "Trusting the first price you see",
+            "Staying in a course you paid for"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "A doctor who recently treated three rare cases starts expecting that illness in every patient. Which idea explains this?",
+          "options": [
+            "Sunk cost fallacy",
+            "Framing effect",
+            "Availability heuristic",
+            "Dunning-Kruger effect"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Why can heavy news coverage make a rare danger feel common?",
+          "options": [
+            "News always exaggerates numbers",
+            "Vivid stories are easy to recall, so they feel frequent",
+            "People trust the first report",
+            "Dangers become common after being reported"
+          ],
+          "correct_index": 1
+        }
+      ],
+      "Dunning-Kruger effect": [
+        {
+          "stem": "After reading one article on investing, Sameer is sure he can beat professional investors. Which effect is this?",
+          "options": [
+            "Dunning-Kruger effect",
+            "Anchoring bias",
+            "Framing effect",
+            "Availability heuristic"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "As someone gains real skill in an area, what does the Dunning-Kruger idea suggest happens?",
+          "options": [
+            "They stop making mistakes",
+            "They become better at seeing their own mistakes",
+            "They always overestimate themselves",
+            "Their confidence never changes"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Which of these is the Dunning-Kruger effect rather than confirmation bias?",
+          "options": [
+            "Reading only news that agrees with you",
+            "Remembering a team's losses",
+            "A beginner rating his own skill far too high",
+            "Fearing flights after a crash"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Neel scored lowest in his class, yet he guessed he was in the top half. What best explains the gap?",
+          "options": [
+            "He did not care about the test",
+            "The test was unfair",
+            "He anchored on his last score",
+            "Low skill made it hard for him to see his own mistakes"
+          ],
+          "correct_index": 3
+        }
+      ],
+      "Framing effect": [
+        {
+          "stem": "A charity says 'Your gift saves 200 lives' rather than 'Without your gift, 200 people will die'. Which effect is it using?",
+          "options": [
+            "Anchoring bias",
+            "Framing effect",
+            "Sunk cost fallacy",
+            "Confirmation bias"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "To judge two offers fairly despite framing, what should you do?",
+          "options": [
+            "Pick the one that sounds more positive",
+            "Rewrite both in the same terms and compare the numbers",
+            "Choose the first one you saw",
+            "Ask which one is more popular"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Which of these is framing rather than anchoring?",
+          "options": [
+            "Judging a price against the first number you heard",
+            "Thinking a sale price is cheap because of the old price",
+            "Preferring '80 percent lean' meat to '20 percent fat' meat",
+            "Naming the first number in a deal"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which wording is a loss frame for the same train data?",
+          "options": [
+            "9 in 10 trains are on time",
+            "Most trains are on time",
+            "Trains are reliable",
+            "1 in 10 trains is late"
+          ],
+          "correct_index": 3
+        }
+      ]
+    },
+    "how_gps_works": {
+      "GPS Receiver Functionality": [
+        {
+          "stem": "Which part of the GPS system works out where you are?",
+          "options": [
+            "The satellites",
+            "Ground stations",
+            "Your receiver, from the satellites' signals",
+            "Your mobile network"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "If the United States switched off GPS, which could still give a phone its position, according to the notes?",
+          "options": [
+            "Nothing at all",
+            "Galileo or BeiDou",
+            "Mobile towers only",
+            "NavIC anywhere in the world"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "A receiver knows when a signal was sent and when it arrived. What can it work out from that?",
+          "options": [
+            "Its distance to that satellite",
+            "The satellite's speed",
+            "The weather",
+            "Its battery level"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "Why does a receiver need signals from several satellites rather than one?",
+          "options": [
+            "One satellite's signal is too weak",
+            "Satellites take turns to send",
+            "One satellite is always behind the Earth",
+            "One distance only places you somewhere on a sphere around that satellite"
+          ],
+          "correct_index": 3
+        }
+      ],
+      "Necessity of Four Satellites": [
+        {
+          "stem": "Why can't a receiver with only three satellites fix its own clock error?",
+          "options": [
+            "Three satellites never agree",
+            "It needs one more measurement for a fourth unknown",
+            "Three satellites cannot send time",
+            "Its clock is switched off"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "How many unknowns does a receiver solve for, and so at least how many satellites does it need?",
+          "options": [
+            "Three unknowns, three satellites",
+            "Four unknowns, three satellites",
+            "Four unknowns, four satellites",
+            "Two unknowns, four satellites"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which clock is more accurate: a GPS satellite's or a phone's?",
+          "options": [
+            "The satellite's atomic clock",
+            "The phone's clock",
+            "They are the same",
+            "Neither keeps time"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "If a receiver had a perfect atomic clock, how many satellites would it need for a position?",
+          "options": [
+            "One",
+            "Two",
+            "Four",
+            "Three"
+          ],
+          "correct_index": 3
+        }
+      ],
+      "Relativistic Clock Corrections": [
+        {
+          "stem": "Whose theory describes the effect that GPS satellite clocks must be corrected for?",
+          "options": [
+            "Newton's",
+            "Einstein's",
+            "Darwin's",
+            "Kepler's"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Engineers build the relativity correction into the satellite clocks. What does that mean for your phone?",
+          "options": [
+            "It must correct for relativity itself",
+            "It needs an atomic clock",
+            "It does not need to correct for relativity itself",
+            "It works only at night"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which of these is a relativity effect rather than a receiver-clock error?",
+          "options": [
+            "A phone's cheap clock being slightly off",
+            "Signals bouncing off tall buildings",
+            "A tunnel blocking signals",
+            "Satellite clocks running about 38 microseconds a day fast"
+          ],
+          "correct_index": 3
+        },
+        {
+          "stem": "A satellite clock and a ground clock start together. After one day with no correction, which shows the later time, and by about how much?",
+          "options": [
+            "The satellite clock, by about 38 microseconds",
+            "The ground clock, by about 38 microseconds",
+            "The satellite clock, by about 38 seconds",
+            "Neither: they stay equal"
+          ],
+          "correct_index": 0
+        }
+      ],
+      "Navigation Systems and Accuracy": [
+        {
+          "stem": "Which country runs BeiDou?",
+          "options": [
+            "Russia",
+            "India",
+            "China",
+            "Japan"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Which list matches each system to its owner?",
+          "options": [
+            "GLONASS: China, Galileo: Russia, BeiDou: European Union",
+            "GLONASS: Russia, Galileo: European Union, BeiDou: China",
+            "GLONASS: European Union, Galileo: China, BeiDou: Russia",
+            "GLONASS: Russia, Galileo: China, BeiDou: European Union"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "A runner's watch shows about 5 metres of error in an open park. What does that tell you?",
+          "options": [
+            "The watch is broken",
+            "The satellites are failing",
+            "Relativity was not corrected",
+            "That is normal accuracy under open sky"
+          ],
+          "correct_index": 3
+        },
+        {
+          "stem": "Which country runs GLONASS?",
+          "options": [
+            "Russia",
+            "China",
+            "The United States",
+            "India"
+          ],
+          "correct_index": 0
+        }
+      ]
+    },
+    "nutrition_labels": {
+      "Serving Size": [
+        {
+          "stem": "A 250 g pack lists 12 g of fat per 100 g. How much fat is in the whole pack?",
+          "options": [
+            "12 g",
+            "25 g",
+            "30 g",
+            "120 g"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "A label gives values per serving, but you eat half a serving. What should you do with the numbers?",
+          "options": [
+            "Double them",
+            "Halve them",
+            "Use them as they are",
+            "Add 50 to them"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "A pack holds 2.5 servings of 160 kcal each. How many kcal are in the whole pack?",
+          "options": [
+            "160",
+            "320",
+            "480",
+            "400"
+          ],
+          "correct_index": 3
+        },
+        {
+          "stem": "Which labels let you compare two cereals fairly without any maths?",
+          "options": [
+            "Both given per 100 g",
+            "Both given per serving of different sizes",
+            "One per serving, one per pack",
+            "Both given per pack of different sizes"
+          ],
+          "correct_index": 0
+        }
+      ],
+      "Percent Daily Value": [
+        {
+          "stem": "A soup gives 30 percent of the daily value of sodium per serving. How is its sodium described?",
+          "options": [
+            "Low",
+            "Between low and high",
+            "High",
+            "You can't tell"
+          ],
+          "correct_index": 2
+        },
+        {
+          "stem": "Two servings of a snack each give 3 percent of the daily value of fat. How is the total from both described?",
+          "options": [
+            "Low",
+            "Between low and high",
+            "High",
+            "Very high"
+          ],
+          "correct_index": 1
+        },
+        {
+          "stem": "Which of these snacks is low in saturated fat?",
+          "options": [
+            "One with 4 percent of the daily value",
+            "One with 12 percent",
+            "One with 20 percent",
+            "One with 35 percent"
+          ],
+          "correct_index": 0
+        },
+        {
+          "stem": "Breakfast gives 12 percent and lunch 15 percent of the daily value of fibre. What share is still needed to reach 100 percent?",
+          "options": [
+            "27 percent",
+            "85 percent",
+            "88 percent",
+            "73 percent"
+          ],
+          "correct_index": 3
+        }
+      ]
+    }
+  }
+}

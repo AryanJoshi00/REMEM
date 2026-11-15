@@ -7,7 +7,8 @@ import pytest
 from backend import config, daily, db, llm, main, remem_test_upgrade, topics
 from tests.test_api import NOTE, answer, client, login, make_concepts  # noqa: F401  (client is a fixture)
 
-PRACTICE = llm.N_PRACTICE
+FIRST = 4        # questions per concept in a first quiz: two easier, two harder
+REVIEW = 2       # and in a review: one easier, one harder
 
 
 def _correct(qid):
@@ -42,18 +43,18 @@ def test_first_quiz_then_daily_test_mixed_and_nameless(client):
     with db.session() as conn:
         note_id = conn.execute("SELECT note_id FROM notes").fetchone()[0]
     d = client.get("/api/due", headers=h).json()
-    assert d["test"]["questions"] == 0 and d["first"] == [{"note_id": note_id, "title": "Bio", "questions": 2 * PRACTICE, "concepts": 2}]
+    assert d["test"]["questions"] == 0 and d["first"] == [{"note_id": note_id, "title": "Bio", "questions": 2 * FIRST, "concepts": 2}]
     assert d["studied"] is False and d["whats_new"] is False
 
     seen, done = _take(client, h, f"/api/test/next?note={note_id}", right=lambda i: i % 3 != 0)
-    assert len(seen) == 2 * PRACTICE and seen[0]["total"] == 2 * PRACTICE and seen[0]["concepts"] == 2
+    assert len(seen) == 2 * FIRST and seen[0]["total"] == 2 * FIRST and seen[0]["concepts"] == 2
     order = [_concept_of(q["question_id"]) for q in seen]
-    assert sorted(order) == sorted([c["concept_id"] for c in cs] * PRACTICE)
+    assert sorted(order) == sorted([c["concept_id"] for c in cs] * FIRST)
     assert all(a != b for a, b in zip(order, order[1:]))                     # mixed: never the same concept twice in a row (2 x 4 allows it)
     assert len({q["question_id"] for q in seen}) == len(seen)                # each question once
-    assert done["total"] == 2 * PRACTICE and done["right"] == sum(1 for i in range(1, 9) if i % 3 != 0)
+    assert done["total"] == 2 * FIRST and done["right"] == sum(1 for i in range(1, 9) if i % 3 != 0)
     assert {c["name"] for c in done["concepts"]} == {"Photosynthesis", "Chlorophyll"}         # names only at the end
-    assert all(len(c["marks"]) == PRACTICE and c["next_due_in_days"] > 0 for c in done["concepts"])
+    assert all(len(c["marks"]) == FIRST and c["next_due_in_days"] > 0 for c in done["concepts"])
 
     d = client.get("/api/due", headers=h).json()
     assert d["first"] == [] and d["test"]["questions"] == 0 and d["studied"] and d["next_test_in_days"] > 0
@@ -63,11 +64,11 @@ def test_first_quiz_then_daily_test_mixed_and_nameless(client):
 
     client.clock["t"] += 40 * config.MS_PER_DAY                               # everything is due now
     d = client.get("/api/due", headers=h).json()
-    assert d["test"] == {"questions": 2 * PRACTICE, "answered": 0, "concepts": 2}
+    assert d["test"] == {"questions": 2 * REVIEW, "answered": 0, "concepts": 2}
     a = client.get("/api/test/next", headers=h).json(); b = client.get("/api/test/next", headers=h).json()
     assert a == b                                                             # the order is stable while nothing is answered
     seen, done = _take(client, h, "/api/test/next")
-    assert len(seen) == 2 * PRACTICE and done["right"] == 2 * PRACTICE
+    assert len(seen) == 2 * REVIEW and done["right"] == 2 * REVIEW
     assert client.get("/api/due", headers=h).json()["test"]["questions"] == 0
 
 
@@ -83,9 +84,9 @@ def test_stopping_halfway_keeps_the_rest_for_later(client):
         assert client.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": 0, "rt_ms": 5000, "idem_key": f"half-{q['question_id']}-{client.clock['t']}"}, headers=h).status_code == 200
         client.clock["t"] += 10_000
     d = client.get("/api/due", headers=h).json()["test"]
-    assert d == {"questions": 2 * PRACTICE - 3, "answered": 3, "concepts": 2}
+    assert d == {"questions": 2 * REVIEW - 3, "answered": 3, "concepts": 2}
     q = client.get("/api/test/next", headers=h).json()
-    assert q["position"] == 4 and q["total"] == 2 * PRACTICE
+    assert q["position"] == 4 and q["total"] == 2 * REVIEW
 
 
 def test_daily_order_spreads_concepts():
@@ -208,7 +209,7 @@ def test_upgrade_writes_the_rubric_test_and_updates_cached_results(tmp_path, mon
         assert conn.execute("SELECT stem FROM questions WHERE question_id=?", (qb,)).fetchone()[0] == "Old question 4 on that?"   # a started test is left alone
         cached = json.loads(conn.execute("SELECT json FROM llm_cache").fetchone()[0])
         assert all(len(c["questions"]) == 7 and c["questions"][4]["stem"] == written["cognitive_biases"][c["name"]][0]["stem"] for c in cached["concepts"])
-        assert [c.name for c in llm.validate_chunk(cached, chunk)] == names            # a future user gets exactly the same 7 questions
+        assert [c.name for c in llm.validate_chunk(cached, chunk, n=llm.N_EASY + llm.N_TEST)] == names            # a future user gets exactly the same 7 questions
         again = remem_test_upgrade.upgrade(conn)                                        # running it twice changes nothing
         assert again["done"] == [] and again["same"] == 1 and again["cache_rows"] == 0
 
@@ -363,3 +364,80 @@ def test_options_are_shuffled_per_person_and_answers_map_back(client):
     # across many people and questions, a stored "always A" answer lands evenly on A to D
     spots = Counter(main.option_order(u, qid).index(0) for u in range(1, 60) for qid in range(1, 60))
     assert all(0.22 < spots[i] / sum(spots.values()) < 0.28 for i in range(4))
+
+
+
+def _level(qid):
+    with db.session() as conn:
+        return conn.execute("SELECT level FROM questions WHERE question_id=?", (qid,)).fetchone()[0]
+
+
+def test_layout_of_a_concepts_questions():
+    assert llm.layout(11) == [(0, 1)] * 4 + [(0, 2)] * 4 + [(1, 0)] * 3          # generated: 4 easier, 4 harder, 3 Remem Test
+    assert llm.layout(7) == [(0, 1)] * 4 + [(1, 0)] * 3                          # fallback bank: 4 practice, 3 Remem Test
+
+
+def test_first_quiz_two_easier_two_harder_reviews_one_of_each_and_they_rotate(client):
+    h = login(client, "p01", "pw-for-p01!")
+    make_concepts(client, h)
+    with db.session() as conn:
+        note_id = conn.execute("SELECT note_id FROM notes").fetchone()[0]
+        assert {tuple(r) for r in conn.execute("SELECT SUM(level=1), SUM(level=2), SUM(is_final_test) FROM questions GROUP BY concept_id")} == {(4, 4, 3)}
+    seen, _ = _take(client, h, f"/api/test/next?note={note_id}")
+    levels = [_level(q["question_id"]) for q in seen]
+    assert levels == [1, 1, 1, 1, 2, 2, 2, 2]                                   # all the easier questions first, then the harder ones
+    reviews = []
+    for _ in range(3):
+        client.clock["t"] += 40 * config.MS_PER_DAY
+        got, _ = _take(client, h, "/api/test/next")
+        assert [_level(q["question_id"]) for q in got] == [1, 1, 2, 2]          # each concept: one easier, then one harder
+        reviews.append({q["question_id"] for q in got})
+    assert not reviews[0] & reviews[1] and not reviews[1] & reviews[2]          # nothing repeats from one review to the next
+
+
+def test_practice_upgrade_adds_harder_questions_and_updates_saved_results(tmp_path, monkeypatch):
+    from backend import practice_upgrade
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "p.db")
+    db.init_db()
+    hard = json.loads((config.ARTIFACTS / "practice_hard.json").read_text(encoding="utf-8"))["topics"]
+    t = topics.get_topic("cognitive_biases")
+    chunk = llm.split_chunks(t["text"])[0]
+    names = list(hard["cognitive_biases"])[:2]
+    span = "The availability heuristic is judging how likely something is by how easily examples come to mind."
+    cached = {"concepts": [{"name": nm, "source_span": span, "questions": [{"stem": f"Q{i} on {nm}?", "options": ["a", "b", "c", "d"], "correct_index": 0} for i in range(7)]}
+                           for nm in names]}
+    with db.session() as conn:
+        conn.execute("INSERT INTO users(username,pw_hash,salt,created_at) VALUES ('u',x'00',x'00',0)")
+        conn.execute("INSERT INTO notes(user_id,title,text,status,created_at,topic_id) VALUES (1,'t','x','done',0,'cognitive_biases')")
+        conn.execute("INSERT INTO llm_cache VALUES (?,?,?,0)", (llm.chunk_hash(chunk), config.PROMPT_VERSION, json.dumps(cached)))
+        ids = []
+        for nm, first in ((names[0], f"Q0 on {names[0]}?"), (names[1], "A different first question?")):
+            cid = conn.execute("INSERT INTO concepts(user_id,note_id,name,arm,created_at) VALUES (1,1,?,'remem',0)", (nm,)).lastrowid
+            for i in range(1, 8):
+                conn.execute("INSERT INTO questions(concept_id,variant_no,stem,options_json,correct_idx,is_final_test,level,created_at) VALUES (?,?,?,?,0,?,?,0)",
+                             (cid, i, first if i == 1 else f"Q{i - 1} on {nm}?", '["a","b","c","d"]', 1 if i > 4 else 0, 0 if i > 4 else 1))
+            ids.append(cid)
+        r = practice_upgrade.upgrade(conn)
+        assert [x[0] for x in r["done"]] == [ids[0]] and [x[0] for x in r["skipped"]] == [ids[1]] and r["cache_rows"] == 1   # only a real generator match
+        got = conn.execute("SELECT variant_no, stem, level, is_final_test FROM questions WHERE concept_id=? AND level=2 ORDER BY variant_no", (ids[0],)).fetchall()
+        assert [(g[0], g[1], g[3]) for g in got] == [(8 + i, q["stem"], 0) for i, q in enumerate(hard["cognitive_biases"][names[0]])]
+        saved = json.loads(conn.execute("SELECT json FROM llm_cache").fetchone()[0])
+        assert all(len(c["questions"]) == llm.N_VARIANTS and c["questions"][4]["stem"] == hard["cognitive_biases"][c["name"]][0]["stem"]
+                   and c["questions"][8]["stem"] == f"Q4 on {c['name']}?" for c in saved["concepts"])       # practice, harder, then the Remem Test
+        assert [c.name for c in llm.validate_chunk(saved, chunk)] == names           # a future user gets all 11
+        again = practice_upgrade.upgrade(conn)
+        assert again["done"] == [] and again["same"] == 1 and again["cache_rows"] == 0
+
+
+def test_harder_practice_questions_are_well_formed_and_do_not_give_away_the_remem_test():
+    hard = json.loads((config.ARTIFACTS / "practice_hard.json").read_text(encoding="utf-8"))["topics"]
+    test = json.loads((config.ARTIFACTS / "remem_test.json").read_text(encoding="utf-8"))["topics"]
+    for tid, cs in hard.items():
+        for name, qs in cs.items():
+            assert len(qs) == 4, name
+            test_answers = {q["options"][q["correct_index"]].lower() for q in test.get(tid, {}).get(name, [])} - {name.lower()}
+            test_stems = {q["stem"] for q in test.get(tid, {}).get(name, [])}
+            for q in qs:
+                llm.MCQ.model_validate(q)
+                assert q["stem"] not in test_stems, q["stem"]
+                assert q["options"][q["correct_index"]].lower() not in test_answers, (name, q["stem"])
