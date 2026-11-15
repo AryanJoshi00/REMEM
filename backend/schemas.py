@@ -34,6 +34,7 @@ class RespondIn(BaseModel):
     chosen_index: int = Field(ge=0, le=3)
     rt_ms: int = Field(ge=0, le=3_600_000)
     idem_key: str = Field(min_length=8, max_length=80)
+    shuffled: bool = False          # the options were shown in this person's shuffled order (chosen_index is a screen position)
 
 
 class FlagIn(BaseModel):
