@@ -877,8 +877,7 @@ function themeSwitch(startDark, onToggle, width) {
     s("g", { "clip-path": "url(#" + id + "-clip)" }, pill("url(#" + id + "-day)"), pillDark, bigDot, smDot, gA, gB, g1, g2, g3, disc, moon));
   const btn = h("button", { class: "theme-switch", type: "button", role: "switch", "aria-checked": String(!!startDark), "aria-label": "Dark mode" }, svg);
   if (width) btn.style.setProperty("--tsw", width + "px");
-  const lblL = h("span", { class: "ts-label", "aria-hidden": "true" }, "Light"), lblD = h("span", { class: "ts-label", "aria-hidden": "true" }, "Dark");
-  const el = h("div", { class: "ts" }, lblL, btn, lblD);
+  const el = btn;                         // no Light / Dark words: the sun and moon say it (the owner's call); the name "Dark mode" stays for screen readers
 
   const tr = (dx, dy) => "translate(" + dx.toFixed(2) + " " + dy.toFixed(2) + ")";
   const mixSh = b => "rgba(" + Math.round(84 * (1 - b)) + "," + Math.round(89 * (1 - b)) + "," + Math.round(226 * (1 - b)) + "," + (0.45 + 0.1 * b).toFixed(2) + ")";
@@ -914,20 +913,17 @@ function themeSwitch(startDark, onToggle, width) {
     render();
     raf = moving && btn.isConnected ? requestAnimationFrame(frame) : 0;
   }
-  function labels() { lblL.classList.toggle("on", !dark); lblD.classList.toggle("on", dark); }
   function set(next, user) {
     if (next === dark) return;
     snap = last; blendT = 0; dark = next;
     if (dark) mode = "F"; else { mode = "R"; if (u > TS.SETTLE) u = TS.SETTLE; }
-    btn.setAttribute("aria-checked", String(dark)); labels();
+    btn.setAttribute("aria-checked", String(dark));
     if (user) onToggle(dark);
     if (still.matches) { u = dark ? TS.END : 0; snap = null; blendT = 1; render(); return; }
     if (!raf) { prev = performance.now(); raf = requestAnimationFrame(frame); }
   }
   btn.addEventListener("click", () => set(!dark, true));
-  lblL.addEventListener("click", () => set(false, true));
-  lblD.addEventListener("click", () => set(true, true));
-  labels(); render();
+  render();
   return { el, set: next => set(next, false) };
 }
 
