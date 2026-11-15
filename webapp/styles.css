@@ -347,43 +347,54 @@ dialog.sheet .stack { margin-top: 16px; }
 .misses .ans.good { border-color: var(--green); background: color-mix(in srgb, var(--green-fill) 10%, var(--surface)); }
 .misses .ans.good .lab { color: var(--green); }
 
-/* Light and dark switching: every colour cross-fades for 300 ms while the theme switch moves (theme.js adds the class) */
+/* Light and dark switching. Where the browser can (View Transitions), the whole page cross-fades as one image, so every
+   colour moves together; the theme switch is lifted out of that image and keeps animating live on top. Elsewhere, colours fade. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 420ms; animation-timing-function: cubic-bezier(.4, 0, .2, 1); }
+::view-transition-group(theme-switch) { animation: none; }
+::view-transition-old(theme-switch) { display: none; }
+::view-transition-new(theme-switch) { animation: none; }
 html.theme-fade, html.theme-fade *:not(.theme-switch):not(.theme-switch *) {
-  transition: background-color 300ms cubic-bezier(.65, 0, .35, 1), color 300ms cubic-bezier(.65, 0, .35, 1), border-color 300ms cubic-bezier(.65, 0, .35, 1),
-              fill 300ms cubic-bezier(.65, 0, .35, 1), stroke 300ms cubic-bezier(.65, 0, .35, 1) !important;
+  transition: background-color 420ms cubic-bezier(.4, 0, .2, 1), color 420ms cubic-bezier(.4, 0, .2, 1), border-color 420ms cubic-bezier(.4, 0, .2, 1),
+              fill 420ms cubic-bezier(.4, 0, .2, 1), stroke 420ms cubic-bezier(.4, 0, .2, 1), outline-color 420ms cubic-bezier(.4, 0, .2, 1) !important;
 }
 
-/* Me: grouped settings. Each section is one panel of hairline-separated rows; long parts (password) stay closed until asked for */
+/* Me: grouped settings. One rule for every row: 16px sides, at least 52px tall, content centred, no inherited margins */
 .me-who { margin: 2px 0 0; color: var(--muted); }
-.me-group { border: 1.5px solid var(--rule); background: var(--surface); border-radius: var(--r-block); margin: 8px 0 0; }
-.me-group > * { padding: 12px 16px; }
+.me-group { border: 1.5px solid var(--rule); background: var(--surface); border-radius: var(--r-block); margin: 8px 0 0; overflow: hidden; }
+.me-group > * { margin: 0; padding: 14px 16px; }
 .me-group > * + * { border-top: 1px solid var(--rule); }
-.me-group p { margin: 0; }
-.me-group .stack > p:first-child { margin-top: 0; }
-.me-group .switch { min-height: 52px; padding-top: 6px; padding-bottom: 6px; }
-.me-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; color: var(--ink); text-decoration: none; }
+.me-group p, .me-group label { margin: 0; }
+.me-group [role="status"]:empty { display: none; }
+.me-group .actions { margin-top: 12px; }
+.me-group > .switch { min-height: 56px; padding-top: 10px; padding-bottom: 10px; font-size: var(--fs-md); font-weight: 400; }
+.me-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; padding-top: 0; padding-bottom: 0; color: var(--ink); text-decoration: none; }
 .me-row .chev { color: var(--muted); flex: none; }
-a.me-row:focus-visible { outline-offset: -3px; }
-.me-group details > summary { justify-content: space-between; gap: 16px; min-height: 52px; margin: -12px -16px; padding: 12px 16px; font-weight: 400; list-style: none; }
+.me-group > details { padding: 0; }
+.me-group details > summary { justify-content: space-between; gap: 16px; min-height: 52px; padding: 0 16px; list-style: none; }
 .me-group details > summary::-webkit-details-marker { display: none; }
 .me-group details > summary .chev { color: var(--muted); transition: transform 200ms var(--ease-out); }
 .me-group details[open] > summary .chev { transform: rotate(90deg); }
-.me-group details[open] > summary { margin-bottom: 4px; }
-.me-group details form { padding-top: 8px; }
-.me-group summary:focus-visible { outline-offset: -3px; }
-.me-theme { display: flex; flex-direction: column; gap: 4px; }
-.me-theme .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; min-height: 60px; }      /* large text: the switch drops under the label */
-.me-theme .hint { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--fs-sm); color: var(--muted); }
+.me-group details form { padding: 0 16px 16px; }
+.me-group details form > div:first-of-type label { margin-top: 0; }
+.me-group details form label { margin: 12px 0 6px; }
+.me-group summary:focus-visible, .me-group a.me-row:focus-visible, .me-group button.me-act:focus-visible { outline-offset: -3px; }
+.me-theme { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-height: 64px; padding-top: 8px; padding-bottom: 8px; }
+.me-theme .sub { display: block; font-size: var(--fs-sm); color: var(--muted); }
+.me-group button.me-act { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-height: 44px; padding: 0 16px; border: 0; border-radius: 0; background: none;
+  color: var(--accent); font-size: var(--fs-sm); font-weight: 500; text-align: left; }      /* a quiet secondary action, not a heading-weight link */
 .me-signout { margin-top: 32px; }
 
-/* The theme switch (owner's reference design, 0.6 scale): a sky pill with a sun-disc by day, a night pill with a crescent and stars.
-   The one deliberate exception to "no gradients": the owner asked for this control to look and move exactly like the reference. */
-.ts { display: inline-flex; align-items: center; gap: 12px; }
-.ts-label { font-weight: 600; color: var(--muted); cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; -webkit-user-select: none; user-select: none; }
+/* The theme switch (owner's reference design): a sky pill with a sun-disc by day, a night pill with a crescent and stars.
+   The one deliberate exception to "no gradients": the owner asked for this control to look and move exactly like the reference.
+   --tsw sets the width; the height keeps the reference's 139:80 shape. Small sizes keep a 44px tap area. */
+.ts { display: inline-flex; align-items: center; gap: 10px; }
+.ts-label { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; -webkit-user-select: none; user-select: none; }
 .ts-label.on { color: var(--ink); }
-.theme-switch { position: relative; flex: none; width: 84px; height: 48.35px; padding: 0; margin: 0; border: 0; min-height: 0; background: none; border-radius: 24.2px; cursor: pointer;
+.theme-switch { --tsw: 60px; position: relative; flex: none; width: var(--tsw); height: calc(var(--tsw) * .5755); padding: 0; margin: 0; border: 0; min-height: 0; background: none;
+  border-radius: 999px; cursor: pointer; view-transition-name: theme-switch;
   --sh: rgba(84, 89, 226, .45); box-shadow: 0 0 0 0 transparent; transition: transform .22s cubic-bezier(.34, 1.56, .64, 1), box-shadow .25s ease; will-change: transform; }
-.theme-switch svg { display: block; width: 84px; height: 48.35px; overflow: visible; pointer-events: none; }
+.theme-switch::after { content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: max(44px, 100%); transform: translateY(-50%); }
+.theme-switch svg { display: block; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 @media (hover: hover) { .theme-switch:hover { transform: scale(1.04); box-shadow: 0 6px 16px -3px var(--sh); } }
 .theme-switch:active { transform: scale(.95); transition-duration: .08s; box-shadow: 0 3px 8px -3px var(--sh); opacity: 1; }
 .theme-switch:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
