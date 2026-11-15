@@ -18,9 +18,18 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from backend import config, db
 
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
-N_PRACTICE = 4                 # asked in the daily tests
+N_EASY = 4                     # practice, easier: recognise, define, a direct example
+N_HARD = 4                     # practice, harder: a new situation, why it happens, telling it apart, working something out
+N_PRACTICE = N_EASY + N_HARD   # asked in the daily tests: one easier and one harder per concept per review
 N_TEST = 3                     # never shown before the Remem Test (the delayed test)
 N_VARIANTS = N_PRACTICE + N_TEST
+N_BANK = N_EASY + N_TEST       # the fallback banks hold 4 easier practice questions and the 3 Remem Test questions
+
+
+def layout(n: int) -> list[tuple[int, int]]:
+    """(is_final_test, level) for each of a concept's n questions, in order: the last N_TEST are the Remem Test, the first
+    N_EASY are easier practice (level 1), anything between is harder practice (level 2). Works for 11 (generated) and 7 (banks)."""
+    return [(1, 0) if i >= n - N_TEST else (0, 1 if i < N_EASY else 2) for i in range(n)]
 
 _lock = threading.Lock()
 _last_call = 0.0
@@ -63,11 +72,15 @@ Read the NOTES below and return ONLY JSON of this shape:
 Rules:
 - 2 to 4 distinct concepts per notes chunk; each concept must be clearly present in the notes.
 - Each concept needs exactly {n} multiple-choice questions with DIFFERENT wording and angle.
-- Questions 1 to 4 are practice: definition, example, application and contrast.
-- Questions 5, 6 and 7 are a later memory test and must test understanding, not recall of wording: 5 puts the idea to use
-  in a NEW situation the notes do not mention; 6 asks why something happens or what follows from it (never "what is X");
-  7 tells the idea apart from a similar one, puts steps in order, or works something out. None of them may repeat a practice
-  question or ask about a detail of an example in the notes (such as a price or a name used only as an illustration).
+- Questions 1 to 4 are easier practice: recognise or define the idea, and a direct example.
+- Questions 5 to 8 are harder practice that make the learner think: a NEW situation where the idea must be applied, why
+  something happens or what follows from it, telling the idea apart from a similar one, and working something out or
+  putting steps in order. Not simple recall of a sentence.
+- Questions 9, 10 and 11 are a later memory test and must test understanding, not recall of wording: 9 puts the idea to use
+  in a NEW situation the notes do not mention; 10 asks why something happens or what follows from it (never "what is X");
+  11 tells the idea apart from a similar one, puts steps in order, or works something out. They must not repeat or give
+  away any practice question.
+- No question may ask about a detail of an example in the notes (such as a price or a name used only as an illustration).
 - Exactly 4 options per question, only one correct, plausible distractors, correct_index is 0-3 and should vary.
 - Use only facts stated in or directly implied by the notes. No trick questions.
 - source_span must be copied character-for-character from the notes.
@@ -99,8 +112,9 @@ def chunk_hash(chunk: str) -> str:
     return hashlib.sha256(f"{config.PROMPT_VERSION}|{chunk}".encode()).hexdigest()   # model-independent: cached content stays valid
 
 
-def validate_chunk(raw: dict, chunk: str) -> list[ConceptOut]:
-    """Schema check + grounding check (source span must occur in the notes) + minimum variants."""
+def validate_chunk(raw: dict, chunk: str, n: int | None = None) -> list[ConceptOut]:
+    """Schema check + grounding check (source span must occur in the notes) + n distinct questions (N_VARIANTS by default)."""
+    n = n or N_VARIANTS
     parsed = ChunkOut.model_validate(raw)
     nchunk = _norm(chunk)
     good = []
@@ -114,9 +128,9 @@ def validate_chunk(raw: dict, chunk: str) -> list[ConceptOut]:
             if key in seen:
                 continue
             seen.add(key); qs.append(q)
-        if len(qs) < N_VARIANTS:
+        if len(qs) < n:
             continue
-        good.append(ConceptOut(name=c.name.strip(), source_span=c.source_span.strip(), questions=qs[:N_VARIANTS]))
+        good.append(ConceptOut(name=c.name.strip(), source_span=c.source_span.strip(), questions=qs[:n]))
     return good
 
 

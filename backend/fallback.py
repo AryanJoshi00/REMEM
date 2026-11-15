@@ -21,7 +21,7 @@ def concepts_for(topic_id: str | None):
     if topic is None or not path.exists():
         return None
     try:
-        concepts = llm.validate_chunk(json.loads(path.read_text(encoding="utf-8")), topic["text"])
+        concepts = llm.validate_chunk(json.loads(path.read_text(encoding="utf-8")), topic["text"], n=llm.N_BANK)
     except Exception:
         return None
     return concepts or None

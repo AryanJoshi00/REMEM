@@ -89,8 +89,8 @@ def test_reminder_rule_due_daytime_once_a_day(pushing):
     assert push.run_once(_at(due_day, 7)) == []                             # 7 am: too early
     assert push.run_once(_at(due_day, 21.02)) == []                         # just after 9 pm: too late
     out = push.run_once(_at(due_day, 9.02))                                 # just after 9 am: sent
-    assert len(out) == 1 and out[0]["n_due"] == 4 and out[0]["sent"] == 1                # one due concept = its 4 practice questions
-    assert c.sent[-1][1]["count"] == 4 and "4 questions are waiting" in c.sent[-1][1]["body"]
+    assert len(out) == 1 and out[0]["n_due"] == 2 and out[0]["sent"] == 1                # one due concept = one easier + one harder question
+    assert c.sent[-1][1]["count"] == 2 and "2 questions are waiting" in c.sent[-1][1]["body"]
     assert push.run_once(_at(due_day, 15)) == []                            # same day: no second reminder
     assert len(push.run_once(_at(due_day + config.MS_PER_DAY, 10))) == 1    # still due the next day: one more
     with db.session() as conn:

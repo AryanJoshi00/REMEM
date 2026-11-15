@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS questions (
   options_json TEXT NOT NULL,
   correct_idx INTEGER NOT NULL,
   is_final_test INTEGER NOT NULL DEFAULT 0,
+  level INTEGER NOT NULL DEFAULT 1,          -- practice difficulty: 1 easier, 2 harder (0 for Remem Test questions)
   flagged INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
@@ -165,6 +166,10 @@ def init_db(path=None) -> None:
         cols = {r[1] for r in c.execute("PRAGMA table_info(notes)")}
         if "topic_id" not in cols:                       # light migration for databases created before topics existed
             c.execute("ALTER TABLE notes ADD COLUMN topic_id TEXT")
+        qcols = {r[1] for r in c.execute("PRAGMA table_info(questions)")}
+        if "level" not in qcols:                         # practice difficulty arrives: every existing practice question is an easier one
+            c.execute("ALTER TABLE questions ADD COLUMN level INTEGER NOT NULL DEFAULT 1")
+            c.execute("UPDATE questions SET level=0 WHERE is_final_test=1")
         if "last_read" not in cols:                      # the notes lock arrives: everyone who already studied a topic gets one last read,
             import time                                  # and people who had answered before now are shown what changed (once)
             c.execute("ALTER TABLE notes ADD COLUMN last_read INTEGER NOT NULL DEFAULT 0")

@@ -240,9 +240,9 @@ def run_generation(note_id: int) -> None:
             arm = pick_arm(conn, user)
             cid = conn.execute("INSERT INTO concepts(user_id,note_id,name,source_span,arm,created_at) VALUES (?,?,?,?,?,?)",
                                (user["user_id"], note_id, c.name, c.source_span, arm, ts)).lastrowid
-            for i, q in enumerate(c.questions, start=1):
-                conn.execute("INSERT INTO questions(concept_id,variant_no,stem,options_json,correct_idx,is_final_test,created_at) VALUES (?,?,?,?,?,?,?)",
-                             (cid, i, q.stem, json.dumps(q.options), q.correct_index, 1 if i > llm.N_PRACTICE else 0, ts))      # 4 practice, then 3 kept for the Remem Test
+            for i, (q, (final, level)) in enumerate(zip(c.questions, llm.layout(len(c.questions))), start=1):   # easier, harder, then the Remem Test
+                conn.execute("INSERT INTO questions(concept_id,variant_no,stem,options_json,correct_idx,is_final_test,level,created_at) VALUES (?,?,?,?,?,?,?,?)",
+                             (cid, i, q.stem, json.dumps(q.options), q.correct_index, final, level, ts))
         conn.execute("UPDATE notes SET status='done' WHERE note_id=?", (note_id,))
 
 

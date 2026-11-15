@@ -213,6 +213,111 @@
           ],
           "correct_index": 0
         }
+      ],
+      "Aperture and Depth of Field": [
+        {
+          "kind": "use",
+          "stem": "A portrait photographer wants to isolate a subject from a distracting background in an outdoor setting. Which aperture setting best achieves this goal?",
+          "options": [
+            "f/16 to render everything in the frame sharp",
+            "f/1.8 to blur the background while keeping the subject sharp",
+            "f/8 to maintain standard sharpness across all planes",
+            "f/22 to reduce light entry"
+          ],
+          "correct_index": 1
+        },
+        {
+          "kind": "explain",
+          "stem": "Why does choosing a smaller f-number lead to a brighter overall photo?",
+          "options": [
+            "It increases sensor sensitivity electronically.",
+            "It keeps the shutter open for a longer period of time.",
+            "It creates a wider lens opening, allowing more light to enter.",
+            "It removes digital noise from dark areas of the image."
+          ],
+          "correct_index": 2
+        },
+        {
+          "kind": "apart",
+          "stem": "What happens to the opening size and depth of field when a photographer changes the setting from f/1.8 to f/16?",
+          "options": [
+            "The opening becomes narrower, and the depth of field becomes deeper.",
+            "The opening becomes wider, and the depth of field becomes shallower.",
+            "The opening becomes wider, and the depth of field becomes deeper.",
+            "The opening becomes narrower, and the depth of field becomes shallower."
+          ],
+          "correct_index": 0
+        }
+      ],
+      "Shutter Speed and Motion": [
+        {
+          "kind": "use",
+          "stem": "A photographer capturing a fast-moving stream wants the flowing water to appear smooth and silky rather than frozen. Which shutter speed choice fits this goal?",
+          "options": [
+            "A fast shutter speed such as 1/2000 second",
+            "A slow shutter speed such as 1/2 second",
+            "A high ISO setting such as 3200",
+            "A wide aperture such as f/1.8"
+          ],
+          "correct_index": 1
+        },
+        {
+          "kind": "explain",
+          "stem": "Why does hand-holding a camera at a slow shutter speed frequently result in blurry images?",
+          "options": [
+            "The sensor loses light sensitivity during longer exposures.",
+            "Small hand movements are recorded while the shutter remains open.",
+            "Slow shutter speeds force the aperture to contract automatically.",
+            "The camera sensor generates digital grain that mimics motion."
+          ],
+          "correct_index": 1
+        },
+        {
+          "kind": "apart",
+          "stem": "Using the rule of thumb mentioned in the notes (at least 1 over the focal length), what is the minimum recommended handheld shutter speed for a 200mm lens?",
+          "options": [
+            "1/200 second",
+            "1/30 second",
+            "1/1000 second",
+            "1/10 second"
+          ],
+          "correct_index": 0
+        }
+      ],
+      "ISO and Image Noise": [
+        {
+          "kind": "use",
+          "stem": "A photographer takes a picture in a dark auditorium using ISO 3200 and notices small grainy specs across the photo. What feature of the settings caused this?",
+          "options": [
+            "Digital noise resulting from the high ISO setting",
+            "Camera shake caused by a fast shutter speed",
+            "Shallow depth of field from a wide aperture",
+            "Excessive ambient light reaching the sensor"
+          ],
+          "correct_index": 0
+        },
+        {
+          "kind": "explain",
+          "stem": "Why might a photographer avoid using a high ISO setting like 3200 when plenty of light is available?",
+          "options": [
+            "It narrows the lens opening automatically.",
+            "It adds unwanted noise that looks like grain to the image.",
+            "It forces the shutter speed to slow down.",
+            "It makes the resulting photograph darker."
+          ],
+          "correct_index": 1
+        },
+        {
+          "kind": "apart",
+          "stem": "When changing settings from ISO 100 to ISO 3200, how do image noise and light requirements change?",
+          "options": [
+            "Image noise increases, and less light is needed for a bright photo.",
+            "Image noise decreases, and more light is needed for a bright photo.",
+            "Image noise increases, and more light is needed for a bright photo.",
+            "Image noise decreases, and less light is needed for a bright photo."
+          ],
+          "correct_index": 0
+        }
       ]
     },
     "central_asia": {
