@@ -162,7 +162,7 @@ function tone(t, f, dur, o = {}) {
 const PLUCK = [[1, 1, "sine"], [2, 0.35, "sine"], [3, 0.12, "triangle"]], BELL = [[1, 1, "triangle"], [2, 0.5, "sine"], [4.01, 0.12, "sine"]];
 const SOUNDS = {
   right: t => { tone(t, 520, 0.07, { glide: 900, glideT: 0.05, gain: 0.18 }); tone(t + 0.06, 880, 0.32, { parts: PLUCK, gain: 0.3 }); tone(t + 0.14, 1318.5, 0.5, { parts: PLUCK, gain: 0.32 }); },   // Bubbly
-  wrong: t => { tone(t, 174.6, 0.16, { type: "square", lp: 900, gain: 0.22 }); tone(t + 0.13, 146.8, 0.3, { type: "square", lp: 700, gain: 0.22 }); },                                             // Soft bonk
+  wrong: t => { tone(t, 392, 0.17, { type: "square", lp: 1800, gain: 0.30 }); tone(t + 0.13, 311.1, 0.32, { type: "square", lp: 1500, gain: 0.30 }); },   // Soft bonk: G4 down to E-flat 4, high enough for phone speakers and as loud as the right-answer sound
   end: t => { const n = [523.3, 659.3, 784, 1046.5]; n.forEach((f, i) => tone(t + i * 0.09, f, 0.3, { parts: PLUCK, gain: 0.24 })); n.forEach(f => tone(t + 0.4, f, 1.1, { parts: BELL, gain: 0.11, attack: 0.03 })); },   // Fanfare
 };
 function play(name) { const c = audioReady(); if (!c) return; try { SOUNDS[name](c.currentTime + 0.02); } catch (e) { /* no sound is fine */ } }
@@ -523,7 +523,7 @@ async function viewTest(note) {           // today's test (all due concepts, mix
     if (answered) return; answered = true;
     audioReady();                                                            // unlock sound inside the tap; it plays when the answer comes back
     opts.forEach(b => b.disabled = true);
-    const body = { question_id: q.question_id, chosen_index: i, rt_ms: Math.round(performance.now() - t0), idem_key: newKey() };
+    const body = { question_id: q.question_id, chosen_index: i, shuffled: q.shuffled === true, rt_ms: Math.round(performance.now() - t0), idem_key: newKey() };
     opts[i].classList.add("picked");
     try {
       const r = await api("/respond", { method: "POST", body });
@@ -596,7 +596,7 @@ async function viewFinal() {               // the Remem Test: three unseen quest
     const opts = q.options.map((text, k) => h("button", { class: "opt", onclick: async () => {
       if (sent) return; sent = true; audioReady(); opts.forEach(b => { b.disabled = true; }); opts[k].classList.add("picked");
       try {
-        await api("/respond", { method: "POST", body: { question_id: q.question_id, chosen_index: k, rt_ms: Math.round(performance.now() - t0), idem_key: newKey() } });
+        await api("/respond", { method: "POST", body: { question_id: q.question_id, chosen_index: k, shuffled: q.shuffled === true, rt_ms: Math.round(performance.now() - t0), idem_key: newKey() } });
         prog.step(q.position);
         setTimeout(ask, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 380);    // let the bar finish its step
       } catch (e) { sent = false; opts.forEach(b => { b.disabled = false; }); opts[k].classList.remove("picked"); toast(errText(e)); if (e.status === 409) ask(); }

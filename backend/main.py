@@ -122,6 +122,19 @@ def sitting_question_ids(conn, uid: int, cid: int, now: int) -> list[int]:
     return [r["question_id"] for r in daily.sitting(conn, uid, cid, now)]
 
 
+def option_order(uid: int, qid: int) -> list[int]:
+    """The order one person sees a question's four options in: random, but the same every time for that person and question
+    (a reload or a second device shows the same order). Position i on screen shows stored option order[i]. The stored
+    question never changes, so the correct answer is no longer mostly A for anyone, and past answers keep their meaning."""
+    return random.Random(f"options:{uid}:{qid}").sample(range(4), 4)
+
+
+def shown(uid: int, q) -> dict:
+    """The question as one person sees it: options in their order, and a flag so their answer is mapped back."""
+    opts = json.loads(q["options_json"])
+    return {"stem": q["stem"], "options": [opts[i] for i in option_order(uid, q["question_id"])], "shuffled": True}
+
+
 def get_concept(conn, user, cid):
     c = conn.execute("SELECT * FROM concepts WHERE concept_id=? AND user_id=?", (cid, user["user_id"])).fetchone()
     if c is None:
@@ -406,8 +419,7 @@ def remem_test_next(user=Depends(auth.consented_user)):
             return {"done": True, "total": st["total"], "right": st["right"]}
         qid = next(q for q in st["order"] if q not in st["done"])
         q = conn.execute("SELECT question_id, stem, options_json FROM questions WHERE question_id=?", (qid,)).fetchone()
-    return {"done": False, "question_id": q["question_id"], "stem": q["stem"], "options": json.loads(q["options_json"]),
-            "position": st["answered"] + 1, "total": st["total"]}
+    return {"done": False, "question_id": q["question_id"], **shown(uid, q), "position": st["answered"] + 1, "total": st["total"]}
 
 
 # ----------------------------------------------------------------------------- the daily test
@@ -423,8 +435,8 @@ def test_next(note: int | None = Query(default=None), user=Depends(auth.consente
         if nxt is None:
             return {"done": True, **test_summary(conn, uid, now, t)}
         _, q = nxt
-    return {"done": False, "question_id": q["question_id"], "stem": q["stem"], "options": json.loads(q["options_json"]),
-            "position": t["answered"] + 1, "total": t["total"], "concepts": len(t["concepts"])}
+    return {"done": False, "question_id": q["question_id"], **shown(uid, q), "position": t["answered"] + 1, "total": t["total"],
+            "concepts": len(t["concepts"])}
 
 
 def test_summary(conn, uid: int, now: int, t: dict) -> dict:
@@ -522,6 +534,8 @@ def respond(body: RespondIn, user=Depends(auth.consented_user)):
                             WHERE q.question_id=? AND c.user_id=?""", (body.question_id, user["user_id"])).fetchone()
         if q is None:
             raise HTTPException(404, "Unknown question")
+        if body.shuffled:                                                   # screen position -> stored option
+            body.chosen_index = option_order(user["user_id"], q["question_id"])[body.chosen_index]
         correct = body.chosen_index == q["correct_idx"]
         cid = q["concept_id"]
         if q["is_final_test"]:

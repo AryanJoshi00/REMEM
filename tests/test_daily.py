@@ -339,3 +339,27 @@ def test_app_files_always_revalidate_so_updates_reach_phones(client):
     assert client.get("/app.js").headers["cache-control"] == "no-cache"
     assert client.get("/").headers["cache-control"] == "no-cache"
     assert "cache-control" not in client.get("/api/health").headers
+
+
+
+def test_options_are_shuffled_per_person_and_answers_map_back(client):
+    """Each person sees the options in their own fixed random order; a tap is marked against the stored answer."""
+    from collections import Counter
+    h = login(client, "p01", "pw-for-p01!")
+    make_concepts(client, h)
+    with db.session() as conn:
+        note_id = conn.execute("SELECT note_id FROM notes").fetchone()[0]
+        uid = conn.execute("SELECT user_id FROM users WHERE username='p01'").fetchone()[0]
+    q = client.get(f"/api/test/next?note={note_id}", headers=h).json()
+    assert q["shuffled"] is True and client.get(f"/api/test/next?note={note_id}", headers=h).json()["options"] == q["options"]   # stable
+    with db.session() as conn:
+        row = conn.execute("SELECT options_json, correct_idx FROM questions WHERE question_id=?", (q["question_id"],)).fetchone()
+    stored = json.loads(row["options_json"])
+    assert sorted(q["options"]) == sorted(stored)
+    screen_pos = q["options"].index(stored[row["correct_idx"]])                    # where the right answer sits on this person's screen
+    r = client.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": screen_pos, "shuffled": True, "rt_ms": 4000,
+                                          "idem_key": "shuffled-right-1"}, headers=h).json()
+    assert r["correct"] is True and r["chosen_index"] == row["correct_idx"]          # stored as the original option
+    # across many people and questions, a stored "always A" answer lands evenly on A to D
+    spots = Counter(main.option_order(u, qid).index(0) for u in range(1, 60) for qid in range(1, 60))
+    assert all(0.22 < spots[i] / sum(spots.values()) < 0.28 for i in range(4))
