@@ -2,7 +2,7 @@
 
 Rule (the same for every arm, so the comparison stays fair): every REMIND_EVERY_S the server looks at each account that
 turned reminders on. If at least one studied concept is due, it is between 9 am and 9 pm India time, and the account has
-not had a reminder yet today, it sends one notification: "Today's test is ready: N questions are waiting". So nobody gets more than
+not had a reminder yet today, it sends one notification: a short playful message naming a concept that is due (backend.nudges). So nobody gets more than
 one reminder a day, and nobody gets one at night. The message carries only the count (it is encrypted end to end).
 
 Keys: run `python -m backend.push keys` once and put the two printed lines in the server's .env.
@@ -17,7 +17,7 @@ import sys
 import time
 from urllib.parse import urlparse
 
-from backend import config, daily, db
+from backend import config, daily, db, nudges
 
 log = logging.getLogger("remem.push")
 
@@ -56,8 +56,8 @@ def due_count(conn, uid: int, now: int) -> int:
 
 
 def message(n: int) -> dict:
-    body = ("1 question is waiting." if n == 1 else f"{n} questions are waiting.") + " A few minutes now keeps what you studied fresh."
-    return {"title": "Today's test is ready", "body": body, "count": n, "url": "./#/"}
+    """Neutral wording (used for tests of the sender). Daily reminders use backend.nudges.build for the playful copy."""
+    return nudges.plain(n)
 
 
 def _send_one(sub, payload: dict) -> int | None:
@@ -95,7 +95,8 @@ def record(conn, uid: int, subs, results, payload: dict, kind: str, now: int) ->
         else:
             conn.execute("UPDATE push_subs SET fails=fails+1 WHERE endpoint=?", (endpoint,))
     conn.execute("INSERT INTO reminders(user_id,ts,n_due,kind,sent,failed,detail) VALUES (?,?,?,?,?,?,?)",
-                 (uid, now, payload.get("count", 0), kind, sent, failed, ",".join(map(str, codes)) or None))
+                 (uid, now, payload.get("count", 0), kind, sent, failed,
+                  ";".join(x for x in (payload.get("tpl") and "tpl:" + payload["tpl"], ",".join(map(str, codes))) if x) or None))
     return sent, failed
 
 
@@ -120,10 +121,10 @@ def run_once(now: int | None = None, path=None) -> list[dict]:
                 continue                                                  # already reminded today
             n = due_count(conn, uid, now)
             if n:
-                todo.append((uid, n, [dict(r) for r in conn.execute("SELECT * FROM push_subs WHERE user_id=?", (uid,))]))
+                todo.append((uid, n, [dict(r) for r in conn.execute("SELECT * FROM push_subs WHERE user_id=?", (uid,))],
+                             nudges.build(conn, uid, now, n)))
     out = []
-    for uid, n, subs in todo:                                             # 2. send, no lock held; 3. record
-        payload = message(n)
+    for uid, n, subs, payload in todo:                                    # 2. send, no lock held; 3. record
         results = deliver(subs, payload)
         with db.session(path) as conn:
             sent, failed = record(conn, uid, subs, results, payload, "due", now)

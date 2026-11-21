@@ -90,7 +90,8 @@ def test_reminder_rule_due_daytime_once_a_day(pushing):
     assert push.run_once(_at(due_day, 21.02)) == []                         # just after 9 pm: too late
     out = push.run_once(_at(due_day, 9.02))                                 # just after 9 am: sent
     assert len(out) == 1 and out[0]["n_due"] == 2 and out[0]["sent"] == 1                # one due concept = one easier + one harder question
-    assert c.sent[-1][1]["count"] == 2 and "2 questions are waiting" in c.sent[-1][1]["body"]
+    p = c.sent[-1][1]
+    assert p["count"] == 2 and p["tpl"] and "{" not in p["title"] + p["body"]               # playful copy, fully filled in
     assert push.run_once(_at(due_day, 15)) == []                            # same day: no second reminder
     assert len(push.run_once(_at(due_day + config.MS_PER_DAY, 10))) == 1    # still due the next day: one more
     with db.session() as conn:
@@ -149,3 +150,19 @@ def test_payload_is_encrypted_and_signed(monkeypatch):
     assert b"ready to review" not in seen["data"]
     seen["code"] = 410
     assert push._send_one(sub, push.message(3)) == 410
+
+
+def test_nudges_situations_and_rotation():
+    from backend import nudges
+    base = {"n": 4, "concept": "Anchoring", "topic": "Cognitive biases", "name": "Rudra", "streak": 0, "next": 1, "away": 1}
+    assert nudges.situation(base) == "normal"
+    assert nudges.situation({**base, "away": 5}) == "comeback"
+    assert nudges.situation({**base, "streak": 3}) == "streak"
+    assert nudges.situation({**base, "n": 1}) == "one"
+    assert nudges.situation({**base, "n": 20}) == "pile"
+    a = nudges.pick(base, 1, 100)
+    assert nudges.pick(base, 1, 100, last_id=a[0])[0] != a[0]                 # never yesterday's line twice
+    for pool in nudges.T.values():                                            # every template fills in cleanly
+        for _, t, b in pool:
+            out = (t + b).format(**base)
+            assert "{" not in out and len(t.format(**base)) <= 50 and len(b.format(**base)) <= 120
