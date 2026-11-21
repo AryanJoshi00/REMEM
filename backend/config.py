@@ -49,5 +49,6 @@ VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
 VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "")                     # the site address (https://...), so push services know who sends
 REMINDERS_ON = os.getenv("REMEM_REMINDERS", "1") == "1"
 REMIND_EVERY_S = int(os.getenv("REMEM_REMIND_EVERY_S", "900"))     # how often the server looks for concepts that have fallen due
+NUDGES_ON = os.getenv("REMEM_NUDGES", "1") == "1"                    # playful reminder copy (0 = the plain wording)
 REMIND_FROM_HOUR, REMIND_UNTIL_HOUR = 9, 21                         # reminders only go out between 9 am and 9 pm India time
 TZ_OFFSET_MS = int(5.5 * 3600 * 1000)                              # India Standard Time, UTC+5:30
