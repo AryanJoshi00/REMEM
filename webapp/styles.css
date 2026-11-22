@@ -360,6 +360,9 @@ html.theme-fade, html.theme-fade *:not(.theme-switch):not(.theme-switch *) {
 
 /* Me: grouped settings. One rule for every row: 16px sides, at least 52px tall, content centred, no inherited margins */
 .me-who { margin: 2px 0 0; color: var(--muted); }
+.me-name { color: var(--ink); font-weight: 700; }
+.me-name:empty { display: none; }
+.me-user { font-weight: 400; }
 .me-group { border: 1.5px solid var(--rule); background: var(--surface); border-radius: var(--r-block); margin: 8px 0 0; overflow: hidden; }
 .me-group > * { margin: 0; padding: 14px 16px; }
 .me-group > * + * { border-top: 1px solid var(--rule); }

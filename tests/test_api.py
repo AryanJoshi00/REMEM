@@ -266,11 +266,14 @@ def test_signup_form_comes_before_consent_and_steers_suggestions(client):
     assert client.post("/api/auth/consent", headers=h).status_code == 400                      # form first
     form = client.get("/api/auth/profile", headers=h).json()
     assert form["done"] is False and len(form["topics"]) == 6 and form["topics"][0]["title"] == "Korean Hangul"
+    assert form["consent_ok"] is False and form["name"] is None                                  # the app uses these to keep the sign-up steps in order
     bad = dict(PROFILE, age=3)
     assert client.post("/api/auth/profile", json=bad, headers=h).status_code == 422
     assert client.post("/api/auth/profile", json=dict(PROFILE, known_topics=["how_gps_works", "nope"]), headers=h).status_code == 200
     assert client.post("/api/auth/login", json={"username": "p01", "password": "pw-for-p01!"}).json()["profile_ok"] is True
     assert client.post("/api/auth/consent", headers=h).status_code == 200
+    form = client.get("/api/auth/profile", headers=h).json()
+    assert form["done"] is True and form["consent_ok"] is True and form["name"] == "Test Person"     # the name shown on Me
     with db.session() as conn:
         row = conn.execute("SELECT full_name, age, known_topics FROM profiles").fetchone()
     assert row["full_name"] == "Test Person" and json.loads(row["known_topics"]) == ["how_gps_works"]   # unknown ids are dropped

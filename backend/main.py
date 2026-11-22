@@ -182,10 +182,12 @@ def _has_profile(conn, user_id: int) -> bool:
 
 @api.get("/auth/profile")
 def profile_form(user=Depends(auth.current_user)):
-    """What the sign-up form needs: whether it is done, and the ready-made topics to tick."""
+    """What the sign-up form needs: whether it (and consent) is done, and the ready-made topics to tick."""
     with db.session() as conn:
         done = _has_profile(conn, user["user_id"])
-    return {"done": done, "topics": [{"id": t["id"], "title": t["title"].split(":")[0], "subject": t["subject"]} for t in topics.all_topics()]}
+        row = conn.execute("SELECT full_name FROM profiles WHERE user_id=?", (user["user_id"],)).fetchone()
+    consent_ok = bool(user["consent_at"]) and user["consent_version"] == config.CONSENT_VERSION
+    return {"done": done, "consent_ok": consent_ok, "name": row["full_name"] if row else None, "topics": [{"id": t["id"], "title": t["title"].split(":")[0], "subject": t["subject"]} for t in topics.all_topics()]}
 
 
 @api.post("/auth/profile")

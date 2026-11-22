@@ -60,6 +60,10 @@ async function api(path, opts = {}) {
   if (S.token) headers.Authorization = "Bearer " + S.token;
   const r = await fetch("api" + path, { method: opts.method || "GET", headers, body: opts.body ? JSON.stringify(opts.body) : undefined });
   if (r.status === 401 && S.token) { signOut(false); throw new Error("Please sign in again."); }
+  if (r.status === 403 && S.token && !/^#\/(about|consent)$/.test(location.hash)) {   // signed in but the intro form or consent is not done
+    const d = await r.clone().json().catch(() => ({}));                     // (e.g. after going back from the consent screen):
+    if (d.detail === "Consent required") { store.del("remem_consented"); location.replace("#/about"); const e = new Error("Finish signing up first."); e.status = 403; throw e; }
+  }
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
     const d = data.detail;                                                   // a 422 sends a list of problems; show the first one in words
@@ -83,7 +87,7 @@ const OFFLINE_MSG ="You're offline. Check your connection and try again.";
 const isOffline = e => e instanceof TypeError || (e && e.message === "Offline");     // fetch failed, or the service worker's offline reply
 function errText(e) { return isOffline(e) ? OFFLINE_MSG : e.message; }
 function errScreen(title, e, back) {                                        // an error is never a dead end: say what happened, offer a retry and a way back
-  const retry = e && e.status === 404 ? null : h("button", { type: "button", onclick: () => route() }, "Try again");   // nothing to retry when the item does not exist
+  const retry = e && (e.status === 404 || e.status === 422) ? null : h("button", { type: "button", onclick: () => route() }, "Try again");   // nothing to retry when the item does not exist
   return mount(h("h1", {}, title), h("div", { class: "err", role: "alert" }, errText(e)),
     h("div", { class: "actions" }, retry, back || null));
 }
@@ -96,7 +100,7 @@ function signOut(call = true) {
     })();
   }
   setBadge(0); S.token = S.role = S.user = null;
-  ["remem_token", "remem_role", "remem_user", "remem_queue", "remem_due"].forEach(store.del);
+  ["remem_token", "remem_role", "remem_user", "remem_queue", "remem_due", "remem_consented", "remem_name"].forEach(store.del);
   if ("caches" in window) caches.delete("remem-api").catch(() => {});
   location.hash = "#/login"; route();
 }
@@ -322,7 +326,7 @@ function renderNav() {
   const nav = document.getElementById("nav"), who = document.getElementById("who");
   nav.replaceChildren(); who.textContent = S.token ? S.user : "";
   const cur = (location.hash || "#/").split("?")[0], n = dueCount();
-  if (!S.token || /^#\/(about|consent)$/.test(cur)) return;                   // no browsing before the intro form and consent
+  if (!S.token || /^#\/(about|consent)$/.test(cur) || store.get("remem_consented") !== "1") return;   // no browsing before the intro form and consent
   [["#/", "Today", "today"], ["#/notes", "Topics", "notes"], ["#/concepts", "Concepts", "concepts"], ["#/me", "Me", "me"]].forEach(([href, label, ic]) => {
     const on = href === "#/" ? cur === "#/" : cur.startsWith(href);
     const badge = href === "#/" && n;
@@ -354,8 +358,10 @@ function viewLogin() {
     try {
       const r = await api("/auth/login", { method: "POST", body: { username: u.value.trim(), password: p.value } });
       S.token = r.token; S.role = r.role; S.user = r.username;
+      if (r.consent_ok) store.set("remem_consented", "1"); else store.del("remem_consented");
       store.set("remem_token", r.token); store.set("remem_role", r.role); store.set("remem_user", r.username);
-      location.hash = !r.profile_ok ? "#/about" : (r.consent_ok ? "#/" : "#/consent"); route();
+      const to = !r.profile_ok ? "#/about" : (r.consent_ok ? "#/" : "#/consent");
+      if (location.hash === to || (!location.hash && to === "#/")) route(); else location.replace(to);   // replace: back never returns to the sign-in form
     } catch (ex) { err.textContent = errText(ex); go.disabled = false; if (!isOffline(ex)) { p.focus(); p.select(); } }
   } }, h("div", {}, h("label", { for: "u" }, "Username"), u), h("div", {}, h("label", { for: "p" }, "Password"), h("div", { class: "pw" }, p, showBtn)), err, go);
   u.id = "u"; p.id = "p";
@@ -366,7 +372,7 @@ function viewLogin() {
 async function viewAbout() {
   mount(h("h1", {}, "A quick intro"), skeleton(3));
   let f; try { f = await api("/auth/profile"); } catch (e) { return errScreen("A quick intro", e); }
-  if (f.done) { location.hash = "#/consent"; return; }
+  if (f.done) { location.replace("#/consent"); return; }
   const name = h("input", { id: "pn", autocomplete: "name", maxlength: 80 });
   const contact = h("input", { id: "pc", autocomplete: "email", autocapitalize: "none", spellcheck: "false", maxlength: 120, placeholder: "Email or phone number" });
   const age = h("input", { id: "pa", type: "number", inputmode: "numeric", min: 10, max: 100 });
@@ -385,7 +391,7 @@ async function viewAbout() {
     go.disabled = true;
     try {
       await api("/auth/profile", { method: "POST", body: { full_name: name.value.trim(), contact: contact.value.trim(), age: Number(age.value), known_topics: boxes.filter(b => b.box.checked).map(b => b.t.id) } });
-      location.hash = "#/consent"; route();
+      location.replace("#/consent");                                     // the form is done: back skips it
     } catch (ex) { err.textContent = errText(ex); go.disabled = false; }
   } },
     h("div", { class: "panel" }, "Your details stay with me, Aryan Joshi. They are not shared with anyone and are only for my final-year project (and a follow-up survey if I need one). In results you are just a number, never a name."),
@@ -397,9 +403,11 @@ async function viewAbout() {
   mount(h("h1", {}, "A quick intro"), h("p", { class: "muted" }, "One short form before you start. It takes about a minute."), form);
 }
 
-function viewConsent() {
+async function viewConsent() {
+  if (store.get("remem_consented") === "1") { location.replace("#/"); return; }   // already agreed (e.g. came back here with the back button)
+  try { if ((await api("/auth/profile")).consent_ok) { store.set("remem_consented", "1"); location.replace("#/"); return; } } catch (e) { /* show the screen */ }
   const ok = h("button", { class: "primary block", onclick: async () => {
-    try { await api("/auth/consent", { method: "POST" }); location.hash = "#/notes"; route(); } catch (e) { toast(errText(e)); }
+    try { await api("/auth/consent", { method: "POST" }); store.set("remem_consented", "1"); location.replace("#/notes"); } catch (e) { toast(errText(e)); }
   } }, "I agree");
   mount(h("h1", {}, "Before you start"), h("div", { class: "panel consent" }, CONSENT_TEXT), ok,
         h("p", {}, h("button", { class: "block", onclick: () => signOut() }, "No thanks, sign out")));
@@ -927,6 +935,10 @@ function themeSwitch(startDark, onToggle, width) {
   return { el, set: next => set(next, false) };
 }
 
+function firstName(full) {                           // "JATIN ASHOK GUPTA" -> "Jatin", "aryan joshi" -> "Aryan"
+  const w = String(full || "").trim().split(/\s+/)[0] || "";
+  return w ? w.charAt(0).toLocaleUpperCase() + w.slice(1).toLocaleLowerCase() : "";
+}
 function viewMe() {
   const old = h("input", { id: "op", type: "password", autocomplete: "current-password" }), nw = h("input", { id: "np", type: "password", autocomplete: "new-password" });
   const msg = h("div", { class: "muted", role: "status" });
@@ -949,7 +961,9 @@ function viewMe() {
     T.phone.addEventListener("change", follow);
   }
   const chev = () => icon("M9 5l7 7-7 7", "chev");
-  mount(h("h1", {}, "Me"), h("p", { class: "me-who" }, S.user || "", S.role !== "student" ? " (" + S.role + ")" : ""),
+  const nameEl = h("b", { class: "me-name" }, store.get("remem_name") || "");
+  api("/auth/profile").then(f => { const n = firstName(f.name); nameEl.textContent = n; if (n) store.set("remem_name", n); else store.del("remem_name"); }).catch(() => {});
+  mount(h("h1", {}, "Me"), h("p", { class: "me-who" }, nameEl, " ", h("span", { class: "me-user" }, S.user || ""), S.role !== "student" ? h("span", { class: "me-user" }, " (" + S.role + ")") : null),
     h("h2", {}, "Reminders"), h("div", { class: "me-group" }, reminders),
     h("h2", {}, "Sound"),
     h("div", { class: "me-group" }, h("label", { class: "switch" }, h("span", {}, "Sounds for right and wrong answers"),
@@ -969,6 +983,12 @@ function viewMe() {
 
 // ---------------------------------------------------------------- router
 let routeGen = 0;
+async function signUpGate() {                        // asked once per sign-in (sessions from before this check have no flag yet)
+  mount(skeleton(2));
+  let f; try { f = await api("/auth/profile"); } catch (e) { return errScreen("Remem", e); }
+  if (f.consent_ok) { store.set("remem_consented", "1"); return route(); }
+  location.replace(f.done ? "#/consent" : "#/about");
+}
 function route() {
   routeGen++;
   const hash = location.hash || "#/";
@@ -976,6 +996,7 @@ function route() {
   if (hash.startsWith("#/install")) return viewInstall();
   if (!S.token) return viewLogin();
   const [path, query] = hash.split("?"), [, a, b] = path.split("/");
+  if (a !== "about" && a !== "consent" && store.get("remem_consented") !== "1") return signUpGate();   // no screen before the intro form and consent
   switch (a) {
     case "about": return viewAbout();
     case "consent": return viewConsent();
@@ -984,10 +1005,11 @@ function route() {
     case "concepts": return viewConcepts();
     case "test": return viewTest(new URLSearchParams(query || "").get("note"));
     case "practice": location.replace("#/test"); return;                  // old links: practice now happens only in the daily test
-    case "curve": return viewCurve(Number(b));
+    case "curve": return /^\d+$/.test(b || "") ? viewCurve(Number(b)) : errScreen("Memory curve", Object.assign(new Error("Unknown concept"), { status: 404 }), h("a", { class: "btn", href: "#/concepts" }, "Back"));
     case "me": return viewMe();
     case "login": location.replace("#/"); return;                          // already signed in: go to Today
-    default: flushQueue(); return viewHome();
+    case undefined: case "": flushQueue(); return viewHome();
+    default: location.replace("#/"); return;                               // an unknown address: go to Today (and show it in the address)
   }
 }
 window.addEventListener("hashchange", route);
