@@ -403,3 +403,45 @@ html.theme-fade, html.theme-fade *:not(.theme-switch):not(.theme-switch *) {
 .theme-switch:active { transform: scale(.95); transition-duration: .08s; box-shadow: 0 3px 8px -3px var(--sh); opacity: 1; }
 .theme-switch:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) { .theme-switch { transition: none; } .me-group details > summary .chev { transition: none; } }
+
+/* owner's pilot view (admin account) */
+.ad-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0 8px; }
+.ad-card { background: var(--surface); border: 1.5px solid var(--rule); border-radius: var(--r-block); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.ad-card b { font-size: var(--fs-lead); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ad-card span { color: var(--muted); font-size: var(--fs-xs); }
+.ad-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ad-pill { flex: none; font-size: var(--fs-xs); font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--tint); color: var(--muted); white-space: nowrap; }
+.ad-pill.good { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green); }
+.ad-pill.warn { background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber); }
+.ad-pill.bad { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
+.ad-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.ad-person { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1.5px solid var(--rule); background: var(--surface); border-radius: var(--r-block); color: inherit; text-decoration: none; }
+.ad-person:active { background: var(--tint); }
+.ad-mid { display: flex; align-items: center; gap: 10px; }
+.ad-dots { display: inline-flex; gap: 4px; }
+.ad-dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--track); }
+.ad-dots i.on { background: var(--green-fill); }
+.ad-table { border: 1.5px solid var(--rule); border-radius: var(--r-block); background: var(--surface); overflow: hidden; margin-top: 8px; }
+.ad-tr { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr; gap: 6px; padding: 10px 12px; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.ad-tr + .ad-tr { border-top: 1px solid var(--rule); }
+.ad-tr.head { color: var(--muted); font-size: var(--fs-xs); font-weight: 600; }
+.ad-cal { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.ad-calrow { display: grid; grid-template-columns: 1fr 1.2fr auto; align-items: center; gap: 10px; }
+.ad-bars { display: flex; flex-direction: column; gap: 3px; }
+.ad-bars i, .ad-key { display: block; height: 8px; border-radius: 4px; }
+.ad-bars i { width: calc(var(--v) * 100%); }
+.pred { background: var(--field); }
+.obs { background: var(--accent); }
+.ad-key { display: inline-block; width: 14px; vertical-align: middle; }
+.ad-chart { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; align-items: end; height: 120px; margin-top: 8px; }
+.ad-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 3px; }
+.ad-col i { display: block; width: 100%; height: calc(var(--v) * 80px); min-height: 2px; background: var(--accent); border-radius: 3px 3px 0 0; }
+.ad-col span, .ad-col small { font-size: .6875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ad-link { color: inherit; text-decoration: none; }
+.ad-q { border: 1.5px solid var(--rule); background: var(--surface); border-radius: var(--r-block); margin-top: 8px; }
+.ad-q > summary { padding: 14px 16px; cursor: pointer; min-height: 48px; }
+.ad-concept { padding: 12px 16px; border-top: 1px solid var(--rule); }
+.ad-qa p { margin: 10px 0 4px; }
+.ad-qa ol { margin: 0; padding-left: 4px; list-style: none; font-size: var(--fs-sm); }
+.ad-qa li { padding: 2px 0; }
+.ad-qa li.ok { color: var(--green); font-weight: 600; }

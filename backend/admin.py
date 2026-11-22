@@ -121,3 +121,28 @@ def final_set(body: FinalIn, admin=Depends(admin_user)):
                      ("1" if body.open else "0",))
         db.audit(conn, "final_test_open" if body.open else "final_test_close", admin["user_id"], ts=_now_ms())
     return {"open": body.open}
+
+
+# ---- the owner's phone view (read-only; see backend/monitor.py)
+@router.get("/overview")
+def overview(_=Depends(admin_user)):
+    from backend import main, monitor                  # late import: main imports this router
+    with db.session() as conn:
+        return monitor.overview(conn, main.now_ms())
+
+
+@router.get("/person/{user_id}")
+def person(user_id: int, _=Depends(admin_user)):
+    from backend import main, monitor                  # late import: main imports this router
+    with db.session() as conn:
+        out = monitor.person(conn, user_id, main.now_ms())
+    if out is None:
+        raise HTTPException(404, "Unknown account")
+    return out
+
+
+@router.get("/final-questions")
+def final_questions(_=Depends(admin_user)):
+    from backend import main, monitor                  # late import: main imports this router
+    with db.session() as conn:
+        return {"people": monitor.final_questions(conn)}

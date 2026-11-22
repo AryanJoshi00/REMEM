@@ -60,7 +60,7 @@ async function api(path, opts = {}) {
   if (S.token) headers.Authorization = "Bearer " + S.token;
   const r = await fetch("api" + path, { method: opts.method || "GET", headers, body: opts.body ? JSON.stringify(opts.body) : undefined });
   if (r.status === 401 && S.token) { signOut(false); throw new Error("Please sign in again."); }
-  if (r.status === 403 && S.token && !/^#\/(about|consent)$/.test(location.hash)) {   // signed in but the intro form or consent is not done
+  if (r.status === 403 && S.token && S.role !== "admin" && !/^#\/(about|consent)$/.test(location.hash)) {   // signed in but the intro form or consent is not done
     const d = await r.clone().json().catch(() => ({}));                     // (e.g. after going back from the consent screen):
     if (d.detail === "Consent required") { store.del("remem_consented"); location.replace("#/about"); const e = new Error("Finish signing up first."); e.status = 403; throw e; }
   }
@@ -326,6 +326,13 @@ function renderNav() {
   const nav = document.getElementById("nav"), who = document.getElementById("who");
   nav.replaceChildren(); who.textContent = S.token ? S.user : "";
   const cur = (location.hash || "#/").split("?")[0], n = dueCount();
+  if (S.token && S.role === "admin") {                                   // the owner's tabs
+    [["#/", "Pilot", "today"], ["#/admin/test", "Remem Test", "concepts"], ["#/me", "Me", "me"]].forEach(([href, label, ic]) => {
+      const on = href === "#/" ? (cur === "#/" || cur.startsWith("#/admin/p")) : cur.startsWith(href);
+      nav.append(h("a", { href, class: on ? "on" : "", "aria-current": on ? "page" : false }, icon(ic), label));
+    });
+    return;
+  }
   if (!S.token || /^#\/(about|consent)$/.test(cur) || store.get("remem_consented") !== "1") return;   // no browsing before the intro form and consent
   [["#/", "Today", "today"], ["#/notes", "Topics", "notes"], ["#/concepts", "Concepts", "concepts"], ["#/me", "Me", "me"]].forEach(([href, label, ic]) => {
     const on = href === "#/" ? cur === "#/" : cur.startsWith(href);
@@ -943,7 +950,7 @@ function viewMe() {
   const old = h("input", { id: "op", type: "password", autocomplete: "current-password" }), nw = h("input", { id: "np", type: "password", autocomplete: "new-password" });
   const msg = h("div", { class: "muted", role: "status" });
   const reminders = h("div", { class: "stack" }, h("p", { class: "muted" }, "Checking..."));
-  fillReminderSettings(reminders);
+  if (S.role !== "admin") fillReminderSettings(reminders);              // the owner account gets no reminders
   const T = window.remTheme;
   const switches = [];
   const toggle = dark => { T.set(dark ? "dark" : "light"); switches.forEach(x => x.set(dark)); showState(); };
@@ -964,7 +971,7 @@ function viewMe() {
   const nameEl = h("b", { class: "me-name" }, store.get("remem_name") || "");
   api("/auth/profile").then(f => { const n = firstName(f.name); nameEl.textContent = n; if (n) store.set("remem_name", n); else store.del("remem_name"); }).catch(() => {});
   mount(h("h1", {}, "Me"), h("p", { class: "me-who" }, nameEl, " ", h("span", { class: "me-user" }, S.user || ""), S.role !== "student" ? h("span", { class: "me-user" }, " (" + S.role + ")") : null),
-    h("h2", {}, "Reminders"), h("div", { class: "me-group" }, reminders),
+    S.role === "admin" ? null : h("h2", {}, "Reminders"), S.role === "admin" ? null : h("div", { class: "me-group" }, reminders),
     h("h2", {}, "Sound"),
     h("div", { class: "me-group" }, h("label", { class: "switch" }, h("span", {}, "Sounds for right and wrong answers"),
       h("input", { type: "checkbox", role: "switch", checked: soundOn(), onchange: e => { store.set("remem_sound", e.target.checked ? "1" : "0"); if (e.target.checked) play("right"); } }))),
@@ -981,6 +988,140 @@ function viewMe() {
     h("p", { class: "me-signout" }, h("button", { class: "block", onclick: () => signOut() }, "Sign out")));
 }
 
+// ---------------------------------------------------------------- owner's view (admin account only): the pilot at a glance
+const ARM_NAMES = { remem: "REMEM", sm2: "SM-2", fixed: "Fixed 3-day" };
+const pct = v => v == null ? "–" : Math.round(v * 100) + "%";
+const clock = ms => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const dayName = ms => new Date(ms).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+function since(ms) {
+  if (!ms) return "never";
+  const day = t => { const x = new Date(t); return Date.UTC(x.getFullYear(), x.getMonth(), x.getDate()) / 86400000; };   // calendar days on this phone
+  const d = day(Date.now()) - day(ms);
+  return d <= 0 ? "today, " + clock(ms) : d === 1 ? "yesterday, " + clock(ms) : d + " days ago";
+}
+function personState(p) {                          // one short label and a tone for a person's line
+  if (!p.signed_up) return ["Not signed up", "off"];
+  if (p.status === "never") return ["Not started", "bad"];
+  if (p.status === "today") return ["Done today", "good"];
+  if (p.days_away >= 3) return ["Quiet " + p.days_away + " days", "bad"];
+  if (p.waiting) return [pl(p.waiting, "question") + " waiting", "warn"];
+  return ["Nothing due", "off"];
+}
+const dots = days => h("span", { class: "ad-dots", role: "img", "aria-label": days.filter(Boolean).length + " of the last 7 days active" },
+  days.map(on => h("i", { class: on ? "on" : "" })));
+function adminCards(nums) { return h("div", { class: "ad-cards" }, nums.map(([v, label]) => h("div", { class: "ad-card" }, h("b", {}, String(v)), h("span", {}, label)))); }
+function personLine(p, finalOpen) {
+  const [label, tone] = personState(p);
+  const meta = [pl(p.topics.length, "topic"), pl(p.answers, "answer"), pl(p.days_active, "active day"), p.reminders_on ? "reminders on" : "reminders off"];
+  if (finalOpen && p.final.total) meta.unshift("Remem Test " + (p.final.finished ? "done" : p.final.answered + "/" + p.final.total));
+  return h("a", { class: "ad-person", href: "#/admin/p/" + p.user_id },
+    h("div", { class: "ad-top" }, h("span", {}, h("b", {}, p.name ? firstName(p.name) : "—"), " ", h("span", { class: "muted" }, p.username + (p.role !== "student" ? " · " + p.role : "") + (p.active ? "" : " · disabled"))),
+      h("span", { class: "ad-pill " + tone }, label)),
+    p.topics.length ? h("div", { class: "small" }, p.topics.join(", ")) : null,
+    h("div", { class: "ad-mid" }, dots(p.last_7), h("span", { class: "muted small" }, "last active " + since(p.last_ts))),
+    h("div", { class: "muted small" }, meta.join(" · ")));
+}
+function finalCard(o, redo) {
+  const f = o.final;
+  const flip = async open => {
+    const ok = await confirmSheet(open ? "Open the Remem Test?" : "Close the Remem Test?",
+      open ? "Everyone who has studied a topic can take it from now on (it shows on their Today screen). Do this once, near the end of the pilot."
+           : "Nobody can answer more Remem Test questions until you open it again. Answers already given are kept.",
+      open ? "Open it" : "Close it", "Cancel");
+    if (!ok) return;
+    try { await api("/admin/final-test", { method: "POST", body: { open } }); toast(open ? "The Remem Test is open." : "The Remem Test is closed."); redo(); } catch (e) { toast(errText(e)); }
+  };
+  return h("div", { class: "panel" },
+    h("div", { class: "ad-top" }, h("b", {}, "The Remem Test"), h("span", { class: "ad-pill " + (f.open ? "good" : "off") }, f.open ? "Open" : "Closed")),
+    h("p", { class: "muted small" }, f.open ? f.finished + " of " + f.eligible + " finished, " + f.started + " part-way through." : f.eligible + (f.eligible === 1 ? " person has" : " people have") + " questions ready. Preview them before you open it."),
+    h("div", { class: "actions" }, location.hash.startsWith("#/admin/test") ? null : h("a", { class: "btn outline", href: "#/admin/test" }, f.open ? "Progress and questions" : "Preview questions"),
+      h("button", { class: f.open ? "" : "primary", type: "button", onclick: () => flip(!f.open) }, f.open ? "Close it" : "Open it")));
+}
+function experimentBlock(x) {
+  return [h("h2", {}, "The experiment"),
+    h("p", { class: "muted small" }, x.reviews + " reviews (" + x.answers + " answers) from " + x.people_reviewing + (x.people_reviewing === 1 ? " person" : " people") + ". A review is a concept coming back after a gap. Overall, REMEM predicted " + pct(x.predicted) + " and people got " + pct(x.observed) + " right."),
+    h("div", { class: "ad-table", role: "table" }, h("div", { class: "ad-tr head", role: "row" }, ["Method", "Concepts", "Reviews", "Correct", "Avg gap"].map(t => h("span", { role: "columnheader" }, t))),
+      x.arms.map(a => h("div", { class: "ad-tr", role: "row" }, [ARM_NAMES[a.arm], String(a.concepts), String(a.reviews), pct(a.accuracy), a.mean_gap_days == null ? "–" : a.mean_gap_days.toFixed(1) + "d"].map(t => h("span", { role: "cell" }, t))))),
+    h("p", { class: "muted small" }, "Balance check, first-quiz accuracy (should be similar): " + x.arms.map(a => ARM_NAMES[a.arm] + " " + pct(a.first_quiz_accuracy)).join(", ") + "."),
+    h("h3", {}, "Predicted vs actual, by days since last review"),
+    x.by_gap.length ? h("div", { class: "ad-cal" }, x.by_gap.map(g => h("div", { class: "ad-calrow" },
+      h("span", { class: "small" }, g.label, h("span", { class: "muted" }, " · " + pl(g.reviews, "review"))),
+      h("div", { class: "ad-bars", "aria-hidden": "true" }, h("i", { class: "pred", style: "--v:" + g.predicted }), h("i", { class: "obs", style: "--v:" + g.observed })),
+      h("span", { class: "small" }, pct(g.predicted) + " → " + pct(g.observed))))) : h("p", { class: "muted" }, "No reviews yet."),
+    h("p", { class: "muted small" }, h("i", { class: "ad-key pred" }), " predicted   ", h("i", { class: "ad-key obs" }), " actually right. Small numbers: read it as a trend, not a result.")];
+}
+async function viewAdmin() {
+  const gen = routeGen;
+  mount(h("h1", {}, "Pilot today"), skeleton(4, true));
+  let o; try { o = await api("/admin/overview"); } catch (e) { if (gen === routeGen) errScreen("Pilot today", e); return; }
+  if (gen !== routeGen) return;
+  const showAll = store.get("remem_admin_all") === "1";
+  const people = o.people.filter(p => showAll || p.role === "student");
+  const t = o.today;
+  const toggle = h("label", { class: "switch" }, h("span", {}, "Show test and admin accounts"),
+    h("input", { type: "checkbox", role: "switch", checked: showAll, onchange: e => { store.set("remem_admin_all", e.target.checked ? "1" : "0"); viewAdmin(); } }));
+  mount(h("h1", {}, "Pilot today"),
+    h("p", { class: "muted small" }, dayName(o.now) + " · updated " + clock(o.now) + " · ", h("button", { class: "link", type: "button", onclick: () => viewAdmin() }, "Refresh")),
+    adminCards([[t.people + "/" + t.started, "answered today"], [t.answers, "questions today"], [t.active_3d + "/" + t.started, "active in last 3 days"], [t.waiting, "have questions waiting"]]),
+    h("p", { class: "muted small" }, t.started + " of " + t.students + " accounts started · " + t.two_topics + " have 2+ topics · " + t.reminders_on + " have reminders on"),
+    finalCard(o, viewAdmin),
+    h("h2", {}, "People"), h("div", { class: "me-group" }, toggle),
+    h("div", { class: "ad-list" }, people.map(p => personLine(p, o.final.open))),
+    ...experimentBlock(o.experiment));
+}
+async function viewAdminPerson(id) {
+  const gen = routeGen;
+  const back = h("a", { class: "btn", href: "#/" }, "Back");
+  mount(h("h1", {}, "Person"), skeleton(4));
+  let p; try { p = await api("/admin/person/" + id); } catch (e) { if (gen === routeGen) errScreen("Person", e, back); return; }
+  if (gen !== routeGen) return;
+  const [label, tone] = personState(p);
+  const max = Math.max(1, ...p.days.map(d => d.answers));
+  mount(h("p", {}, h("a", { href: "#/" }, "← Pilot today")),
+    h("h1", {}, p.name || p.username),
+    h("p", { class: "muted" }, p.username + " · " + p.role + (p.age ? " · age " + p.age : "") + (p.active ? "" : " · disabled") + " ", h("span", { class: "ad-pill " + tone }, label)),
+    adminCards([[p.days_active, "active days"], [p.answers, "answers"], [p.concepts, "concepts"], [p.waiting, "waiting now"]]),
+    h("p", { class: "muted small" }, "Last active " + since(p.last_ts) + " · reminders " + (p.reminders_on ? "on" : "off") +
+      (p.final.total ? " · Remem Test " + (p.final.finished ? "finished, " + p.final.right + "/" + p.final.total + " right" : p.final.answered + "/" + p.final.total + " answered") : "")),
+    h("h2", {}, "Last 14 days"),
+    h("div", { class: "ad-chart", role: "img", "aria-label": "Answers per day over the last 14 days: " + p.days.map(d => d.answers).join(", ") },
+      p.days.map(d => h("div", { class: "ad-col" }, h("small", {}, d.answers ? String(d.answers) : ""), h("i", { style: "--v:" + (d.answers / max) }), h("span", {}, String(new Date(d.day_ms).getDate()))))),
+    h("h2", {}, "Topics"),
+    p.topic_list.length ? h("div", { class: "me-group" }, p.topic_list.map(t => h("div", {}, h("b", {}, t.title), h("div", { class: "muted small" },
+      (t.own_notes ? "own notes · " : "") + pl(t.concepts, "concept") + " (" + Object.entries(t.arms).map(([a, n]) => ARM_NAMES[a] + " " + n).join(", ") + ") · added " + dayName(t.added))))) : h("p", { class: "muted" }, "No topics yet."),
+    p.known_topics.length ? h("p", { class: "muted small" }, "Said they already know: " + p.known_topics.join(", ")) : null,
+    h("h2", {}, "Recent reviews"),
+    p.reviews.length ? h("div", { class: "me-group" }, p.reviews.map(r => h("div", {}, h("div", { class: "ad-top" }, h("span", {}, r.concept), h("b", {}, r.right + "/" + r.n)),
+      h("div", { class: "muted small" }, dayName(r.ts) + " · " + ARM_NAMES[r.arm] + " · after " + r.gap_days.toFixed(1) + " days · predicted " + pct(r.predicted))))) : h("p", { class: "muted" }, "No reviews yet."),
+    h("h2", {}, "Reminders sent"),
+    p.reminders.length ? h("div", { class: "me-group" }, p.reminders.map(r => h("div", { class: "small" }, dayName(r.ts) + ", " + clock(r.ts) + (r.template ? " · line " + r.template : " · plain") + (r.reached ? "" : " · not delivered")))) : h("p", { class: "muted" }, "None yet."),
+    h("p", {}, back));
+}
+async function viewAdminTest() {
+  const gen = routeGen;
+  const back = h("a", { class: "btn", href: "#/" }, "Back");
+  mount(h("h1", {}, "The Remem Test"), skeleton(4));
+  let o, q; try { [o, q] = await Promise.all([api("/admin/overview"), api("/admin/final-questions")]); } catch (e) { if (gen === routeGen) errScreen("The Remem Test", e, back); return; }
+  if (gen !== routeGen) return;
+  const letters = "ABCDEF";
+  const takers = o.people.filter(p => p.role === "student" && p.final.total);
+  mount(h("h1", {}, "The Remem Test"),
+    finalCard(o, viewAdminTest),
+    h("h2", {}, "Progress"),
+    takers.length ? h("div", { class: "me-group" }, takers.map(p => h("a", { class: "ad-top ad-link", href: "#/admin/p/" + p.user_id },
+      h("span", {}, h("b", {}, p.name ? firstName(p.name) : p.username), " ", h("span", { class: "muted small" }, p.username)),
+      h("span", { class: "ad-pill " + (p.final.finished ? "good" : p.final.answered ? "warn" : "off") },
+        p.final.finished ? "Done · " + p.final.right + "/" + p.final.total : p.final.answered ? p.final.answered + "/" + p.final.total : "Not started")))) : h("p", { class: "muted" }, "Nobody has questions yet."),
+    h("h2", {}, "Questions"),
+    h("p", { class: "muted small" }, "Each person gets three unseen questions for every concept they studied, shuffled, without concept names. The right answer is marked ✓."),
+    q.people.map(person => h("details", { class: "ad-q" },
+      h("summary", {}, h("span", {}, h("b", {}, person.name ? firstName(person.name) : person.username), " ", h("span", { class: "muted small" }, person.username + " · " + pl(person.concepts.length, "concept") + " · " + pl(person.concepts.reduce((n, c) => n + c.questions.length, 0), "question")))),
+      person.concepts.map(c => h("div", { class: "ad-concept" }, h("div", { class: "muted small" }, c.topic), h("b", {}, c.concept),
+        c.questions.map(x => h("div", { class: "ad-qa" }, h("p", {}, x.stem),
+          h("ol", {}, x.options.map((op, i) => h("li", { class: i === x.correct ? "ok" : "" }, h("span", { class: "muted" }, letters[i] + ". "), op, i === x.correct ? " ✓" : ""))))))))),
+    h("p", {}, back));
+}
+
 // ---------------------------------------------------------------- router
 let routeGen = 0;
 async function signUpGate() {                        // asked once per sign-in (sessions from before this check have no flag yet)
@@ -995,7 +1136,14 @@ function route() {
   renderNav();
   if (hash.startsWith("#/install")) return viewInstall();
   if (!S.token) return viewLogin();
-  const [path, query] = hash.split("?"), [, a, b] = path.split("/");
+  const [path, query] = hash.split("?"), [, a, b, c] = path.split("/");
+  if (S.role === "admin") {                                              // the owner's account: the pilot view, not the student app
+    if (a === "admin" && b === "p" && /^\d+$/.test(c || "")) return viewAdminPerson(Number(c));
+    if (a === "admin" && b === "test") return viewAdminTest();
+    if (a === "me") return viewMe();
+    if (a) { location.replace("#/"); return; }
+    return viewAdmin();
+  }
   if (a !== "about" && a !== "consent" && store.get("remem_consented") !== "1") return signUpGate();   // no screen before the intro form and consent
   switch (a) {
     case "about": return viewAbout();

@@ -567,3 +567,30 @@ def test_repair_replay_matches_the_live_api(client):
         assert {r["concept_id"]: dict(r) for r in conn.execute("SELECT * FROM state")} == live
         assert [tuple(r) for r in conn.execute("SELECT pred_R, elapsed_days, mode, was_due, stability_after, mastery_after FROM responses ORDER BY response_id")] == logged
         assert tuple(conn.execute("SELECT ability, n_answers FROM users WHERE username='p01'").fetchone()) == user
+
+
+def test_admin_phone_view(client):
+    hs = login(client, "p01", "pw-for-p01!")
+    with db.session() as conn:
+        auth.create_user(conn, "boss", "boss-pass-12", "admin")
+    ha = login(client, "boss", "boss-pass-12", consent=False)
+    for path in ("/api/admin/overview", "/api/admin/person/1", "/api/admin/final-questions"):
+        assert client.get(path, headers=hs).status_code == 403                                  # students never see it
+    cs = make_concepts(client, hs)
+    for c in cs:
+        assert answer(client, hs, c["concept_id"], True).status_code == 200
+    o = client.get("/api/admin/overview", headers=ha).json()
+    people = {p["username"]: p for p in o["people"]}
+    assert set(people) == {"p01", "p02", "demo", "boss"}                                        # every account, with its role
+    p = people["p01"]
+    assert p["name"] == "Test Person" and p["topics"] == ["Bio"] and p["answers"] == 2 and p["concepts"] == 2
+    assert p["signed_up"] and p["last_7"][-1] is True and p["final"]["total"] > 0
+    assert people["p02"]["status"] == "never" and not people["p02"]["signed_up"]
+    assert o["today"]["students"] == 2 and o["today"]["started"] == 1 and o["final"]["eligible"] == 1
+    assert {a["arm"] for a in o["experiment"]["arms"]} == {"remem", "sm2", "fixed"}
+    d = client.get(f"/api/admin/person/{p['user_id']}", headers=ha).json()
+    assert d["topic_list"][0]["concepts"] == 2 and sum(d["topic_list"][0]["arms"].values()) == 2 and len(d["days"]) == 14
+    assert client.get("/api/admin/person/9999", headers=ha).status_code == 404
+    q = client.get("/api/admin/final-questions", headers=ha).json()["people"]
+    assert len(q) == 1 and q[0]["username"] == "p01" and len(q[0]["concepts"]) == 2
+    assert all(0 <= x["correct"] < len(x["options"]) for c in q[0]["concepts"] for x in c["questions"])
