@@ -162,7 +162,13 @@ def test_nudges_situations_and_rotation():
     assert nudges.situation({**base, "n": 20}) == "pile"
     a = nudges.pick(base, 1, 100)
     assert nudges.pick(base, 1, 100, last_id=a[0])[0] != a[0]                 # never yesterday's line twice
+    assert nudges.slot(9) == "am" and nudges.slot(14) == "pm" and nudges.slot(20) == "eve"
+    morning = {nudges.pick(base, u, 100, hour=10)[0] for u in range(60)}
+    evening = {nudges.pick(base, u, 100, hour=19)[0] for u in range(60)}
+    assert "ev1" not in morning and "am1" not in evening and "ev1" in evening   # time-of-day lines only in their slot
+    ids = [t[0] for pool in nudges.T.values() for t in pool]
+    assert len(ids) == len(set(ids))                                          # ids are unique (they are logged)
     for pool in nudges.T.values():                                            # every template fills in cleanly
-        for _, t, b in pool:
+        for t, b in (x[1:3] for x in pool):
             out = (t + b).format(**base)
             assert "{" not in out and len(t.format(**base)) <= 50 and len(b.format(**base)) <= 120

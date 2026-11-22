@@ -329,6 +329,17 @@ def page_pilot() -> None:
                                                                                "observed": st.column_config.NumberColumn("Observed", format="percent")})
             a.markdown('<p class="note">Brackets: the lower end is included, the upper end is not.</p>', unsafe_allow_html=True)
             calibration_chart(b, cal)
+            note("The same comparison by days since the last review: where in time the forgetting model holds, and where it drifts.")
+            gap = pilot.calibration_by_gap(conn)
+            st.dataframe(gap, hide_index=True, width="stretch", column_config={"gap": "Days since last review", "reviews": "Reviews", "n": "Answers",
+                         "predicted": st.column_config.NumberColumn("Predicted", format="percent"), "observed": st.column_config.NumberColumn("Observed", format="percent")})
+
+        st.header("Are the three groups comparable?", anchor=False)
+        note("Methods are assigned per concept, balanced within each student. The first quiz happens before any scheduling, so its accuracy should be similar for every method.")
+        bal = pilot.balance(conn).replace({"remem": "REMEM", "sm2": "SM-2", "fixed": "Fixed, every 3 days"})
+        st.dataframe(bal, hide_index=True, width="stretch", column_config={"arm": "Method", "concepts": "Concepts",
+                     "per_student_min": "Fewest per student", "per_student_max": "Most per student", "first_quiz_answers": "First-quiz answers",
+                     "first_quiz_accuracy": st.column_config.NumberColumn("First-quiz share correct", format="percent")})
 
         st.header("Activity", anchor=False)
         da = pilot.daily_activity(conn)

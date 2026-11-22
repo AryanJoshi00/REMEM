@@ -136,6 +136,38 @@ def calibration(conn, bins=(0, .5, .6, .7, .8, .9, 1.0001)) -> pd.DataFrame:
     return out
 
 
+def calibration_by_gap(conn, bins=(0, 1, 2, 4, 7, 10_000)) -> pd.DataFrame:
+    """The same predicted-against-observed comparison, split by days since the last review (all arms). Shows where in time
+    the forgetting model holds and where it drifts. n counts answers."""
+    t = review_tests(conn)
+    cols = ["gap", "reviews", "n", "predicted", "observed"]
+    if t.empty:
+        return pd.DataFrame(columns=cols)
+    labels = [f"{a}–{b} days" if b < 10_000 else f"{a}+ days" for a, b in zip(bins, bins[1:])]
+    t["gap"] = pd.cut(t["gap_days"], bins=list(bins), right=False, labels=labels)
+    t["wp"] = t["pred_R"] * t["n"]
+    g = t.groupby("gap", observed=True)
+    out = pd.DataFrame({"reviews": g.size(), "n": g["n"].sum(), "predicted": g["wp"].sum() / g["n"].sum(),
+                        "observed": g["right"].sum() / g["n"].sum()}).reset_index()
+    out["gap"] = out["gap"].astype(str)
+    return out[cols]
+
+
+def balance(conn) -> pd.DataFrame:
+    """Evidence that the arms are comparable: concepts per arm per student, and first-quiz accuracy per arm (learning before
+    any scheduling happened, so it should be similar across arms)."""
+    c = _df(conn, """SELECT c.user_id, c.arm FROM concepts c JOIN users u USING(user_id) WHERE u.role='student'""")
+    f = _df(conn, """SELECT r.arm, r.correct FROM responses r JOIN users u USING(user_id) WHERE u.role='student' AND r.mode='first'""")
+    rows = []
+    for arm in ["remem", "sm2", "fixed"]:
+        per = c[c["arm"] == arm].groupby("user_id").size().reindex(c["user_id"].unique(), fill_value=0) if not c.empty else pd.Series(dtype=int)
+        x = f[f["arm"] == arm] if not f.empty else f
+        rows.append({"arm": arm, "concepts": int((c["arm"] == arm).sum()) if not c.empty else 0,
+                     "per_student_min": int(per.min()) if len(per) else 0, "per_student_max": int(per.max()) if len(per) else 0,
+                     "first_quiz_answers": len(x), "first_quiz_accuracy": float(x["correct"].mean()) if len(x) else np.nan})
+    return pd.DataFrame(rows)
+
+
 def adherence(conn, now_ms: int) -> dict:
     """Of the concepts a student has learned, how many are currently overdue, and how late are the overdue ones."""
     s = _df(conn, """SELECT s.due_at FROM state s JOIN users u USING(user_id) WHERE u.role='student' AND s.due_at IS NOT NULL""")

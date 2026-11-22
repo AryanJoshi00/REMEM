@@ -110,3 +110,15 @@ def test_reviews_before_the_feedback_change_count_their_first_answer_only(tmp_pa
                       (u, 1, 1, k, ts, ok, 0.8, 2 if k in "ac" else 0.0002, "review", "remem"))
     t = pilot.review_tests(pilot.open_ro(p))
     assert t["n"].tolist() == [1, 2] and t["right"].tolist() == [0, 1]
+
+
+def test_calibration_by_gap_and_balance(tmp_path):
+    c = build(tmp_path)
+    g = pilot.calibration_by_gap(c).set_index("gap")
+    assert g["n"].sum() == 5 and g.loc["2–4 days", "reviews"] == 3 and g.loc["4–7 days", "n"] == 1   # gaps 3,3,3(+practice) and 5 days
+    assert abs(g.loc["4–7 days", "predicted"] - 0.8) < 1e-9 and g.loc["4–7 days", "observed"] == 1.0
+    b = pilot.balance(c).set_index("arm")
+    assert b["concepts"].tolist() == [1, 1, 1] and b.loc["fixed", "first_quiz_answers"] == 1 and b.loc["fixed", "first_quiz_accuracy"] == 1.0
+    assert b.loc["remem", "per_student_min"] == 1                                                   # the admin's answers are not counted
+    e = tmp_path / "e2.db"; db.init_db(e)
+    assert pilot.calibration_by_gap(pilot.open_ro(e)).empty and len(pilot.balance(pilot.open_ro(e))) == 3
