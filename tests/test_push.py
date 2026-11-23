@@ -190,6 +190,9 @@ def test_remem_test_launch_and_daily_nudge(pushing):
     assert len(c.sent) == n0 + 1                                                     # told once, even if reopened
     with db.session() as conn:
         assert conn.execute("SELECT COUNT(*) FROM reminders WHERE kind='final' AND sent=1").fetchone()[0] == 1
+    with db.session() as conn:                                                       # the launch went out "today" (at the app clock)
+        conn.execute("UPDATE reminders SET ts=? WHERE kind='final'", (_at(c.clock["t"], 9.5),))
+    assert push.run_once(_at(c.clock["t"], 11)) == []                                 # same day as the launch: no "still waiting" yet
     out = push.run_once(_at(c.clock["t"] + config.MS_PER_DAY, 10))                  # next morning: the daily reminder is about the test
     assert len(out) == 1 and c.sent[-1][1]["tpl"].startswith("fn") and c.sent[-1][1]["url"] == "./#/final"
 

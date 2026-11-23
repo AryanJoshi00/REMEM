@@ -175,6 +175,9 @@ def run_once(now: int | None = None, path=None) -> list[dict]:
                 continue                                                  # already reminded today
             st = remem_test(conn, uid)
             if st["open"] and st["total"] and not st["finished"]:            # while the Remem Test is open, finishing it comes first
+                told = conn.execute("SELECT MAX(ts) FROM reminders WHERE user_id=? AND kind='final' AND sent>0", (uid,)).fetchone()[0]
+                if told is not None and local_day(told) == local_day(now):
+                    continue                                              # told about the test today already: the nudge starts tomorrow
                 prev = conn.execute("SELECT detail FROM reminders WHERE user_id=? AND kind='due' AND detail LIKE 'tpl:f%' ORDER BY ts DESC LIMIT 1", (uid,)).fetchone()
                 payload = nudges.final_reminder(_name(conn, uid), uid, local_day(now), st["total"], st["answered"],
                                                 prev[0].split(";")[0][4:] if prev else None)
