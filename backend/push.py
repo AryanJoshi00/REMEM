@@ -94,9 +94,10 @@ def record(conn, uid: int, subs, results, payload: dict, kind: str, now: int) ->
             conn.execute("DELETE FROM push_subs WHERE endpoint=?", (endpoint,))
         else:
             conn.execute("UPDATE push_subs SET fails=fails+1 WHERE endpoint=?", (endpoint,))
-    conn.execute("INSERT INTO reminders(user_id,ts,n_due,kind,sent,failed,detail) VALUES (?,?,?,?,?,?,?)",
+    conn.execute("INSERT INTO reminders(user_id,ts,n_due,kind,sent,failed,detail,title,body) VALUES (?,?,?,?,?,?,?,?,?)",
                  (uid, now, payload.get("count", 0), kind, sent, failed,
-                  ";".join(x for x in (payload.get("tpl") and "tpl:" + payload["tpl"], ",".join(map(str, codes))) if x) or None))
+                  ";".join(x for x in (payload.get("tpl") and "tpl:" + payload["tpl"], ",".join(map(str, codes))) if x) or None,
+                  payload.get("title"), payload.get("body")))
     return sent, failed
 
 

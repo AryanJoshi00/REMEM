@@ -328,7 +328,7 @@ function renderNav() {
   const cur = (location.hash || "#/").split("?")[0], n = dueCount();
   if (S.token && S.role === "admin") {                                   // the owner's tabs
     [["#/", "Pilot", "today"], ["#/admin/test", "Remem Test", "concepts"], ["#/me", "Me", "me"]].forEach(([href, label, ic]) => {
-      const on = href === "#/" ? (cur === "#/" || cur.startsWith("#/admin/p")) : cur.startsWith(href);
+      const on = href === "#/" ? (cur === "#/" || cur.startsWith("#/admin/p") || cur.startsWith("#/admin/notify")) : href === "#/admin/test" ? (cur.startsWith("#/admin/test") || cur.startsWith("#/admin/try")) : cur.startsWith(href);
       nav.append(h("a", { href, class: on ? "on" : "", "aria-current": on ? "page" : false }, icon(ic), label));
     });
     return;
@@ -950,7 +950,7 @@ function viewMe() {
   const old = h("input", { id: "op", type: "password", autocomplete: "current-password" }), nw = h("input", { id: "np", type: "password", autocomplete: "new-password" });
   const msg = h("div", { class: "muted", role: "status" });
   const reminders = h("div", { class: "stack" }, h("p", { class: "muted" }, "Checking..."));
-  if (S.role !== "admin") fillReminderSettings(reminders);              // the owner account gets no reminders
+  fillReminderSettings(reminders);
   const T = window.remTheme;
   const switches = [];
   const toggle = dark => { T.set(dark ? "dark" : "light"); switches.forEach(x => x.set(dark)); showState(); };
@@ -971,7 +971,7 @@ function viewMe() {
   const nameEl = h("b", { class: "me-name" }, store.get("remem_name") || "");
   api("/auth/profile").then(f => { const n = firstName(f.name); nameEl.textContent = n; if (n) store.set("remem_name", n); else store.del("remem_name"); }).catch(() => {});
   mount(h("h1", {}, "Me"), h("p", { class: "me-who" }, nameEl, " ", h("span", { class: "me-user" }, S.user || ""), S.role !== "student" ? h("span", { class: "me-user" }, " (" + S.role + ")") : null),
-    S.role === "admin" ? null : h("h2", {}, "Reminders"), S.role === "admin" ? null : h("div", { class: "me-group" }, reminders),
+    h("h2", {}, "Reminders"), h("div", { class: "me-group" }, reminders),
     h("h2", {}, "Sound"),
     h("div", { class: "me-group" }, h("label", { class: "switch" }, h("span", {}, "Sounds for right and wrong answers"),
       h("input", { type: "checkbox", role: "switch", checked: soundOn(), onchange: e => { store.set("remem_sound", e.target.checked ? "1" : "0"); if (e.target.checked) play("right"); } }))),
@@ -1065,6 +1065,7 @@ async function viewAdmin() {
     adminCards([[t.people + "/" + t.started, "answered today"], [t.answers, "questions today"], [t.active_3d + "/" + t.started, "active in last 3 days"], [t.waiting, "have questions waiting"]]),
     h("p", { class: "muted small" }, t.started + " of " + t.students + " accounts started · " + t.two_topics + " have 2+ topics · " + t.reminders_on + " have reminders on"),
     finalCard(o, viewAdmin),
+    h("a", { class: "panel ad-row", href: "#/admin/notify" }, h("span", {}, h("b", {}, "Notifications"), h("span", { class: "muted small" }, " · see every message, send one to your phone")), icon("M9 5l7 7-7 7", "chev")),
     h("h2", {}, "People"), h("div", { class: "me-group" }, toggle),
     h("div", { class: "ad-list" }, people.map(p => personLine(p, o.final.open))),
     ...experimentBlock(o.experiment));
@@ -1094,7 +1095,11 @@ async function viewAdminPerson(id) {
     p.reviews.length ? h("div", { class: "me-group" }, p.reviews.map(r => h("div", {}, h("div", { class: "ad-top" }, h("span", {}, r.concept), h("b", {}, r.right + "/" + r.n)),
       h("div", { class: "muted small" }, dayName(r.ts) + " · " + ARM_NAMES[r.arm] + " · after " + r.gap_days.toFixed(1) + " days · predicted " + pct(r.predicted))))) : h("p", { class: "muted" }, "No reviews yet."),
     h("h2", {}, "Reminders sent"),
-    p.reminders.length ? h("div", { class: "me-group" }, p.reminders.map(r => h("div", { class: "small" }, dayName(r.ts) + ", " + clock(r.ts) + (r.template ? " · line " + r.template : " · plain") + (r.reached ? "" : " · not delivered")))) : h("p", { class: "muted" }, "None yet."),
+    p.reminders.length ? h("div", { class: "me-group ad-rems" }, p.reminders.map(r => h("details", {},
+      h("summary", {}, h("span", {}, h("span", { class: "small" }, dayName(r.ts) + ", " + clock(r.ts) + (r.reached ? "" : " · not delivered")), h("br"), h("b", { class: "small" }, r.title)), icon("M9 5l7 7-7 7", "chev")),
+      h("div", { class: "ad-notif" }, h("b", {}, r.title), h("p", {}, r.body)),
+      h("p", { class: "muted small" }, ({ due: "Daily reminder", final: "Remem Test opened", done: "Remem Test finished", test: "Reminders-on check", owner: "Sent to yourself" }[r.kind] || r.kind) +
+        (r.template ? " · line " + r.template : "") + (r.exact ? "" : " · an older reminder: its exact words weren't saved, so [blanks] mark where their topic and numbers went"))))) : h("p", { class: "muted" }, "None yet."),
     h("p", {}, back));
 }
 async function viewAdminTest() {
@@ -1116,10 +1121,84 @@ async function viewAdminTest() {
     h("p", { class: "muted small" }, "Each person gets three unseen questions for every concept they studied, shuffled, without concept names. The right answer is marked ✓."),
     q.people.map(person => h("details", { class: "ad-q" },
       h("summary", {}, h("span", {}, h("b", {}, person.name ? firstName(person.name) : person.username), " ", h("span", { class: "muted small" }, person.username + " · " + pl(person.concepts.length, "concept") + " · " + pl(person.concepts.reduce((n, c) => n + c.questions.length, 0), "question")))),
+      h("div", { class: "ad-concept" }, h("a", { class: "btn outline", href: "#/admin/try/" + person.user_id }, "Take this test yourself")),
       person.concepts.map(c => h("div", { class: "ad-concept" }, h("div", { class: "muted small" }, c.topic), h("b", {}, c.concept),
         c.questions.map(x => h("div", { class: "ad-qa" }, h("p", {}, x.stem),
           h("ol", {}, x.options.map((op, i) => h("li", { class: i === x.correct ? "ok" : "" }, h("span", { class: "muted" }, letters[i] + ". "), op, i === x.correct ? " ✓" : ""))))))))),
     h("p", {}, back));
+}
+
+async function notifySelf(tpl, extra) {               // send one message to the owner's own phone; true when it went
+  try {
+    const r = await api("/admin/notify-self", { method: "POST", body: Object.assign({ tpl }, extra || {}) });
+    if (!r.sent) { toast("Couldn't reach your phone. Check that notifications are allowed."); return false; }
+    toast("Sent: " + r.title); return true;
+  } catch (e) { toast(errText(e)); return false; }
+}
+async function viewAdminNotify() {
+  const gen = routeGen;
+  const back = h("a", { class: "btn", href: "#/" }, "Back");
+  mount(h("h1", {}, "Notifications"), skeleton(4));
+  let c; try { c = await api("/admin/notify-catalog"); } catch (e) { if (gen === routeGen) errScreen("Notifications", e, back); return; }
+  if (gen !== routeGen) return;
+  const turnOn = h("button", { class: "primary", type: "button", onclick: async () => {
+    turnOn.disabled = true;
+    try { await turnOnReminders(); toast("Notifications are on for this phone."); viewAdminNotify(); } catch (e) { turnOn.disabled = false; toast(errText(e)); }
+  } }, "Turn on notifications");
+  const groups = [];
+  c.messages.forEach(m => { const g = groups.find(x => x.name === m.group); if (g) g.items.push(m); else groups.push({ name: m.group, items: [m] }); });
+  mount(h("p", {}, h("a", { href: "#/" }, "← Pilot today")), h("h1", {}, "Notifications"),
+    h("p", { class: "muted" }, "Every message people can get, filled with sample words. Tap Send to see exactly how it looks on your phone. Sending to yourself never counts in the pilot."),
+    c.reminders_on ? null : h("div", { class: "calm" }, h("b", {}, "Notifications are off on this phone"),
+      h("p", { class: "muted" }, "Turn them on once, then you can send any message to yourself."), h("div", { class: "actions" }, turnOn)),
+    groups.map(g => [h("h2", {}, g.name), h("div", { class: "me-group" }, g.items.map(m => {
+      const send = h("button", { class: "btn outline", type: "button", disabled: !c.reminders_on, onclick: async () => { send.disabled = true; await notifySelf(m.tpl); send.disabled = false; } }, "Send");
+      return h("div", { class: "ad-msg" }, h("div", {}, h("b", {}, m.title), h("div", { class: "muted small" }, m.body)), send);
+    }))]),
+    h("p", {}, back));
+}
+function shuffled(list, seed) {                       // a fixed shuffle for one practice run
+  let x = seed || 1; const rnd = () => (x = (x * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const a = list.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a;
+}
+async function viewAdminTry(uid) {
+  const gen = routeGen;
+  const back = h("a", { class: "btn", href: "#/admin/test" }, "Back");
+  mount(h("h1", {}, "Practice Remem Test"), skeleton(3));
+  let q; try { q = await api("/admin/final-questions"); } catch (e) { if (gen === routeGen) errScreen("Practice Remem Test", e, back); return; }
+  if (gen !== routeGen) return;
+  const person = q.people.find(p => p.user_id === uid);
+  if (!person) return errScreen("Practice Remem Test", Object.assign(new Error("No Remem Test questions for this account."), { status: 404 }), back);
+  const all = shuffled(person.concepts.flatMap(c => c.questions.map(x => ({ ...x, concept: c.concept }))), Date.now() % 100000 + 7);
+  const who = person.name ? firstName(person.name) : person.username;
+  const picks = [];
+  const finish = () => {
+    if (gen !== routeGen) return;
+    const right = picks.filter((p, i) => p === all[i].correct).length;
+    notifySelf("fd1", { n: all.length, right });
+    const wrong = all.map((x, i) => ({ x, p: picks[i] })).filter(r => r.p !== r.x.correct);
+    mount(h("h1", {}, "You got " + right + " of " + all.length),
+      h("p", { class: "muted" }, "Practice run on " + who + "'s questions. Nothing was saved. If notifications are on for this phone, \"Mogambo khush hua\" is on its way."),
+      wrong.length ? h("h2", {}, "The ones you missed") : h("p", {}, "Perfect score. 🎉"),
+      wrong.map(r => h("div", { class: "panel" }, h("div", { class: "muted small" }, r.x.concept), h("p", {}, r.x.stem),
+        h("p", { class: "small" }, "You chose: " + r.x.options[r.p]), h("p", { class: "small ok" }, "Right answer: " + r.x.options[r.x.correct]))),
+      h("div", { class: "actions" }, h("button", { class: "primary", type: "button", onclick: () => viewAdminTry(uid) }, "Try again"), back));
+  };
+  const ask = i => {
+    if (gen !== routeGen) return;
+    if (i >= all.length) return finish();
+    const x = all[i];
+    mount(h("p", { class: "muted small" }, "Practice run · " + who + "'s questions · nothing is saved"),
+      h("h1", {}, "Question " + (i + 1) + " of " + all.length),
+      h("div", { class: "meter" }, h("i", { style: "--v:" + (i / all.length) })),
+      h("p", { class: "ad-stem" }, x.stem),
+      h("div", { class: "stack" }, x.options.map((op, k) => h("button", { class: "block ad-opt", type: "button", onclick: () => { picks[i] = k; ask(i + 1); } }, op))),
+      h("p", {}, h("button", { class: "link", type: "button", onclick: () => { location.hash = "#/admin/test"; } }, "Stop")));
+  };
+  mount(h("p", {}, h("a", { href: "#/admin/test" }, "← The Remem Test")), h("h1", {}, "Practice Remem Test"),
+    h("p", {}, "You'll answer " + who + "'s " + all.length + " Remem Test questions, shuffled and without concept names, just as they will see them. Right answers show at the end."),
+    h("div", { class: "calm" }, h("b", {}, "Nothing is saved"), h("p", { class: "muted" }, "Your answers don't count anywhere. You'll get the \"Kaabil bano\" notification when you start and \"Mogambo khush hua\" with your score when you finish (if notifications are on for this phone).")),
+    h("div", { class: "actions" }, h("button", { class: "primary", type: "button", onclick: () => { notifySelf("fl1", { n: all.length }); ask(0); } }, "Start"), back));
 }
 
 // ---------------------------------------------------------------- router
@@ -1140,6 +1219,8 @@ function route() {
   if (S.role === "admin") {                                              // the owner's account: the pilot view, not the student app
     if (a === "admin" && b === "p" && /^\d+$/.test(c || "")) return viewAdminPerson(Number(c));
     if (a === "admin" && b === "test") return viewAdminTest();
+    if (a === "admin" && b === "notify") return viewAdminNotify();
+    if (a === "admin" && b === "try" && /^\d+$/.test(c || "")) return viewAdminTry(Number(c));
     if (a === "me") return viewMe();
     if (a) { location.replace("#/"); return; }
     return viewAdmin();

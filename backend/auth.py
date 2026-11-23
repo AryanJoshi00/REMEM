@@ -113,3 +113,8 @@ def consented_user(user=Depends(current_user)):
     if not user["consent_at"] or user["consent_version"] != config.CONSENT_VERSION:
         raise HTTPException(403, "Consent required")
     return user
+
+
+def consented_or_admin(user=Depends(current_user)):
+    """Reminders: students after consent, and the owner's account (to receive test notifications on their own phone)."""
+    return user if user["role"] == "admin" else consented_user(user)

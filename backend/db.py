@@ -129,7 +129,9 @@ CREATE TABLE IF NOT EXISTS reminders (              -- every reminder the server
   kind TEXT NOT NULL,                               -- due | test
   sent INTEGER NOT NULL,                            -- devices reached
   failed INTEGER NOT NULL,
-  detail TEXT
+  detail TEXT,
+  title TEXT,                                       -- the exact words sent (older rows: not stored)
+  body TEXT
 );
 CREATE TABLE IF NOT EXISTS llm_cache (
   chunk_hash TEXT PRIMARY KEY,
@@ -166,6 +168,10 @@ def init_db(path=None) -> None:
         cols = {r[1] for r in c.execute("PRAGMA table_info(notes)")}
         if "topic_id" not in cols:                       # light migration for databases created before topics existed
             c.execute("ALTER TABLE notes ADD COLUMN topic_id TEXT")
+        rcols = {r[1] for r in c.execute("PRAGMA table_info(reminders)")}
+        if "title" not in rcols:                         # reminders start keeping their exact words (for the owner's view)
+            c.execute("ALTER TABLE reminders ADD COLUMN title TEXT")
+            c.execute("ALTER TABLE reminders ADD COLUMN body TEXT")
         qcols = {r[1] for r in c.execute("PRAGMA table_info(questions)")}
         if "level" not in qcols:                         # practice difficulty arrives: every existing practice question is an easier one
             c.execute("ALTER TABLE questions ADD COLUMN level INTEGER NOT NULL DEFAULT 1")

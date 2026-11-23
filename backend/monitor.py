@@ -150,15 +150,38 @@ def person(conn, uid: int, now: int) -> dict | None:
                        "concepts": sum(arms.values()), "arms": arms})
     names = {r[0]: r[1] for r in conn.execute("SELECT concept_id, name FROM concepts WHERE user_id=?", (uid,))}
     reviews = sorted(review_tests(conn, [uid]), key=lambda t: -t["ts"])[:15]
-    rem = conn.execute("SELECT ts, detail, sent FROM reminders WHERE user_id=? ORDER BY ts DESC LIMIT 7", (uid,)).fetchall()
+    rem = conn.execute("SELECT ts, kind, detail, sent, n_due, title, body FROM reminders WHERE user_id=? ORDER BY ts DESC LIMIT 20", (uid,)).fetchall()
     return row | {
-        "age": p["age"] if p else None, "known_topics": json.loads(p["known_topics"]) if p else [],
+        "age": p["age"] if p else None, "known_topics": _topic_titles(json.loads(p["known_topics"])) if p else [],
         "days": [{"day_ms": d * config.MS_PER_DAY - config.TZ_OFFSET_MS, "answers": per_day.get(d, 0)} for d in range(today - 13, today + 1)],
         "topic_list": topics,
         "reviews": [{"ts": t["ts"], "concept": names.get(t["concept_id"], "?"), "arm": t["arm"], "gap_days": t["gap_days"],
                      "predicted": t["pred_R"], "right": t["right"], "n": t["n"]} for t in reviews],
-        "reminders": [{"ts": r["ts"], "template": (r["detail"] or "").split(";")[0].removeprefix("tpl:") or None, "reached": r["sent"] > 0} for r in rem],
+        "reminders": [_reminder(r) for r in rem],
     }
+
+
+def _topic_titles(ids: list[str]) -> list[str]:
+    from backend import topics
+    names = {t["id"]: t["title"].split(":")[0] for t in topics.all_topics()}
+    return [names.get(i, i) for i in ids]
+
+
+def _reminder(r) -> dict:
+    """One sent reminder with its words: stored since the words were kept; before that, the template with [blanks]."""
+    from backend import nudges
+    detail = r["detail"] or ""
+    tpl = detail.split(";")[0].removeprefix("tpl:") if detail.startswith("tpl:") else None
+    title, body, exact = r["title"], r["body"], bool(r["title"])
+    if not exact:
+        if tpl and nudges.template(tpl):
+            title, body = nudges.template(tpl)
+        elif r["kind"] == "test":
+            title, body = "Reminders are on", "This is what a Remem reminder looks like. You'll get one when a concept is due to review."
+        else:
+            title, body = "Today's test is ready", f"{r['n_due']} questions are waiting. A few minutes now keeps what you studied fresh."
+            exact = True                                 # the plain wording never varied
+    return {"ts": r["ts"], "kind": r["kind"], "template": tpl, "reached": r["sent"] > 0, "title": title, "body": body, "exact": exact}
 
 
 def final_questions(conn) -> list[dict]:

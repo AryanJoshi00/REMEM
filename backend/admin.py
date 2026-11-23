@@ -150,3 +150,35 @@ def final_questions(_=Depends(admin_user)):
     from backend import main, monitor                  # late import: main imports this router
     with db.session() as conn:
         return {"people": monitor.final_questions(conn)}
+
+
+class NotifyIn(BaseModel):
+    tpl: str = Field(max_length=8)
+    n: int | None = Field(default=None, ge=0, le=500)
+    right: int | None = Field(default=None, ge=0, le=500)
+
+
+@router.get("/notify-catalog")
+def notify_catalog(admin=Depends(admin_user)):
+    from backend import nudges
+    with db.session() as conn:
+        on = conn.execute("SELECT COUNT(*) FROM push_subs WHERE user_id=?", (admin["user_id"],)).fetchone()[0]
+        name = conn.execute("SELECT full_name FROM profiles WHERE user_id=?", (admin["user_id"],)).fetchone()
+    return {"reminders_on": on > 0, "messages": nudges.catalog(name[0] if name else "Aryan")}
+
+
+@router.post("/notify-self")
+def notify_self(body: NotifyIn, admin=Depends(admin_user)):
+    """Send one message to the owner's own phone, to see exactly how it looks. Logged as kind 'owner' (never in pilot numbers)."""
+    from backend import main, nudges, push
+    if not push.enabled():
+        raise HTTPException(503, "Reminders aren't switched on for this server.")
+    with db.session() as conn:
+        if not conn.execute("SELECT 1 FROM push_subs WHERE user_id=?", (admin["user_id"],)).fetchone():
+            raise HTTPException(404, "Turn on reminders for this phone first (Me tab).")
+        name = conn.execute("SELECT full_name FROM profiles WHERE user_id=?", (admin["user_id"],)).fetchone()
+    payload = nudges.for_owner(body.tpl, name[0] if name else "Aryan", n=body.n, right=body.right)
+    if payload is None:
+        raise HTTPException(404, "Unknown message")
+    sent, failed = push.send_to_user(admin["user_id"], payload, "owner", main.now_ms())
+    return {"sent": sent, "failed": failed, "title": payload["title"]}

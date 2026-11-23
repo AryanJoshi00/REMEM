@@ -10,6 +10,7 @@ dashboard can later check which lines actually bring people back.
 from __future__ import annotations
 
 import hashlib
+import re
 import random
 
 from backend import config, daily
@@ -175,3 +176,42 @@ def final_reminder(name: str | None, uid: int, day: int, total: int, answered: i
 
 def final_done(name: str | None, right: int, total: int) -> dict:
     return _fill(FINAL_DONE, {"name": _first_name(name), "n": total, "right": right}, 0, "./#/")
+
+
+# ---- every message in one list, for the owner's "send to me" screen and for showing older reminders' wording
+GROUPS = {"comeback": "Coming back after 3+ days", "streak": "On a streak", "one": "Just one question due",
+          "pile": "A big backlog (12+)", "normal": "A normal day"}
+SAMPLE = {"n": 4, "concept": "Confirmation bias", "topic": "Cognitive Biases", "streak": 3, "next": 4, "away": 4, "left": 6, "right": 12}
+
+
+def catalog(name: str | None = None) -> list[dict]:
+    ctx = {**SAMPLE, "name": _first_name(name)}
+    out = []
+    for key, label in GROUPS.items():
+        for t in T[key]:
+            when = {"am": " (mornings)", "pm": " (afternoons)", "eve": " (evenings)"}.get(t[3], "") if len(t) == 4 else ""
+            out.append({"tpl": t[0], "group": "Daily reminder · " + label + when, "title": t[1].format(**ctx), "body": t[2].format(**ctx)})
+    for t, label in ((FINAL_LAUNCH, "When you open it"), (FINAL_NOT_STARTED, "Later, not started"),
+                     (FINAL_LEFT, "Later, part-way"), (FINAL_DONE, "When they finish")):
+        fctx = {**ctx, "n": 15}                         # a Remem Test is three questions per concept: a typical size
+        out.append({"tpl": t[0], "group": "Remem Test · " + label, "title": t[1].format(**fctx), "body": t[2].format(**fctx)})
+    return out
+
+
+def template(tpl: str):
+    """(title, body) of a template id with its placeholders shown as [concept], [topic] and so on, or None."""
+    for t in [x for pool in T.values() for x in pool] + [FINAL_LAUNCH, FINAL_NOT_STARTED, FINAL_LEFT, FINAL_DONE]:
+        if t[0] == tpl:
+            return re.sub(r"\{(\w+)\}", r"[\1]", t[1]), re.sub(r"\{(\w+)\}", r"[\1]", t[2])
+    return None
+
+
+def for_owner(tpl: str, name: str | None, n: int | None = None, right: int | None = None, left: int | None = None) -> dict | None:
+    """One message filled with sample words (and the given numbers), sent to the owner's own phone."""
+    every = [x for pool in T.values() for x in pool] + [FINAL_LAUNCH, FINAL_NOT_STARTED, FINAL_LEFT, FINAL_DONE]
+    t = next((x for x in every if x[0] == tpl), None)
+    if t is None:
+        return None
+    ctx = {**SAMPLE, "name": _first_name(name), **({"n": 15} if tpl.startswith("f") else {})}
+    ctx.update({k: v for k, v in (("n", n), ("right", right), ("left", left)) if v is not None})
+    return {"title": t[1].format(**ctx), "body": t[2].format(**ctx), "count": 0, "url": "./#/admin/test" if tpl.startswith("f") else "./#/", "tpl": tpl}

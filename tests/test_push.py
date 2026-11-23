@@ -225,3 +225,32 @@ def test_mogambo_when_the_remem_test_is_finished(pushing):
         assert c.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": pick, "rt_ms": 4000, "idem_key": f"remem-test-{q['question_id']}"}, headers=h).status_code == 200
     done = [p for _, p in c.sent if p.get("tpl") == "fd1"]
     assert len(done) == 1 and done[0]["body"].startswith(f"You remembered {right} of {total}")
+
+
+def test_owner_sends_messages_to_self_and_sees_reminder_words(pushing):
+    c = pushing
+    _due_student(c)
+    from backend import auth
+    with db.session() as conn:
+        auth.create_user(conn, "boss", "boss-pass-12", "admin")
+    ha = login(c, "boss", "boss-pass-12", consent=False)
+    cat = c.get("/api/admin/notify-catalog", headers=ha).json()
+    assert cat["reminders_on"] is False and len(cat["messages"]) >= 40 and all("{" not in m["title"] + m["body"] for m in cat["messages"])
+    assert c.post("/api/admin/notify-self", json={"tpl": "bw1"}, headers=ha).status_code == 404            # no phone yet
+    assert c.post("/api/push/subscribe", json={"endpoint": FCM + "-boss", "keys": _client_keys()}, headers=ha).status_code == 200   # the owner can turn reminders on
+    r = c.post("/api/admin/notify-self", json={"tpl": "fd1", "n": 15, "right": 11}, headers=ha).json()
+    assert r["sent"] == 1 and c.sent[-1][0] == FCM + "-boss" and c.sent[-1][1]["body"].startswith("You remembered 11 of 15")
+    assert c.post("/api/admin/notify-self", json={"tpl": "zz9"}, headers=ha).status_code == 404
+    hs = login(c, "p02", "pw-for-p02!")
+    assert c.post("/api/admin/notify-self", json={"tpl": "bw1"}, headers=hs).status_code == 403            # students cannot
+    assert push.run_once(_at(c.clock["t"] + 10 * config.MS_PER_DAY, 10))                                # p01 gets a daily reminder
+    with db.session() as conn:
+        uid = conn.execute("SELECT user_id FROM users WHERE username='p01'").fetchone()[0]
+        conn.execute("INSERT INTO reminders(user_id,ts,n_due,kind,sent,failed,detail) VALUES (?,?,?,?,?,?,?)", (uid, 1, 3, "due", 1, 0, "tpl:bw2"))   # an older row: no words kept
+    rems = c.get(f"/api/admin/person/{uid}", headers=ha).json()["reminders"]
+    newest = [x for x in rems if x["kind"] == "due" and x["exact"]]
+    assert newest and newest[0]["title"] and "{" not in newest[0]["body"]
+    old = [x for x in rems if x["ts"] == 1][0]
+    assert not old["exact"] and old["title"].startswith("Ghajini mat bano") and "[concept]" in old["body"]
+    with db.session() as conn:                                                                       # owner messages never reach pilot numbers
+        assert conn.execute("SELECT COUNT(*) FROM reminders WHERE kind='owner'").fetchone()[0] == 1

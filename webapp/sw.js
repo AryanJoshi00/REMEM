@@ -1,5 +1,5 @@
 /* Remem service worker: cache the app shell; cache-fallback for the due list and concept list. */
-const SHELL = "remem-shell-v32";
+const SHELL = "remem-shell-v33";
 const API = "remem-api";
 const FILES = ["./", "index.html", "theme.js", "app.js", "styles.css", "manifest.json", "icon-192.png", "icon-512.png", "icon.svg", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-32.png"];
 

@@ -629,12 +629,12 @@ def flag_question(body: FlagIn, user=Depends(auth.consented_user)):
 
 # ----------------------------------------------------------------------------- reminders (web push)
 @api.get("/push/key")
-def push_key(user=Depends(auth.consented_user)):
+def push_key(user=Depends(auth.consented_or_admin)):
     return {"enabled": push.enabled(), "public_key": config.VAPID_PUBLIC_KEY if push.enabled() else None}
 
 
 @api.post("/push/subscribe")
-def push_subscribe(body: PushSubIn, user=Depends(auth.consented_user)):
+def push_subscribe(body: PushSubIn, user=Depends(auth.consented_or_admin)):
     if not push.enabled():
         raise HTTPException(503, "Reminders aren't switched on for this server yet.")
     if not push.endpoint_ok(body.endpoint):
@@ -657,7 +657,7 @@ def push_unsubscribe(body: PushEndIn, user=Depends(auth.current_user)):
 
 
 @api.post("/push/test")
-def push_test(user=Depends(auth.consented_user)):
+def push_test(user=Depends(auth.consented_or_admin)):
     """Send one sample reminder to this account's devices right away, so the person sees what it looks like."""
     if not push.enabled():
         raise HTTPException(503, "Reminders aren't switched on for this server yet.")
