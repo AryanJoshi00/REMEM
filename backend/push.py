@@ -143,6 +143,24 @@ def announce_final(now: int | None = None, path=None) -> list[dict]:
     return out
 
 
+def announce_finished(uid: int, right: int, total: int, now: int | None = None, path=None) -> dict | None:
+    """Straight after someone's last Remem Test answer: "Mogambo khush hua!" with their score (they have just seen it)."""
+    now = now or int(time.time() * 1000)
+    if not enabled():
+        return None
+    with db.session(path) as conn:
+        if conn.execute("SELECT 1 FROM reminders WHERE user_id=? AND kind='done' AND sent>0", (uid,)).fetchone():
+            return None
+        subs = [dict(r) for r in conn.execute("SELECT * FROM push_subs WHERE user_id=?", (uid,))]
+        payload = nudges.final_done(_name(conn, uid), right, total)
+    if not subs:
+        return None
+    results = deliver(subs, payload)
+    with db.session(path) as conn:
+        sent, failed = record(conn, uid, subs, results, payload, "done", now)
+    return {"user_id": uid, "sent": sent, "failed": failed}
+
+
 def run_once(now: int | None = None, path=None) -> list[dict]:
     """One round of the reminder rule. Returns what was sent (for logs and tests)."""
     now = now or int(time.time() * 1000)

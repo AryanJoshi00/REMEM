@@ -196,11 +196,32 @@ def test_remem_test_launch_and_daily_nudge(pushing):
 
 def test_final_copy_fills_and_fits():
     from backend import nudges
-    for pool in (nudges.FINAL_LAUNCH, nudges.FINAL_LEFT, nudges.FINAL_NOT_STARTED):
-        for _, t, b in pool:
-            tt, bb = t.format(name="Rudra", n=15, left=6), b.format(name="Rudra", n=15, left=6)
-            assert "{" not in tt + bb and len(tt) <= 50 and len(bb) <= 120
-    assert nudges.final_reminder("JATIN GUPTA", 5, 3, 24, 10)["tpl"].startswith("fr")       # part-way through: "N left" lines
-    assert nudges.final_reminder("JATIN GUPTA", 5, 3, 24, 0)["tpl"].startswith("fn")        # not started yet
-    a = nudges.final_reminder(None, 5, 3, 24, 10)["tpl"]
-    assert nudges.final_reminder(None, 5, 3, 24, 10, last_id=a)["tpl"] != a                 # not the same line two days running
+    for _, t, b in (nudges.FINAL_LAUNCH, nudges.FINAL_NOT_STARTED, nudges.FINAL_LEFT, nudges.FINAL_DONE):
+        tt, bb = t.format(name="Rudra", n=15, left=6, right=12), b.format(name="Rudra", n=15, left=6, right=12)
+        assert "{" not in tt + bb and len(tt) <= 50 and len(bb) <= 120
+    assert nudges.final_launch(None, 5, 24)["title"].startswith("Kaabil bano")
+    assert nudges.final_reminder("JATIN GUPTA", 5, 3, 24, 0)["title"] == "Jatin, the Remem Test is still waiting 👀"   # not started
+    assert nudges.final_reminder("JATIN GUPTA", 5, 3, 24, 10)["body"].startswith("14 Remem Test questions left")       # part-way
+    assert nudges.final_done("Rudra", 12, 15)["body"].startswith("You remembered 12 of 15")
+
+
+def test_mogambo_when_the_remem_test_is_finished(pushing):
+    c = pushing
+    h, _ = _due_student(c)
+    from backend import auth
+    with db.session() as conn:
+        auth.create_user(conn, "boss", "boss-pass-12", "admin")
+    ha = login(c, "boss", "boss-pass-12", consent=False)
+    c.post("/api/admin/final-test", json={"open": True}, headers=ha)
+    right = total = 0
+    while True:
+        q = c.get("/api/final/next", headers=h).json()
+        if q["done"]:
+            break
+        with db.session() as conn:
+            ok = conn.execute("SELECT correct_idx FROM questions WHERE question_id=?", (q["question_id"],)).fetchone()[0]
+        pick = ok if total % 2 == 0 else (ok + 1) % 4                                # half right
+        right += pick == ok; total += 1
+        assert c.post("/api/respond", json={"question_id": q["question_id"], "chosen_index": pick, "rt_ms": 4000, "idem_key": f"remem-test-{q['question_id']}"}, headers=h).status_code == 200
+    done = [p for _, p in c.sent if p.get("tpl") == "fd1"]
+    assert len(done) == 1 and done[0]["body"].startswith(f"You remembered {right} of {total}")

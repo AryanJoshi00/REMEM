@@ -523,7 +523,7 @@ def next_question(concept: int, final: int = 0, user=Depends(auth.consented_user
 
 
 @api.post("/respond")
-def respond(body: RespondIn, user=Depends(auth.consented_user)):
+def respond(body: RespondIn, tasks: BackgroundTasks, user=Depends(auth.consented_user)):
     models, ts = get_models(), now_ms()
     with db.session() as conn:
         # The key is stored with the user id in front, so two users can never collide (older rows hold the bare key).
@@ -553,6 +553,7 @@ def respond(body: RespondIn, user=Depends(auth.consented_user)):
             if st["total"] and st["answered"] == st["total"] and not conn.execute(
                     "SELECT 1 FROM audit WHERE user_id=? AND event='remem_test_finished'", (user["user_id"],)).fetchone():
                 db.audit(conn, "remem_test_finished", user["user_id"], ts=ts)     # stays finished even if a new topic adds questions later
+                tasks.add_task(push.announce_finished, user["user_id"], st["right"], st["total"])   # "Mogambo khush hua!", after the reply
             return result
         run = sitting_question_ids(conn, user["user_id"], cid, ts)
         if q["question_id"] in run:                                           # e.g. a second tab: one answer per question per sitting

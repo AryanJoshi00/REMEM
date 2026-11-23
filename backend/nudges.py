@@ -148,47 +148,30 @@ def build(conn, uid: int, now: int, n: int) -> dict:
     return {"title": title, "body": body, "count": n, "url": "./#/", "tpl": tid}
 
 
-# ---- the Remem Test (the pilot's final test): one launch message when the owner opens it, then a daily nudge until done.
-# {name} first name · {n} questions in the test · {left} still to answer
-FINAL_LAUNCH = [
-    ("fl1", "🎬 Picture abhi baaki hai… The Remem Test is LIVE", "{name}, {n} questions. The grand finale. Show the forgetting curve who's boss."),
-    ("fl2", "Lagaan maaf karwana hai? 🏏", "Toh Remem Test jeetna padega. {n} questions, one innings."),
-    ("fl3", "Sattar minute… 🏑", "Nahi, bas {n} questions. The Remem Test is open. Chak de!"),
-    ("fl4", "Mogambo khush hua? 😈", "Only if you ace the Remem Test. {n} questions are waiting for you."),
-    ("fl5", "📢 Breaking: the Remem Test has dropped", "{n} questions. No notes, no Ghajini tattoos. Sab yaad hai na?"),
-    ("fl6", "Final boss unlocked 🎮", "The Remem Test is open: {n} questions on everything you studied. Best of luck, {name}!"),
-]
-FINAL_LEFT = [
-    ("fr1", "{left} questions baaki hain 🏁", "Remem Test adhoora hai. Finish line dikh rahi hai, {name}."),
-    ("fr2", "Mogambo abhi khush nahi hua 😤", "{left} Remem Test questions to go. Khush kar do."),
-    ("fr3", "Interval khatam, picture shuru 🍿", "Your Remem Test is waiting. {left} questions to the climax."),
-    ("fr4", "Last over, {left} balls left 🏏", "Remem Test finish karo, match jeeto."),
-    ("fr5", "Picture abhi baaki hai mere dost 🎬", "{left} Remem Test questions. The ending is the best part."),
-]
-FINAL_NOT_STARTED = [
-    ("fn1", "Exam hall mein aapka swagat hai 📝", "The Remem Test is open and your {n} questions haven't started. 10 minutes, tops."),
-    ("fn2", "Kaabil bano… 🎓", "…kaamyaabi jhak maarke peeche aayegi. Pehle Remem Test: {n} questions."),
-    ("fn3", "{name}, the Remem Test is still waiting 👀", "{n} questions. It's the last thing I need from you. Promise. 🙏"),
-]
+# ---- the Remem Test (the pilot's final test). Four messages, kept simple so people know what each one means:
+#   day it opens        "Kaabil bano…"                          (launch, once per person)
+#   later, not started  "{name}, the Remem Test is still waiting"
+#   later, part-way     "Picture abhi baaki hai mere dost"
+#   when they finish    "Mogambo khush hua!" with their score   (once, straight after the last answer)
+# {name} first name · {n} questions in the test · {left} still to answer · {right} answered correctly
+FINAL_LAUNCH = ("fl1", "Kaabil bano… 🎓", "…kaamyaabi jhak maarke peeche aayegi. Pehle Remem Test: {n} questions.")
+FINAL_NOT_STARTED = ("fn1", "{name}, the Remem Test is still waiting 👀", "{n} questions. It's the last thing I need from you. Promise. 🙏")
+FINAL_LEFT = ("fr1", "Picture abhi baaki hai mere dost 🎬", "{left} Remem Test questions left. The ending is the best part.")
+FINAL_DONE = ("fd1", "Mogambo khush hua! 😄", "You remembered {right} of {n}. Thank you so much for being part of this. 🙏")
 
 
-def _rotate(pool, uid: int, day: int, last_id: str | None = None):
-    start = int(hashlib.sha1(f"final:{uid}".encode()).hexdigest(), 16) + day
-    for k in range(len(pool)):
-        t = pool[(start + k) % len(pool)]
-        if t[0] != last_id or len(pool) == 1:
-            return t
-    return pool[0]
+def _fill(t, ctx: dict, count: int, url: str) -> dict:
+    return {"title": t[1].format(**ctx), "body": t[2].format(**ctx), "count": count, "url": url, "tpl": t[0]}
 
 
 def final_launch(name: str | None, uid: int, n: int) -> dict:
-    tid, title, body = _rotate(FINAL_LAUNCH, uid, 0)
-    ctx = {"name": _first_name(name), "n": n}
-    return {"title": title.format(**ctx), "body": body.format(**ctx), "count": n, "url": "./#/final", "tpl": tid}
+    return _fill(FINAL_LAUNCH, {"name": _first_name(name), "n": n}, n, "./#/final")
 
 
 def final_reminder(name: str | None, uid: int, day: int, total: int, answered: int, last_id: str | None = None) -> dict:
-    pool = FINAL_LEFT if answered else FINAL_NOT_STARTED
-    tid, title, body = _rotate(pool, uid, day, last_id)
     ctx = {"name": _first_name(name), "n": total, "left": total - answered}
-    return {"title": title.format(**ctx), "body": body.format(**ctx), "count": total - answered, "url": "./#/final", "tpl": tid}
+    return _fill(FINAL_LEFT if answered else FINAL_NOT_STARTED, ctx, total - answered, "./#/final")
+
+
+def final_done(name: str | None, right: int, total: int) -> dict:
+    return _fill(FINAL_DONE, {"name": _first_name(name), "n": total, "right": right}, 0, "./#/")
