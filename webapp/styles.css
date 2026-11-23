@@ -462,8 +462,9 @@ html.theme-fade, html.theme-fade *:not(.theme-switch):not(.theme-switch *) {
 
 /* ---- launch screen. On an installed Android app, Chrome first shows its own splash (cream, the full logo at 56% of the
    screen width, centred), so this one starts exactly where that ends: same colour, size and place, logo already there.
-   Full story (first open of the day): the strokes dim, bright white fills up the stem and splits into the branch, the dot
-   lights up and ripples, "remem" appears, then the app fades in. Short (later that day): one dot pulse. Still: no motion.
+   Full story (opened after more than 5 minutes off screen): the strokes dim, bright white fills up the stem and splits into
+   the branch, the dot lights up and ripples, "remem" appears, then the app fades in. Short (back within 5 minutes): one dot
+   pulse. Still: no motion.
    In a browser tab (no system splash first) the tile also makes a small entrance. */
 #splash { position: fixed; inset: 0; z-index: 1000; display: none; place-items: center; background: #f7f6f2;
   animation: sp-failsafe 0s linear 3s forwards; }                                   /* belt and braces: never stays up */

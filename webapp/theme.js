@@ -33,16 +33,20 @@
   window.remTheme = { saved: saved, effective: effective, set: set, clear: clear, phone: mq };
 
   /* Launch screen: the logo draws itself (stem up, the branch splitting off, the dot lighting up), then hands over to the app.
-     Full story on the first open of the day, a short dot pulse after that, a still logo with reduced motion. It never holds
-     the app back: the app loads underneath, a tap skips it, and CSS hides it on its own if this script never finishes. */
-  var DAY_KEY = "remem_splash_day", t0 = Date.now();
+     Full story when the app opens after more than 5 minutes off screen, a short dot pulse when it comes back sooner, a still
+     logo with reduced motion. It never holds the app back: the app loads underneath, a tap skips it, and CSS hides it on its
+     own if this script never finishes. */
+  var SEEN_KEY = "remem_last_seen", GAP_MS = 5 * 60 * 1000, t0 = Date.now();
   var mode = "full";
   try {
-    var today = new Date().toDateString();
+    var last = Number(localStorage.getItem(SEEN_KEY) || 0);
     if (still && still.matches) mode = "still";
-    else if (localStorage.getItem(DAY_KEY) === today) mode = "short";
-    localStorage.setItem(DAY_KEY, today);
+    else if (last && t0 - last < GAP_MS) mode = "short";
+    localStorage.setItem(SEEN_KEY, String(t0));
   } catch (e) { mode = still && still.matches ? "still" : "short"; }
+  function seenNow() { try { localStorage.setItem(SEEN_KEY, String(Date.now())); } catch (e) {} }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") seenNow(); });   // the gap counts from the last time Remem was on screen
+  window.addEventListener("pagehide", seenNow);
   var standalone = window.matchMedia && (matchMedia("(display-mode: standalone)").matches || navigator.standalone === true);
   root.classList.add("sp-" + mode, standalone ? "sp-app" : "sp-tab");     // a browser tab has no system splash before ours
   var darkTab = !standalone && effective() === "dark";                     // no system splash to match in a tab: follow the theme, no bright flash
