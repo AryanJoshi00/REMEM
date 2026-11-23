@@ -21,7 +21,8 @@ from backend import auth, config, db, engine, fallback, llm, topics
 DEMO_USER = "demo"
 DAY_MS = config.MS_PER_DAY
 # (days ago the first quiz was, correctness of the review answers given since). An empty list: only the first quiz so far.
-HISTORY = [
+HISTORY = [                                                     # the two oldest leave concepts due at seed time, so Today opens on a test
+    (12.0, []), (10.0, [True]),
     (7.0, [True, True]), (6.0, [True]), (5.0, [False, True]), (4.0, []), (3.0, [True]), (2.0, []),
 ]
 LEAVE_NEW = {"korean_hangul": 5, "photography_basics": 5, "central_asia": 5, "cognitive_biases": 5, "how_gps_works": 6, "nutrition_labels": 5}     # concepts from this position on stay new, so the demo also shows first quizzes
@@ -81,12 +82,12 @@ def seed(conn, password: str | None = None, reset: bool = False, now_ms: int | N
         if not concepts:
             raise RuntimeError(f"no valid fallback bank for topic {t['id']}")
         nid = conn.execute("INSERT INTO notes(user_id,title,text,status,created_at,topic_id) VALUES (?,?,?,?,?,?)",
-                           (uid, t["title"], t["text"], "done", now - 8 * DAY_MS, t["id"])).lastrowid
+                           (uid, t["title"], t["text"], "done", now - 13 * DAY_MS, t["id"])).lastrowid
         for pos, c in enumerate(concepts):
             cid = conn.execute("INSERT INTO concepts(user_id,note_id,name,source_span,arm,created_at) VALUES (?,?,?,?,?,?)",
-                               (uid, nid, c.name, c.source_span, "remem", now - 8 * DAY_MS)).lastrowid
+                               (uid, nid, c.name, c.source_span, "remem", now - 13 * DAY_MS)).lastrowid
             qids = [conn.execute("INSERT INTO questions(concept_id,variant_no,stem,options_json,correct_idx,is_final_test,level,created_at) VALUES (?,?,?,?,?,?,?,?)",
-                                 (cid, i, q.stem, json.dumps(q.options), q.correct_index, final, level, now - 8 * DAY_MS)).lastrowid
+                                 (cid, i, q.stem, json.dumps(q.options), q.correct_index, final, level, now - 13 * DAY_MS)).lastrowid
                     for i, (q, (final, level)) in enumerate(zip(c.questions, llm.layout(len(c.questions))), start=1)]
             n_concepts += 1
             if pos >= LEAVE_NEW.get(t["id"], 10 ** 9):

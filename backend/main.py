@@ -250,9 +250,9 @@ def run_generation(note_id: int) -> None:
 
 def _create_note(conn, user, title: str, text: str, topic_id: str | None = None) -> int:
     ts = now_ms()
-    n = conn.execute("SELECT COUNT(*) FROM notes WHERE user_id=? AND created_at>?", (user["user_id"], ts - config.MS_PER_DAY)).fetchone()[0]
+    n = conn.execute("SELECT COUNT(*) FROM notes WHERE user_id=? AND created_at>? AND status!='failed'", (user["user_id"], ts - config.MS_PER_DAY)).fetchone()[0]   # a failed attempt does not use up the day
     if n >= config.NOTES_PER_DAY:
-        raise HTTPException(429, f"Daily note limit ({config.NOTES_PER_DAY}) reached")
+        raise HTTPException(429, f"You can add {config.NOTES_PER_DAY} topics a day. Try again tomorrow.")
     return conn.execute("INSERT INTO notes(user_id,title,text,status,created_at,topic_id) VALUES (?,?,?,?,?,?)",
                         (user["user_id"], title.strip(), text[:config.MAX_NOTE_CHARS], "pending", ts, topic_id)).lastrowid
 
@@ -477,9 +477,11 @@ def concepts_list(user=Depends(auth.consented_user)):
     with db.session() as conn:
         concepts = conn.execute("SELECT * FROM concepts WHERE user_id=? ORDER BY concept_id", (user["user_id"],)).fetchall()
         states = {r["concept_id"]: r for r in conn.execute("SELECT * FROM state WHERE user_id=?", (user["user_id"],))}
+        titles = {r["note_id"]: r["title"] for r in conn.execute("SELECT note_id, title FROM notes WHERE user_id=?", (user["user_id"],))}
     out = []
     for c in concepts:
         d = concept_status(models, c, states.get(c["concept_id"]), now, config.THETA)
+        d["topic"] = (titles.get(c["note_id"]) or "").split(":")[0]           # display only: the Concepts screen groups by topic
         if user["role"] == "admin":
             d["arm"] = c["arm"]
         out.append(d)

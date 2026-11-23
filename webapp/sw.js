@@ -1,5 +1,5 @@
 /* Remem service worker: cache the app shell; cache-fallback for the due list and concept list. */
-const SHELL = "remem-shell-v36";
+const SHELL = "remem-shell-v38";
 const API = "remem-api";
 const FILES = ["./", "index.html", "theme.js", "app.js", "styles.css", "manifest.json", "icon-192.png", "icon-512.png", "icon.svg", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-32.png"];
 
@@ -26,7 +26,8 @@ self.addEventListener("push", e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (x) { d = { body: e.data ? e.data.text() : "" }; }
   const n = Number(d.count) || 0;
-  const badge = n > 0 && self.navigator.setAppBadge ? self.navigator.setAppBadge(n).catch(() => {}) : Promise.resolve();
+  const forRememTest = /final/.test(d.url || "");                           // its count is Remem Test questions: the icon number stays "questions in today's test"
+  const badge = n > 0 && !forRememTest && self.navigator.setAppBadge ? self.navigator.setAppBadge(n).catch(() => {}) : Promise.resolve();
   e.waitUntil(Promise.all([badge, self.registration.showNotification(d.title || "Time to review", {
     body: d.body || "Some concepts are ready to review.", icon: "icon-192.png", badge: "icon-192.png",
     tag: "remem-due", renotify: true, data: { url: d.url || "./#/" },

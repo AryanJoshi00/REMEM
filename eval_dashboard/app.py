@@ -226,6 +226,18 @@ flash = st.session_state.pop("flash", None)
 
 
 # ------------------------------------------------------------------ pilot
+@st.dialog("Open the Remem Test?")
+def open_test_dialog(server: Server) -> None:
+    st.write("Everyone who has studied a topic can take it from now on, and everyone with reminders on gets a notification "
+             "right away. Do this once, near the end of the pilot.")
+    a, b = st.columns(2)
+    if a.button("Open it", type="primary", use_container_width=True):
+        server.set_final(True)
+        st.rerun()
+    if b.button("Cancel", use_container_width=True):
+        st.rerun()
+
+
 @st.dialog("Reset test data")
 def reset_dialog(server: Server) -> None:
     st.markdown(f'<span style="color:{RED};font-weight:700">Proceed with caution. This cannot be undone.</span>', unsafe_allow_html=True)
@@ -303,7 +315,8 @@ def page_pilot() -> None:
         c[3].metric("Answers in total", f"{int(stu['n_answers'].sum()):,}")
         c[4].metric("Overdue now", f"{adh['overdue']} of {adh['tracked']}" if adh["tracked"] else "0")
         if adh["tracked"]:
-            note(f"{adh['overdue']} of {adh['tracked']} scheduled concepts are overdue right now; the median overdue concept is {adh['median_days_late']:.1f} days late.")
+            note(f"{adh['overdue']} of {adh['tracked']} scheduled concepts are overdue right now; the median overdue concept is {adh['median_days_late']:.1f} days late."
+                 if adh['overdue'] else f"None of the {adh['tracked']} scheduled concepts is overdue right now.")
 
         # ---- results: what an examiner reads
         separator("Results")
@@ -380,8 +393,8 @@ def page_pilot() -> None:
                              column_config={"username": "Account", "full_name": "Name", "contact": "Contact", "age": "Age", "known_topics": "Already know well"})
                 st.download_button("Download as CSV", prof.to_csv(index=False).encode("utf-8"), "participants.csv", "text/csv")
 
-        st.header("Final check", anchor=False)
-        note("One reserved question per concept, answered without feedback near the end of the pilot. Students only see it while it is open.")
+        st.header("Remem Test", anchor=False)
+        note("Three reserved questions per concept, shuffled and answered without feedback near the end of the pilot. Students only see it while it is open.")
         if srv is None:
             note(f"Currently {'open' if pilot.final_test_open(conn) else 'closed'} (as of the last data copy). Connect to the server to change it.")
         else:
@@ -393,14 +406,17 @@ def page_pilot() -> None:
             if is_open is not None:
                 cols = st.columns([3, 1.4], vertical_alignment="center")
                 state = "open" if is_open else "closed"
-                cols[0].markdown(f'The final check is <span class="pill {state}">{state}</span>.', unsafe_allow_html=True)
-                if cols[1].button("Close the final check" if is_open else "Open the final check", use_container_width=True):
-                    srv.set_final(not is_open)
-                    st.rerun()
+                cols[0].markdown(f'The Remem Test is <span class="pill {state}">{state}</span>.', unsafe_allow_html=True)
+                if cols[1].button("Close the Remem Test" if is_open else "Open the Remem Test...", use_container_width=True):
+                    if is_open:                                                   # closing notifies nobody
+                        srv.set_final(False)
+                        st.rerun()
+                    else:
+                        open_test_dialog(srv)                                     # opening notifies everyone: ask first
 
         st.header("Reset test data", anchor=False)                                     # shown whether or not the dashboard is connected
         with st.container(border=True, key="danger"):
-            note("Use this after you have tried the app with an account and want a clean start. It deletes learning data only; accounts and passwords stay.")
+            note("Use this after you have tried the app with an account and want a clean start. It deletes learning data only; accounts, passwords and the Remem Test switch (open or closed, for everyone) stay as they are.")
             if srv is None:
                 note("Connect to the server to use this.")
             elif st.button("Reset test data...", key="open_reset"):
@@ -750,7 +766,7 @@ def findings_rows() -> list[dict]:
                      "What we found": f"The deployed starter curve recommends a median gap of {j['median_recommended_gap_at_0.85']:.0f} days; near those gaps its predicted chance of a correct answer is off by {j['near_ece']:.2f} (limit 0.05).",
                      "Verdict": "Not supported on EdNet" if j["verdict"] == "unreliable" else "Supported", "Why not stronger": "EdNet is English test practice, not study notes; the pilot measures this on real study material.", "Details": "EdNet results"})
     rows.append({"Question": "Pilot: is predicted recall calibrated on real study material, and how do the three schedulers compare?",
-                 "What we found": "Collecting data now (about 14 days, up to 10 people). Calibration comes first; the arm comparison and the delayed test are descriptive only.",
+                 "What we found": "Collecting data now (about 14 days, up to 10 people). Calibration comes first; the arm comparison and the Remem Test (the delayed test) are descriptive only.",
                  "Verdict": "Pending", "Why not stronger": "Too few people for significance tests by design.", "Details": "Pilot"})
     return rows
 

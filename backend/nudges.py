@@ -27,11 +27,10 @@ T = {
         ("cb5", "💔 {concept} left you on seen", "{away} din se reply nahi kiya. {n} questions mein patch-up ho jayega."),
         ("cb6", "Picture abhi baaki hai mere dost 🎬", "{topic}: The Comeback. {n} questions, now streaming."),
     ],
-    "streak": [
-        ("st1", "{streak}-day streak 🔥 Don't drop it", "{n} questions stand between you and day {next}."),
-        ("st2", "Streak status: still sizzling 🍳", "Day {next} is waiting. {topic} is on the menu."),
-        ("st3", "{streak} din ka streak 🔥 Nazar na lage", "{n} questions karo, streak zinda rakho."),
-        ("st4", "Main apni favourite hoon 💁", "{streak} din se tum bhi ho. {n} questions for day {next}."),
+    "streak": [                          # studied on recent days: a warm hello, no streak to keep or lose (the app shows none)
+        ("ro1", "Back again, {name}? Love that 😄", "{n} questions on {topic} are ready."),
+        ("ro2", "Same time, same brain 🧠", "{n} questions on {concept}. You know the drill."),
+        ("ro3", "Roz ka kaam, roz ✅", "{n} questions karo, {topic} fresh rahega."),
     ],
     "one": [
         ("on1", "Just 1 question. Literally one ☝️", "Faster than replying 'ok' on WhatsApp. It's on {concept}."),
@@ -46,7 +45,7 @@ T = {
     ],
     "normal": [
         ("bw1", "Kitne topics the? …2? 😅", "Pappi bhai mat bano. {n} questions on {topic}."),
-        ("bw2", "Ghajini mat bano 🧠", "REMEM hai na. {n} questions on {concept}, aur yaad pakka."),
+        ("bw2", "Ghajini mat bano 🧠", "Remem hai na. {n} questions on {concept}, aur yaad pakka."),
         ("bw3", "All is well? {topic} isn't 🫠", "{n} questions karo, phir sach mein all is well."),
         ("bw4", "Memory ko jaadu ki jhappi do 🤗", "{n} questions on {concept}. Tension nahi lene ka."),
         ("bw5", "{concept} bhoolna mushkil hi nahi… 😎", "…namumkin hai. Bas {n} questions kar lo."),
@@ -104,12 +103,12 @@ def context(conn, uid: int, now: int, n: int) -> dict:
 
 
 def situation(ctx: dict) -> str:
+    if ctx["n"] == 1:                     # first: every other situation's lines are written for several questions
+        return "one"
     if ctx["away"] >= COMEBACK_AFTER:
         return "comeback"
     if ctx["streak"] >= 2:
         return "streak"
-    if ctx["n"] == 1:
-        return "one"
     if ctx["n"] >= PILE_AT:
         return "pile"
     return "normal"
@@ -156,8 +155,9 @@ def build(conn, uid: int, now: int, n: int) -> dict:
 #   when they finish    "Mogambo khush hua!" with their score   (once, straight after the last answer)
 # {name} first name · {n} questions in the test · {left} still to answer · {right} answered correctly
 FINAL_LAUNCH = ("fl1", "Kaabil bano… 🎓", "…kaamyaabi jhak maarke peeche aayegi. Pehle Remem Test: {n} questions.")
-FINAL_NOT_STARTED = ("fn1", "{name}, the Remem Test is still waiting 👀", "{n} questions. It's the last thing I need from you. Promise. 🙏")
+FINAL_NOT_STARTED = ("fn1", "{name}, the Remem Test is still waiting 👀", "{n} questions. It's the last step of the study. Promise. 🙏")
 FINAL_LEFT = ("fr1", "Picture abhi baaki hai mere dost 🎬", "{left} Remem Test questions left. The ending is the best part.")
+FINAL_LEFT_ONE = (FINAL_LEFT[0], FINAL_LEFT[1], "1 Remem Test question left. The ending is the best part.")   # same line, singular
 FINAL_DONE = ("fd1", "Mogambo khush hua! 😄", "You remembered {right} of {n}. Thank you so much for being part of this. 🙏")
 
 
@@ -171,7 +171,8 @@ def final_launch(name: str | None, uid: int, n: int) -> dict:
 
 def final_reminder(name: str | None, uid: int, day: int, total: int, answered: int, last_id: str | None = None) -> dict:
     ctx = {"name": _first_name(name), "n": total, "left": total - answered}
-    return _fill(FINAL_LEFT if answered else FINAL_NOT_STARTED, ctx, total - answered, "./#/final")
+    t = (FINAL_LEFT_ONE if total - answered == 1 else FINAL_LEFT) if answered else FINAL_NOT_STARTED
+    return _fill(t, ctx, total - answered, "./#/final")
 
 
 def final_done(name: str | None, right: int, total: int) -> dict:
@@ -179,7 +180,7 @@ def final_done(name: str | None, right: int, total: int) -> dict:
 
 
 # ---- every message in one list, for the owner's "send to me" screen and for showing older reminders' wording
-GROUPS = {"comeback": "Coming back after 3+ days", "streak": "On a streak", "one": "Just one question due",
+GROUPS = {"comeback": "Coming back after 3+ days", "streak": "Studied on recent days", "one": "Just one question due",
           "pile": "A big backlog (12+)", "normal": "A normal day"}
 SAMPLE = {"n": 4, "concept": "Confirmation bias", "topic": "Cognitive Biases", "streak": 3, "next": 4, "away": 4, "left": 6, "right": 12}
 
@@ -198,9 +199,18 @@ def catalog(name: str | None = None) -> list[dict]:
     return out
 
 
+# Lines no longer sent, kept so the owner's history of reminders already sent still shows their words.
+RETIRED = [
+    ("st1", "{streak}-day streak 🔥 Don't drop it", "{n} questions stand between you and day {next}."),
+    ("st2", "Streak status: still sizzling 🍳", "Day {next} is waiting. {topic} is on the menu."),
+    ("st3", "{streak} din ka streak 🔥 Nazar na lage", "{n} questions karo, streak zinda rakho."),
+    ("st4", "Main apni favourite hoon 💁", "{streak} din se tum bhi ho. {n} questions for day {next}."),
+]
+
+
 def template(tpl: str):
     """(title, body) of a template id with its placeholders shown as [concept], [topic] and so on, or None."""
-    for t in [x for pool in T.values() for x in pool] + [FINAL_LAUNCH, FINAL_NOT_STARTED, FINAL_LEFT, FINAL_DONE]:
+    for t in [x for pool in T.values() for x in pool] + RETIRED + [FINAL_LAUNCH, FINAL_NOT_STARTED, FINAL_LEFT, FINAL_DONE]:
         if t[0] == tpl:
             return re.sub(r"\{(\w+)\}", r"[\1]", t[1]), re.sub(r"\{(\w+)\}", r"[\1]", t[2])
     return None

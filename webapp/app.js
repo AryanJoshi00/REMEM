@@ -69,7 +69,7 @@ async function api(path, opts = {}) {
   const headers = { "Content-Type": "application/json" };
   if (S.token) headers.Authorization = "Bearer " + S.token;
   const r = await fetch("api" + path, { method: opts.method || "GET", headers, body: opts.body ? JSON.stringify(opts.body) : undefined });
-  if (r.status === 401 && S.token) { signOut(false); throw new Error("Please sign in again."); }
+  if (r.status === 401 && S.token && path !== "/auth/password") { signOut(false); throw new Error("Please sign in again."); }   // a mistyped current password is not an expired session
   if (r.status === 403 && S.token && S.role !== "admin" && !/^#\/(about|consent)$/.test(location.hash)) {   // signed in but the intro form or consent is not done
     const d = await r.clone().json().catch(() => ({}));                     // (e.g. after going back from the consent screen):
     if (d.detail === "Consent required") { store.del("remem_consented"); location.replace("#/about"); const e = new Error("Finish signing up first."); e.status = 403; throw e; }
@@ -77,7 +77,7 @@ async function api(path, opts = {}) {
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
     const d = data.detail;                                                   // a 422 sends a list of problems; show the first one in words
-    const msg = Array.isArray(d) ? fieldProblem(d[0]) : d;
+    const msg = (Array.isArray(d) ? fieldProblem(d[0]) : typeof d === "string" ? d : "").replace(/([^.!?])$/, "$1.");   // every message ends like a sentence
     const err = new Error(msg || ("Error " + r.status)); err.status = r.status;  // the status lets a not-found screen skip a retry that cannot work
     throw err;
   }
@@ -131,6 +131,11 @@ async function flushQueue() {
 window.addEventListener("online", flushQueue);
 
 const pl = (n, w) => n + " " + w + (Number(n) === 1 ? "" : "s");     // 1 day, 2 days
+const HANGUL = /([ᄀ-ᇿ㄰-㆏가-힯]+(?:[\sᄀ-ᇿ㄰-㆏가-힯]*[ᄀ-ᇿ㄰-㆏가-힯])?)/;
+function ko(text) {                                  // Korean letters inside English text get lang="ko", so screen readers say them in Korean
+  const parts = String(text).split(HANGUL);
+  return parts.length === 1 ? String(text) : parts.map((p, i) => i % 2 ? h("span", { lang: "ko" }, p) : p).filter(p => p !== "");
+}
 // ---------------------------------------------------------------- add to home screen
 let deferredInstall = null;                         // Chrome / Edge / Android: the browser's own install prompt, when it offers one
 window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredInstall = e; });
@@ -286,7 +291,7 @@ function viewInstall() {
   const e = env();
   const back = h("a", { class: "btn block", href: S.token ? "#/" : "#/login" }, S.token ? "Back to today" : "Back to sign in");
   if (e.standalone) return mount(h("h1", {}, "Already on your home screen"), phoneArt(), h("p", { class: "muted" }, "You're using Remem as an app. Nothing more to do."), back);
-  const nodes = [h("h1", {}, "Add Remem to your home screen"), phoneArt(), h("p", {}, "It opens full screen like an app, and the icon shows how many concepts are due.")];
+  const nodes = [h("h1", {}, "Add Remem to your home screen"), phoneArt(), h("p", {}, "It opens full screen like an app, and the icon shows how many questions are waiting.")];
   if (e.inApp) {
     const copy = h("button", { class: "block", onclick: async () => { try { await navigator.clipboard.writeText(location.origin + "/"); toast("Link copied. Paste it in Chrome or Safari."); } catch (x) { toast("Copy the address from the menu instead."); } } }, "Copy the link");
     nodes.push(h("div", { class: "panel" }, h("b", {}, "First, open it in your browser"), h("p", { class: "muted" }, "This page is open inside another app (such as WhatsApp or Instagram), and those can't add to the home screen. Tap the menu or the compass icon and choose Open in browser (Chrome or Safari), or copy the link and paste it there."), copy));
@@ -382,7 +387,7 @@ function viewLogin() {
     } catch (ex) { err.textContent = errText(ex); go.disabled = false; if (!isOffline(ex)) { p.focus(); p.select(); } }
   } }, h("div", {}, h("label", { for: "u" }, "Username"), u), h("div", {}, h("label", { for: "p" }, "Password"), h("div", { class: "pw" }, p, showBtn)), err, go);
   u.id = "u"; p.id = "p";
-  mount(h("h1", {}, "Remember what you study"), h("p", { class: "muted" }, "Remem quizzes you just before you'd forget, so what you study actually stays. Your project owner gives you a username and password."), form,
+  mount(h("h1", {}, "Remember what you study"), h("p", { class: "muted" }, "Remem quizzes you just before you'd forget, so what you study actually stays. You get a username and password when you join the study."), form,
     env().standalone ? null : h("p", {}, h("a", { href: "#/install" }, "Add Remem to your home screen")));
 }
 
@@ -402,7 +407,7 @@ async function viewAbout() {
     e.preventDefault(); err.textContent = "";
     const ok = [mark(name, name.value.trim() ? "" : "Enter your name."),
                 mark(contact, contact.value.trim().length >= 3 ? "" : "Enter an email address or phone number."),
-                mark(age, Number(age.value) >= 10 ? "" : "Enter your age (10 or over).")];
+                mark(age, Number(age.value) >= 10 && Number(age.value) <= 100 ? "" : "Enter your age as a number from 10 to 100.")];
     const bad = [name, contact, age][ok.indexOf(false)];
     if (bad) { bad.focus({ preventScroll: true }); bad.scrollIntoView({ block: "center" }); return; }
     go.disabled = true;
@@ -411,10 +416,10 @@ async function viewAbout() {
       location.replace("#/consent");                                     // the form is done: back skips it
     } catch (ex) { err.textContent = errText(ex); go.disabled = false; }
   } },
-    h("div", { class: "panel" }, "Your details stay with me, Aryan Joshi. They are not shared with anyone and are only for my final-year project (and a follow-up survey if I need one). In results you are just a number, never a name."),
+    h("div", { class: "panel" }, "Your details stay private: only the project owner, Aryan Joshi, can see them. They are not shared with anyone and are used only for this final-year project (and a follow-up survey if one is needed). In results you are just a number, never a name."),
     h("div", {}, h("label", { for: "pn" }, "Name"), name, fe.pn), h("div", {}, h("label", { for: "pc" }, "Email or phone"), contact, fe.pc), h("div", {}, h("label", { for: "pa" }, "Age"), age, fe.pa),
     h("h2", {}, "What do you already know well?"),
-    h("p", { class: "muted" }, "Tick any topic you could already explain in detail. Please be honest: this is not a test, and it keeps my data fair. Tick nothing if none apply."),
+    h("p", { class: "muted" }, "Tick any topic you could already explain in detail. Please be honest: this is not a test, and it keeps the study fair. Tick nothing if none apply."),
     h("div", { class: "checks" }, boxes.map(b => h("label", { class: "check" }, b.box, h("span", {}, h("b", {}, b.t.title), h("span", { class: "muted small" }, " " + b.t.subject))))),
     err, go);
   mount(h("h1", {}, "A quick intro"), h("p", { class: "muted" }, "One short form before you start. It takes about a minute."), form);
@@ -426,7 +431,9 @@ async function viewConsent() {
   const ok = h("button", { class: "primary block", onclick: async () => {
     try { await api("/auth/consent", { method: "POST" }); store.set("remem_consented", "1"); location.replace("#/notes"); } catch (e) { toast(errText(e)); }
   } }, "I agree");
-  mount(h("h1", {}, "Before you start"), h("div", { class: "panel consent" }, CONSENT_TEXT), ok,
+  const [head, ...lines] = CONSENT_TEXT.split("\n").filter(l => l.trim());              // the fixed text, drawn as a heading and a real list
+  mount(h("h1", {}, "Before you start"), h("div", { class: "panel consent" }, h("p", { class: "consent-head" }, head),
+        h("ul", {}, lines.map(l => h("li", {}, l.replace(/^- /, ""))))), ok,
         h("p", {}, h("button", { class: "block", onclick: () => signOut() }, "No thanks, sign out")));
 }
 
@@ -444,22 +451,27 @@ function renderHome(d) {
       h("p", {}, (t.answered ? pl(t.questions, "question") + " left" : pl(t.questions, "question") + " from " + pl(t.concepts, "concept")) + ". " + mins(t.questions)),
       h("a", { class: "btn", href: "#/test" }, t.answered ? "Continue the test" : "Start the test")));
   }
+  const fin = d.final || {};
+  const remOpen = fin.open && fin.remaining > 0;
+  if (remOpen) {                            // the study's last check comes first while it is open (after a test already in progress)
+    const line = "One last check on everything you've studied: " + pl(fin.remaining, "question") + (fin.answered ? " left" : "") + ", no hints. It doesn't change your schedule.";
+    const go = fin.answered ? "Continue the Remem Test" : "Start the Remem Test";
+    if (!hero) { hero = true; nodes.push(h("div", { class: "next" }, h("h2", {}, "The Remem Test is open"), h("p", {}, line), h("a", { class: "btn", href: "#/final" }, go))); }
+    else nodes.push(h("div", { class: "calm" }, h("b", {}, "The Remem Test is open"), h("p", { class: "muted" }, line), h("a", { class: "btn outline block", href: "#/final" }, go)));
+  }
   first.forEach(f => {                      // a topic just read: its first quiz, kept apart from the reviews
     const card = [h("h2", {}, "First quiz: " + f.title), h("p", {}, pl(f.questions, "question") + " on what you just read. " + mins(f.questions))];
-    if (!hero) { hero = true; nodes.push(h("div", { class: "next" }, card, h("a", { class: "btn", href: "#/test?note=" + f.note_id }, "Start the first quiz"))); }
-    else nodes.push(h("div", { class: "calm" }, h("b", {}, "First quiz: " + f.title), h("p", { class: "muted" }, card[1].textContent), h("a", { class: "btn outline block", href: "#/test?note=" + f.note_id }, "Start the first quiz")));
+    const label = "Start the first quiz: " + f.title;
+    if (!hero) { hero = true; nodes.push(h("div", { class: "next" }, card, h("a", { class: "btn", href: "#/test?note=" + f.note_id, "aria-label": label }, "Start the first quiz"))); }
+    else nodes.push(h("div", { class: "calm" }, h("b", {}, "First quiz: " + f.title), h("p", { class: "muted" }, card[1].textContent), h("a", { class: "btn outline block", href: "#/test?note=" + f.note_id, "aria-label": label }, "Start the first quiz")));
   });
-  const fin = d.final || {};
-  if (fin.open && fin.remaining > 0) {
-    nodes.push(h("div", { class: "calm" }, h("b", {}, "The Remem Test is open"),
-      h("p", { class: "muted" }, "One last check on everything you've studied: " + pl(fin.remaining, "question") + ", no hints. It doesn't change your schedule."),
-      h("a", { class: "btn outline block", href: "#/final" }, fin.answered ? "Continue the Remem Test" : "Start the Remem Test")));
-  } else if (fin.finished) {
+  if (!remOpen && fin.finished) {
     nodes.push(h("div", { class: "calm" }, h("b", {}, "You finished the Remem Test"), h("p", { class: "muted" }, "Thank you. Your notes are unlocked again, so you can re-read any topic.")));
   }
   if (!hero && d.studied) {
-    nodes.push(h("div", { class: "calm" }, h("b", {}, "You're all caught up"),
-      h("p", { class: "muted" }, d.next_test_in_days == null ? "Your next test will appear here." : "Your next test is " + aboutDays(d.next_test_in_days) + ". Remem will remind you."),
+    const nextP = h("p", { class: "muted" }, d.next_test_in_days == null ? "Your next test will appear here." : "Your next test is " + aboutDays(d.next_test_in_days) + ".");
+    if (d.next_test_in_days != null && !S.offline) reminderState().then(s => { if (s === "on") nextP.append(" Remem will remind you."); }).catch(() => {});   // promised only when reminders are on
+    nodes.push(h("div", { class: "calm" }, h("b", {}, "You're all caught up"), nextP,
       h("a", { class: "btn block", href: "#/notes" }, "Pick another topic")));
   } else if (!hero && !d.studied) {
     nodes.push(h("div", { class: "calm" }, h("b", {}, "How Remem works"),
@@ -481,13 +493,13 @@ function showWhatsNew(d) {                 // once, only for people who had answ
   const item = (title, text) => h("li", {}, h("b", {}, title), " " + text);
   const dlg = h("dialog", { class: "sheet", "aria-labelledby": "wn-title" },
     h("h2", { id: "wn-title" }, "Thank you for testing Remem"),
-    h("p", {}, "I made a few mistakes in the first days, and your feedback helped me fix them. Here's what's new:"),
+    h("p", {}, "A few things went wrong in the first days, and your feedback helped fix them. Here's what's new:"),
     h("ol", { class: "wn" },
       item("No more repeated questions.", "Each question comes up once per test. The schedule is fixed too, so nothing gets pushed 348 days away any more."),
       item("One test a day.", "Everything due is mixed into one short test, without telling you the topic. That way it checks what you remember, not what you can guess. You see the right answers at the end."),
       item("Reminders.", "Turn them on, and Remem tells you when your test is ready."),
       item("Notes lock after one read.", "If you could re-read, Remem couldn't tell what you remembered from what you just read. You get one last read now; after that, your notes open again once you finish the Remem Test.")),
-    h("p", { class: "muted" }, "Thanks for your help. — Aryan"),
+    h("p", { class: "muted" }, "Thanks for your help."),
     h("div", { class: "stack" },
       reads.length ? h("button", { class: "primary block", type: "button", onclick: () => { seen(); close(); location.hash = reads.length === 1 ? "#/notes/" + reads[0].topic_id : "#/notes"; } }, "Read my notes one last time") : null,
       h("button", { class: reads.length ? "block" : "primary block", type: "button", onclick: () => { seen(); close(); } }, "Got it")));
@@ -538,7 +550,10 @@ function newKey() { return crypto.randomUUID ? crypto.randomUUID() : String(Date
 async function viewTest(note) {           // today's test (all due concepts, mixed) or one topic's first quiz; no concept names until the end
   const title = note ? "First quiz" : "Today's test", back = h("a", { class: "btn", href: "#/" }, "Back to today");
   mount(h("h1", {}, title), skeleton(2));
-  let q; try { q = await api("/test/next" + (note ? "?note=" + note : "")); } catch (e) { return errScreen(title, e, back); }
+  let q; try { q = await api("/test/next" + (note ? "?note=" + note : "")); } catch (e) {
+    if (e.status === 404 && note) return mount(h("h1", {}, "This quiz isn't here any more"), h("p", { class: "muted" }, "It may have finished already. Today shows everything that is waiting for you."), h("p", {}, h("a", { class: "btn primary block", href: "#/" }, "Back to today")));   // an old link
+    return errScreen(title, e, back);
+  }
   if (q.done) return testDone(q, note);
   const prog = progress(q.position - 1, q.total), last = q.position >= q.total;
   const t0 = performance.now();
@@ -568,11 +583,11 @@ async function viewTest(note) {           // today's test (all due concepts, mix
       if (e instanceof TypeError) { const qd = queue(); qd.push(body); saveQueue(qd); fb.replaceChildren(h("div", { class: "panel" }, "You're offline. Your answer is saved and will sync when you reconnect."), h("a", { class: "btn block", href: "#/" }, "Back to today")); }
       else { answered = false; opts[i].classList.remove("picked"); opts.forEach(b => b.disabled = false); toast(errText(e)); if (e.status === 409) viewTest(note); }
     }
-  } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[i]), h("span", { class: "txt", dir: "auto" }, text)));
+  } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[i]), h("span", { class: "txt", dir: "auto" }, ko(text))));
   const flag = h("button", { class: "link flag", type: "button", onclick: async () => {
     try { await api("/flag", { method: "POST", body: { question_id: q.question_id } }); toast("Thanks, question flagged"); flag.textContent = "Reported, thank you"; flag.disabled = true; } catch (x) { toast(errText(x)); }
   } }, "Report a bad question");
-  mount(testHeader(prog, q.position, q.total), h("h1", { class: "q", dir: "auto" }, q.stem), h("div", { class: "opts" }, opts), fb, h("p", { class: "links" }, flag));
+  mount(testHeader(prog, q.position, q.total), h("h1", { class: "q", dir: "auto" }, ko(q.stem)), h("div", { class: "opts" }, opts), fb, h("p", { class: "links" }, flag));
 }
 
 function testDone(s, note) {               // the score, then each concept by name: how it went and when it comes back
@@ -580,18 +595,18 @@ function testDone(s, note) {               // the score, then each concept by na
   const back = h("p", {}, h("a", { class: "btn primary block", href: "#/" }, "Back to today"));
   if (!s.total) return mount(h("h1", {}, "Nothing to answer right now"), h("p", { class: "muted" }, "There's no test waiting. Remem will bring your next one when it's time."), back);
   play("end");
-  const rows = s.concepts.filter(c => c.marks.length).map(c => h("li", {},
-    h("span", { class: "name", dir: "auto" }, c.name),
-    h("span", { class: "dots", role: "img", "aria-label": c.marks.filter(Boolean).length + " of " + c.marks.length + " right" }, c.marks.map(m => h("i", { class: m ? "on" : "" }))),
-    h("span", { class: "when" }, c.next_due_in_days == null ? "" : "Back " + aboutDays(c.next_due_in_days))));
+  const rows = s.concepts.filter(c => c.marks.length).map(c => h("li", {},      // no per-concept return date: side by side, those would show which method schedules each concept
+    h("span", { class: "name", dir: "auto" }, ko(c.name)),
+    h("span", { class: "dots", role: "img", "aria-label": c.marks.filter(Boolean).length + " of " + c.marks.length + " right" }, c.marks.map(m => h("i", { class: m ? "on" : "" })))));
   const missed = (s.missed || []).map(m => h("li", { class: "miss" },
-    h("p", { class: "q", dir: "auto" }, m.stem),
+    h("p", { class: "q", dir: "auto" }, ko(m.stem)),
     m.chosen_index == null || m.chosen_index === m.correct_index ? null
-      : h("p", { class: "ans bad", dir: "auto" }, h("span", { class: "lab" }, "Your answer"), m.options[m.chosen_index]),
-    h("p", { class: "ans good", dir: "auto" }, h("span", { class: "lab" }, "Right answer"), m.options[m.correct_index])));
+      : h("p", { class: "ans bad", dir: "auto" }, h("span", { class: "lab" }, "Your answer"), ko(m.options[m.chosen_index])),
+    h("p", { class: "ans good", dir: "auto" }, h("span", { class: "lab" }, "Right answer"), ko(m.options[m.correct_index]))));
   mount(h("div", { class: "mk-done" }, markSvg("mk-burst", 56)), h("h1", {}, note ? "First quiz done" : "Test done"),
     h("div", { class: "score" }, h("b", {}, s.right + " of " + s.total), h("span", {}, " right")),
     h("ul", { class: "ledger summary" }, rows),
+    h("p", { class: "muted" }, "Remem brings each concept back in a later test when it's time."),
     h("h2", {}, missed.length ? "Your mistakes" : "No mistakes this time"),
     missed.length ? h("ul", { class: "misses" }, missed) : null, back);
 }
@@ -601,7 +616,7 @@ async function viewFinal() {               // the Remem Test: three unseen quest
   mount(h("h1", {}, title), skeleton(2));
   let d; try { d = await api("/due"); } catch (e) { return errScreen(title, e, back); }
   const fin = d.final || {};
-  if (!fin.open) return mount(h("h1", {}, title), h("div", { class: "calm" }, h("b", {}, "The Remem Test isn't open yet"), h("p", { class: "muted" }, "Your project owner will tell you when it opens.")), back);
+  if (!fin.open) return mount(h("h1", {}, title), h("div", { class: "calm" }, h("b", {}, "The Remem Test isn't open yet"), h("p", { class: "muted" }, "You'll hear when it opens.")), back);
   if (!fin.total) return mount(h("h1", {}, title), h("div", { class: "calm" }, h("b", {}, "Nothing to answer"), h("p", { class: "muted" }, "Study a topic first, then come back for the Remem Test.")), back);
   if (fin.remaining > 0) {
     mount(h("h1", {}, title), h("p", {}, "Do you still remember? " + pl(fin.total, "question") + " on the concepts you've studied, mixed together, with no hints. You'll see your score at the end, and your review schedule stays as it is."),
@@ -625,8 +640,8 @@ async function viewFinal() {               // the Remem Test: three unseen quest
         prog.step(q.position);
         setTimeout(ask, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 380);    // let the bar finish its step
       } catch (e) { sent = false; opts.forEach(b => { b.disabled = false; }); opts[k].classList.remove("picked"); toast(errText(e)); if (e.status === 409) ask(); }
-    } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[k]), h("span", { class: "txt", dir: "auto" }, text)));
-    mount(testHeader(prog, q.position, q.total), h("h1", { class: "q", dir: "auto" }, q.stem), h("div", { class: "opts" }, opts));
+    } }, h("span", { class: "key", "aria-hidden": "true" }, "ABCD"[k]), h("span", { class: "txt", dir: "auto" }, ko(text))));
+    mount(testHeader(prog, q.position, q.total), h("h1", { class: "q", dir: "auto" }, ko(q.stem)), h("div", { class: "opts" }, opts));
   }
 }
 
@@ -661,14 +676,14 @@ async function startQuiz(path, body, msg, onFail) {
 function readingBlocks(text) {                                  // plain text -> headings, paragraphs and bullet lists (textContent only)
   const lines = text.split("\n").slice(1), out = [];            // the first line is the title, shown as the page heading
   let list = null, para = [];
-  const flush = () => { if (para.length) { out.push(h("p", {}, para.join(" "))); para = []; } list = null; };
+  const flush = () => { if (para.length) { out.push(h("p", {}, ko(para.join(" ")))); para = []; } list = null; };
   lines.forEach((raw, i) => {
     const l = raw.trim();
     if (!l) { flush(); return; }
-    if (l.startsWith("- ")) { if (!list) { flush(); list = h("ul", { class: "reading-list" }); out.push(list); } list.append(h("li", {}, l.slice(2))); return; }
+    if (l.startsWith("- ")) { if (!list) { flush(); list = h("ul", { class: "reading-list" }); out.push(list); } list.append(h("li", {}, ko(l.slice(2)))); return; }
     list = null;
     const next = (lines[i + 1] || "").trim();
-    if (!para.length && next && l.length <= 60 && !/[.:;?!,]$/.test(l)) { out.push(h("h2", { class: "rh" }, l)); return; }
+    if (!para.length && next && l.length <= 60 && !/[.:;?!,]$/.test(l)) { out.push(h("h2", { class: "rh" }, ko(l))); return; }
     para.push(l);
   });
   flush(); return out;
@@ -680,7 +695,8 @@ async function viewTopic(tid) {
   catch (e) {
     if (e.status === 403) return mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/notes", "aria-label": "Back to topics" }, icon("M15 5l-7 7 7 7", "chev"), "Topics")),
       h("h1", {}, "Notes locked"), h("div", { class: "calm" }, h("b", {}, "You've read these notes once"),
-        h("p", { class: "muted" }, "They stay locked until you finish the Remem Test, so Remem measures what you remember, not what you just re-read.")), h("p", {}, toTopics));
+        h("p", { class: "muted" }, "They stay locked until you finish the Remem Test, so Remem measures what you remember, not what you just re-read.")),
+        h("div", { class: "actions" }, h("a", { class: "btn primary", href: "#/" }, "Go to Today"), toTopics));     // a waiting first quiz is on Today
     return errScreen("Reading", e, toTopics);
   }
   const msg = h("div", { class: "muted", role: "status" });
@@ -688,10 +704,12 @@ async function viewTopic(tid) {
   const hint = h("span", { class: "hint", id: "readhint", "aria-live": "polite" }, "Read to the end");
   const go = h("button", { class: "primary", disabled: true, onclick: async () => {
     if (t.done) { location.hash = t.last_read ? "#/" : "#/notes"; return; }
-    if (!(await confirmSheet("Ready for the quiz?", "Your notes will lock after this.", "Start the quiz", "Keep reading"))) return;
+    if (!(await confirmSheet("Ready for the quiz?", "Your notes will lock until the Remem Test, a short final check near the end of the study.", "Start the quiz", "Keep reading"))) return;
     go.disabled = true;
-    mount(h("h1", {}, "Making your quiz"), msg, skeleton(3));
-    startQuiz("/notes/topic", { topic_id: tid }, msg, () => {});
+    const wait = skeleton(3);
+    mount(h("h1", {}, "Making your quiz"), msg, wait);
+    startQuiz("/notes/topic", { topic_id: tid }, msg, () => wait.replaceWith(h("div", { class: "actions" },   // never a dead end: a way back when it fails
+      h("a", { class: "btn", href: "#/notes" }, "Back to topics"), h("a", { class: "btn", href: "#/" }, "Go to Today"))));
   }, "aria-describedby": "readhint" }, t.done ? "Done reading" : "I've read it. Make my quiz");
   const unlock = () => { go.disabled = false; hint.textContent = t.done ? "" : "Ready when you are"; bar.classList.add("ready"); };
   const bar = h("div", { class: "readbar" }, h("div", { class: "inner" }, hint, go));
@@ -700,7 +718,7 @@ async function viewTopic(tid) {
     ? h("div", { class: "panel hint-panel" }, h("b", {}, "This is your last read."), h("p", { class: "muted" }, "When you leave this page, these notes lock until you finish the Remem Test."))
     : t.done ? null
     : h("div", { class: "panel hint-panel" }, h("b", {}, "Read to understand, not to memorise."),
-        h("p", { class: "muted" }, "Go at your own pace. Remembering is Remem's job: it will test you at the right times. You can read this once. When you start the quiz, the notes lock until the Remem Test."));
+        h("p", { class: "muted" }, "Go at your own pace. Remembering is Remem's job: it will test you at the right times. You can read this once. When you start the quiz, the notes lock until the Remem Test, a short final check near the end of the study."));
   mount(h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/notes", "aria-label": "Back to topics" }, icon("M15 5l-7 7 7 7", "chev"), "Topics")),
     h("h1", {}, title), h("p", { class: "muted" }, t.subject + ", about " + t.minutes + " min read"), note,
     h("article", { class: "reading" }, readingBlocks(t.text)), sentinel, bar);
@@ -748,10 +766,15 @@ async function viewConcepts() {
   let d; try { d = await api("/concepts"); } catch (e) { return errScreen("Concepts", e); }
   const nodes = [h("h1", {}, "Concepts")];
   if (!d.concepts.length) nodes.push(h("div", { class: "calm" }, h("b", {}, "No concepts yet"), h("p", { class: "muted" }, "Pick a topic and they will appear here."), h("a", { class: "btn primary block", href: "#/notes" }, "Pick a topic")));
-  nodes.push(h("ul", { class: "ledger" }, d.concepts.map(c => h("li", {}, h(c.new ? "div" : "a", { class: "item", href: c.new ? false : "#/curve/" + c.concept_id },
-    h("span", { class: "name" }, c.name),
-    h("span", { class: "when" }, c.new ? "not studied yet" : "remembered for about " + pl(Math.round(c.stability_days), "day")),
-    c.new ? h("div", { class: "meter empty", "aria-hidden": "true" }) : [meter(c.R_now, c.R_now < THETA_UI, c.name), h("span", { class: "note" }, "Mastery " + Math.round(c.mastery * 100) + "% · " + pl(c.n_responses, "answer"))])))));
+  else if (d.concepts.some(c => !c.new)) nodes.push(h("p", { class: "muted" }, "The bar is how much you're likely to recall now. Mastery is how well you've answered so far."));
+  const row = c => h("li", {}, h(c.new ? "div" : "a", { class: "item", href: c.new ? false : "#/curve/" + c.concept_id },
+    h("span", { class: "name" }, ko(c.name)),
+    h("span", { class: "when" }, c.new ? "not studied yet" : ""),
+    c.new ? h("div", { class: "meter empty", "aria-hidden": "true" }) : [meter(c.R_now, c.R_now < THETA_UI, c.name),
+      h("span", { class: "note" }, "Mastery " + Math.round(c.mastery * 100) + "% · " + pl(c.n_responses, "answer") + " · recall above 90% for about " + pl(Math.round(c.stability_days), "day"))]));
+  const groups = [];                                                       // one list per topic, in the order the topics were added
+  d.concepts.forEach(c => { const k = c.topic || "Your notes"; let g = groups.find(x => x.k === k); if (!g) groups.push(g = { k, items: [] }); g.items.push(c); });
+  groups.forEach(g => nodes.push(groups.length > 1 ? h("h2", {}, ko(g.k)) : null, h("ul", { class: "ledger" }, g.items.map(row))));
   mount(nodes);
 }
 
@@ -769,13 +792,12 @@ async function viewCurve(cid, theta, keep) {
   const H = Math.max(Math.round(Math.min(300, Math.max(200, W * 0.62))), Math.round(FS * 15)), L = Math.round(FS * 2.6) + 8, B = FS + 15, T = Math.max(14, Math.round(FS * 0.7)), Rr = 12;   // H and T grow at large text so labels neither collide nor clip
   const maxD = r.points[r.points.length - 1].day;
   const x = d => L + (d / maxD) * (W - L - Rr), y = v => T + (1 - v) * (H - T - B);
-  let revX = 0;
-  const left = r.next_review_day - r.elapsed_days;                        // days from now, the same quantity as Today's rows
-  const when = left <= 0 ? "review now" : "review " + aboutDays(left);
+  // No review-day marker: the review day comes from the concept's scheduling method, and drawing it against the target
+  // would show the student which method that is. The curve, the target and "now" are the same for every concept.
   const NS = "http://www.w3.org/2000/svg";
   const se = (t, a, txt) => { const e = document.createElementNS(NS, t); for (const [k, v] of Object.entries(a || {})) e.setAttribute(k, v); if (txt != null) e.textContent = txt; return e; };
   const svg = se("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: "chart", style: "--fs:" + FS + "px", role: "img",
-    "aria-label": "Predicted recall over the next " + maxD + " days. Recall now " + Math.round(r.R_now * 100) + "%, next review " + (left <= 0 ? "now" : aboutDays(left)) + "." });
+    "aria-label": "Predicted recall over the next " + maxD + " days, with the " + Math.round(r.theta * 100) + "% target. Recall now " + Math.round(r.R_now * 100) + "%." });
   [0, 0.5, 1].forEach(v => { svg.append(se("line", { class: "grid", x1: L, x2: W - Rr, y1: y(v), y2: y(v) })); svg.append(se("text", { x: L - 6, y: y(v) + FS * 0.35, "text-anchor": "end" }, Math.round(v * 100) + "%")); });
   for (let i = 0; i <= 4; i++) { const d = (maxD * i) / 4; svg.append(se("text", { x: x(d), y: H - 8, "text-anchor": i === 0 ? "start" : i === 4 ? "end" : "middle" }, d.toFixed(0) + "d")); }
   const pts = r.points.map(p => x(p.day).toFixed(1) + "," + y(p.R).toFixed(1));
@@ -783,26 +805,20 @@ async function viewCurve(cid, theta, keep) {
   svg.append(se("line", { class: "target", x1: L, x2: W - Rr, y1: y(r.theta), y2: y(r.theta) }));
   svg.append(se("polyline", { class: "curve", points: pts.join(" ") }));
   svg.append(se("text", { class: "halo", x: L + 6, y: y(r.theta) + FS + 4, "text-anchor": "start" }, "target " + Math.round(r.theta * 100) + "%"));
-  if (r.next_review_day <= maxD) {
-    const rx = x(r.next_review_day), lw = when.length * FS * 0.56, lx = Math.max(L + 4, Math.min(rx + 6, W - Rr - lw)); revX = lx;   // label stays inside the chart at any text size
-    svg.append(se("line", { class: "review", x1: rx, x2: rx, y1: T, y2: H - B }));
-    svg.append(se("text", { class: "lab halo", x: lx, y: T + FS, "text-anchor": "start" }, when));
-  }
   if (r.elapsed_days <= maxD) {                                              // "now N%" goes where it collides with nothing already drawn
     const cx = x(r.elapsed_days), cy = y(r.R_now), nowTxt = "now " + Math.round(r.R_now * 100) + "%", nw = nowTxt.length * FS * 0.64;
     const tgtTxt = "target " + Math.round(r.theta * 100) + "%", busy = [
       [L + 2, y(r.theta), L + 12 + tgtTxt.length * FS * 0.62, y(r.theta) + FS + 10],                       // target label
-      r.next_review_day <= maxD ? [revX - 3, T - 3, revX + when.length * FS * 0.6 + 3, T + FS + 7] : null,               // review label
-      [cx - 8, cy - 8, cx + 8, cy + 8]].filter(Boolean);                                                         // the dot itself
+      [cx - 8, cy - 8, cx + 8, cy + 8]];                                                                         // the dot itself
     const fits = ([x0, y0, x1, y1]) => x0 >= L && x1 <= W - Rr && y0 >= 0 && y1 <= H - B && !busy.some(([a, b, c, d]) => x0 < c && a < x1 && y0 < d && b < y1);
     const spots = [[cx - 10 - nw, cy - FS / 2], [cx + 10, cy - FS / 2], [cx + 10, cy + 8], [cx - 10 - nw, cy + 8], [cx + 10, cy - FS - 10], [cx - nw / 2, cy + FS + 10]];
     const spot = spots.find(([a, b]) => fits([a, b, a + nw, b + FS + 2]));
     svg.append(se("circle", { class: "now", cx, cy, r: 6 }));
     if (spot) svg.append(se("text", { class: "lab halo", x: spot[0], y: spot[1] + FS * 0.85, "text-anchor": "start" }, nowTxt));   // no room (large text): the sentence under the chart already says it
   }
-  const nodes = [h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/", "aria-label": "Back to today" }, icon("M15 5l-7 7 7 7", "chev"), "Today")),
-    h("h1", { dir: "auto" }, r.concept), svg, h("p", { class: "muted small axis-cap" }, "days since you last practised"),
-    h("p", { class: "muted" }, "The dot is you now, at " + Math.round(r.R_now * 100) + "% recall. Remem asks you to review at the vertical line. Recall falls to about 90% after " + pl(Math.round(r.stability_days), "day") + ".")];
+  const nodes = [h("div", { class: "bar" }, h("a", { class: "btn link", href: "#/concepts", "aria-label": "Back to concepts" }, icon("M15 5l-7 7 7 7", "chev"), "Concepts")),
+    h("h1", { dir: "auto" }, ko(r.concept)), svg, h("p", { class: "muted small axis-cap" }, "days since you last practised"),
+    h("p", { class: "muted" }, "The dot is you now, at " + Math.round(r.R_now * 100) + "% recall. The dashed line is the " + Math.round(r.theta * 100) + "% target. Recall falls to about 90% after " + pl(Math.round(r.stability_days), "day") + ".")];
   if (S.role === "demo" || S.role === "admin") {
     const lab = h("b", {}, "target " + Math.round(r.theta * 100) + "%");
     const sl = h("input", { type: "range", min: 60, max: 97, value: Math.round(r.theta * 100), "aria-label": "What-if target retention", "aria-valuetext": Math.round(r.theta * 100) + "%",
@@ -900,7 +916,7 @@ function themeSwitch(startDark, onToggle, width) {
       s("mask", { id: id + "-moon", maskUnits: "userSpaceOnUse", x: -60, y: -60, width: 120, height: 120 },
         s("rect", { x: -60, y: -60, width: 120, height: 120, fill: "#fff" }), s("circle", { cx: -14.64, cy: -7.63, r: 19.96, fill: "#000" }))),
     s("g", { "clip-path": "url(#" + id + "-clip)" }, pill("url(#" + id + "-day)"), pillDark, bigDot, smDot, gA, gB, g1, g2, g3, disc, moon));
-  const btn = h("button", { class: "theme-switch", type: "button", role: "switch", "aria-checked": String(!!startDark), "aria-label": "Dark mode" }, svg);
+  const btn = h("button", { class: "theme-switch", type: "button", role: "switch", "aria-checked": String(!!startDark), "aria-label": "Theme: dark mode" }, svg);
   if (width) btn.style.setProperty("--tsw", width + "px");
   const el = btn;                         // no Light / Dark words: the sun and moon say it (the owner's call); the name "Dark mode" stays for screen readers
 
@@ -1049,7 +1065,10 @@ function finalCard(o, redo) {
 }
 function experimentBlock(x) {
   return [h("h2", {}, "The experiment"),
-    h("p", { class: "muted small" }, x.reviews + " reviews (" + x.answers + " answers) from " + x.people_reviewing + (x.people_reviewing === 1 ? " person" : " people") + ". A review is a concept coming back after a gap. Overall, REMEM predicted " + pct(x.predicted) + " and people got " + pct(x.observed) + " right."),
+    h("p", { class: "muted small" }, x.reviews
+      ? pl(x.reviews, "review") + " (" + pl(x.answers, "answer") + ") from " + x.people_reviewing + (x.people_reviewing === 1 ? " person" : " people") + ". A review is a concept coming back after a gap." +
+        (x.predicted == null ? "" : " Overall, REMEM predicted " + pct(x.predicted) + " and people got " + pct(x.observed) + " right.")
+      : "No reviews yet. A review is a concept coming back after a gap."),
     h("div", { class: "ad-table", role: "table" }, h("div", { class: "ad-tr head", role: "row" }, ["Method", "Concepts", "Reviews", "Correct", "Avg gap"].map(t => h("span", { role: "columnheader" }, t))),
       x.arms.map(a => h("div", { class: "ad-tr", role: "row" }, [ARM_NAMES[a.arm], String(a.concepts), String(a.reviews), pct(a.accuracy), a.mean_gap_days == null ? "–" : a.mean_gap_days.toFixed(1) + "d"].map(t => h("span", { role: "cell" }, t))))),
     h("p", { class: "muted small" }, "Balance check, first-quiz accuracy (should be similar): " + x.arms.map(a => ARM_NAMES[a.arm] + " " + pct(a.first_quiz_accuracy)).join(", ") + "."),
@@ -1073,7 +1092,7 @@ async function viewAdmin() {
   mount(h("h1", {}, "Pilot today"),
     h("p", { class: "muted small" }, dayName(o.now) + " · updated " + clock(o.now) + " · ", h("button", { class: "link", type: "button", onclick: () => viewAdmin() }, "Refresh")),
     adminCards([[t.people + "/" + t.started, "answered today"], [t.answers, "questions today"], [t.active_3d + "/" + t.started, "active in last 3 days"], [t.waiting, "have questions waiting"]]),
-    h("p", { class: "muted small" }, t.started + " of " + t.students + " accounts started · " + t.two_topics + " have 2+ topics · " + t.reminders_on + " have reminders on"),
+    h("p", { class: "muted small" }, t.started + " of " + pl(t.students, "account") + " started · " + t.two_topics + " have 2+ topics · " + t.reminders_on + " have reminders on"),
     finalCard(o, viewAdmin),
     h("a", { class: "panel ad-row", href: "#/admin/notify" }, h("span", {}, h("b", {}, "Notifications"), h("span", { class: "muted small" }, " · see every message, send one to your phone")), icon("M9 5l7 7-7 7", "chev")),
     h("h2", {}, "People"), h("div", { class: "me-group" }, toggle),
@@ -1189,7 +1208,7 @@ async function viewAdminTry(uid) {
     const wrong = all.map((x, i) => ({ x, p: picks[i] })).filter(r => r.p !== r.x.correct);
     mount(h("div", { class: "mk-done" }, markSvg("mk-burst", 56)), h("h1", {}, "You got " + right + " of " + all.length),
       h("p", { class: "muted" }, "Practice run on " + who + "'s questions. Nothing was saved. If notifications are on for this phone, \"Mogambo khush hua\" is on its way."),
-      wrong.length ? h("h2", {}, "The ones you missed") : h("p", {}, "Perfect score. 🎉"),
+      wrong.length ? h("h2", {}, "The ones you missed") : h("p", {}, "Perfect score."),
       wrong.map(r => h("div", { class: "panel" }, h("div", { class: "muted small" }, r.x.concept), h("p", {}, r.x.stem),
         h("p", { class: "small" }, "You chose: " + r.x.options[r.p]), h("p", { class: "small ok" }, "Right answer: " + r.x.options[r.x.correct]))),
       h("div", { class: "actions" }, h("button", { class: "primary", type: "button", onclick: () => viewAdminTry(uid) }, "Try again"), back));

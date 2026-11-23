@@ -67,13 +67,17 @@ def explain(concept_name: str, R_now: float, theta: float, n_sessions: int, days
     else:
         recent = f"Last practised {plural(days_since, 'day', 1)} ago."
     if short:
+        if days_since < 0.05:
+            return "Just practised."
         if R_now < theta:
             return f"Time to review: recall has dropped to about {R_now:.0%}."
         return f"{recent} You should still remember most of it."
+    if days_since < 0.05:                       # recall reads 100% straight after any answer, right or wrong: claim nothing yet
+        return f"**{concept_name}**: just practised. Your next test will show how well it stuck."
     if R_now < theta:
         head = f"**{concept_name}**: time to review. Estimated recall is {R_now:.0%}, below your {theta:.0%} target."
     else:
-        head = f"**{concept_name}**: still fresh. Estimated recall is {R_now:.0%} (Remem reminds you when it falls to {theta:.0%})."
+        head = f"**{concept_name}**: still fresh. Estimated recall is {R_now:.0%}; the target is {theta:.0%}."
     return (f"{head} You have practised it in {plural(n_sessions, 'session')}. {recent} "
             f"You tend to remember this for about {plural(S_days, 'day')}.")
 

@@ -105,3 +105,16 @@ def test_demo_seed_builds_an_offline_account_with_a_realistic_history(tmp_path, 
         assert again["concepts"] == 0 and conn.execute("SELECT COUNT(*) FROM concepts").fetchone()[0] == 37
         seed_demo.seed(conn, None, reset=True, now_ms=1_800_000_000_000)
         assert conn.execute("SELECT COUNT(*) FROM concepts").fetchone()[0] == 37 and conn.execute("SELECT COUNT(*) FROM users WHERE username='demo'").fetchone()[0] == 1
+
+
+def test_demo_seed_opens_on_a_due_test(tmp_path, monkeypatch):
+    """The viva demo starts from a fresh seed: Today must show a test straight away."""
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "d.db")
+    monkeypatch.setattr(main, "now_ms", lambda: 1_800_000_000_000)
+    db.init_db()
+    with db.session() as conn:
+        seed_demo.seed(conn, "demo-pass-1", now_ms=1_800_000_000_000)
+    c = TestClient(main.app)
+    tok = c.post("/api/auth/login", json={"username": "demo", "password": "demo-pass-1"}).json()
+    due = c.get("/api/due", headers={"Authorization": "Bearer " + tok["token"]}).json()
+    assert due["test"]["questions"] > 0 and len(due["new"]) >= 4 and len(due["upcoming"]) >= 4

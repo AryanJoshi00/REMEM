@@ -45,8 +45,10 @@
   } catch (e) { mode = still && still.matches ? "still" : "short"; }
   var standalone = window.matchMedia && (matchMedia("(display-mode: standalone)").matches || navigator.standalone === true);
   root.classList.add("sp-" + mode, standalone ? "sp-app" : "sp-tab");     // a browser tab has no system splash before ours
+  var darkTab = !standalone && effective() === "dark";                     // no system splash to match in a tab: follow the theme, no bright flash
+  if (darkTab) root.classList.add("sp-dark");
   var bars = document.querySelectorAll('meta[name="theme-color"]'), barWas = [];
-  for (var b = 0; b < bars.length; b++) { barWas.push(bars[b].getAttribute("content")); bars[b].setAttribute("content", "#f7f6f2"); }   // status bar matches the splash
+  for (var b = 0; b < bars.length; b++) { barWas.push(bars[b].getAttribute("content")); bars[b].setAttribute("content", darkTab ? PAPER.dark : "#f7f6f2"); }   // status bar matches the splash
   var MIN = { full: 1380, short: 520, still: 220 }[mode], gone = false;
   function hide() {
     if (gone) return; gone = true;
@@ -54,7 +56,7 @@
     if (!el) { apply(); return; }
     el.classList.add("sp-out");
     apply();                                                // status bar back to the theme's colour
-    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); root.classList.remove("sp-" + mode, "sp-app", "sp-tab"); }, 360);
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); root.classList.remove("sp-" + mode, "sp-app", "sp-tab", "sp-dark"); }, 360);
   }
   window.remSplashDone = function () {                     // called by the app once its first screen is on the page
     setTimeout(hide, Math.max(0, MIN - (Date.now() - t0)));
