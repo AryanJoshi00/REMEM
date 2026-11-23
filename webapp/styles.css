@@ -457,3 +457,70 @@ html.theme-fade, html.theme-fade *:not(.theme-switch):not(.theme-switch *) {
 .ad-stem { font-size: var(--fs-q); line-height: 1.35; margin: 16px 0; }
 .ad-opt { text-align: left; justify-content: flex-start; min-height: 52px; padding: 12px 16px; }
 .small.ok, p.ok { color: var(--green); }
+
+/* ---- launch screen: the mark tells its story once a day (stem rises, the branch splits off, the dot lights up)
+   Timing, full: tile 0-420ms · stem 140-560 · branch from the fork 340-700 · dot 640-1060 · rings 760-1460 · word 820-1200.
+   Short (later the same day): the drawn mark with one dot pulse. Still (reduced motion): the drawn mark, then a fade. */
+#splash { position: fixed; inset: 0; z-index: 1000; display: none; place-items: center; background: var(--paper);
+  animation: sp-failsafe 0s linear 3s forwards; }                                   /* belt and braces: never stays up */
+.sp-full #splash, .sp-short #splash, .sp-still #splash { display: grid; }
+.sp-full body, .sp-short body, .sp-still body { overflow: hidden; }
+#splash.sp-out { animation: sp-out 300ms var(--ease-out) forwards; pointer-events: none; }
+#splash.sp-out .sp-stage { animation: sp-lift 300ms var(--ease-out) forwards; }
+.sp-stage { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: -6vh; }
+.sp-mark { display: block; overflow: visible; filter: drop-shadow(0 10px 24px rgba(42, 46, 196, .22)); }
+.sp-mark .sp-stem, .sp-mark .sp-branch { fill: none; stroke: #fff; stroke-width: 58; stroke-linecap: round; stroke-dasharray: 1 2; }
+.sp-mark .sp-dot { fill: #ffb23f; transform-box: fill-box; transform-origin: center; }
+.sp-mark .sp-ring { fill: none; stroke: #ffb23f; stroke-width: 10; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.sp-word { font-weight: 700; font-size: 1.375rem; letter-spacing: -.01em; color: var(--ink); }
+
+.sp-full .sp-mark { animation: sp-tile 420ms var(--ease-out) both; }
+.sp-full .sp-stem { animation: sp-draw 420ms cubic-bezier(.55, 0, .25, 1) 140ms both; }
+.sp-full .sp-branch { animation: sp-draw 360ms cubic-bezier(.2, .7, .3, 1) 340ms both; }
+.sp-full .sp-dot { animation: sp-dot 420ms cubic-bezier(.34, 1.56, .64, 1) 640ms both; }
+.sp-full .sp-ring { animation: sp-ring 700ms cubic-bezier(.2, .7, .3, 1) 760ms forwards; }   /* forwards: invisible until it starts */
+.sp-full .sp-ring2 { animation-delay: 900ms; }
+.sp-full .sp-word { animation: sp-word 380ms var(--ease-out) 820ms both; }
+
+.sp-short .sp-mark { animation: sp-fade 160ms ease-out both; }
+.sp-short .sp-stem, .sp-short .sp-branch, .sp-still .sp-stem, .sp-still .sp-branch { stroke-dashoffset: 0; }
+.sp-short .sp-dot { animation: sp-pulse 380ms cubic-bezier(.34, 1.56, .64, 1) 120ms both; }
+.sp-short .sp-ring:not(.sp-ring2) { animation: sp-ring 560ms cubic-bezier(.2, .7, .3, 1) 180ms forwards; }
+
+@keyframes sp-tile { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: none; } }
+@keyframes sp-draw { from { stroke-dashoffset: 1; opacity: 0; } 2% { opacity: 1; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes sp-dot { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes sp-pulse { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: scale(1); } }
+@keyframes sp-ring { from { opacity: .7; transform: scale(1); } to { opacity: 0; transform: scale(2.7); } }
+@keyframes sp-word { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes sp-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sp-out { to { opacity: 0; visibility: hidden; } }
+@keyframes sp-lift { to { transform: scale(1.04); } }
+@keyframes sp-failsafe { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+
+/* ---- the same mark, small, inside the app */
+.mk { display: block; overflow: visible; }
+.mk .mk-tile { fill: #4247e0; }
+.mk .mk-stem, .mk .mk-branch { fill: none; stroke: #fff; stroke-width: 58; stroke-linecap: round; }
+.mk .mk-dot { fill: #ffb23f; transform-box: fill-box; transform-origin: center; }
+.mk .mk-ring { fill: none; stroke: #ffb23f; stroke-width: 12; opacity: 0; transform-box: fill-box; transform-origin: center; }
+/* a test is finished: the dot lights up, the moment of remembering */
+.mk-done { margin: 16px 0 4px; }
+.mk-burst { animation: sp-tile 360ms var(--ease-out) both; filter: drop-shadow(0 6px 14px rgba(42, 46, 196, .2)); }
+.mk-burst .mk-dot { animation: sp-dot 440ms cubic-bezier(.34, 1.56, .64, 1) 200ms both; }
+.mk-burst .mk-ring { animation: sp-ring 760ms cubic-bezier(.2, .7, .3, 1) 360ms forwards; }
+.mk-burst .mk-ring2 { animation-delay: 520ms; }
+/* a slow screen: the mark appears after a short wait and its dot breathes (fast loads never see it) */
+.mk-wait { display: flex; justify-content: center; padding: 14px 0 4px; opacity: 0; animation: sp-fade 220ms ease-out 450ms forwards; }
+.mk-breathe .mk-dot { animation: mk-breathe 1.1s ease-in-out infinite alternate; }
+@keyframes mk-breathe { from { transform: scale(.72); opacity: .55; } to { transform: scale(1.12); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-full .sp-mark, .sp-full .sp-stem, .sp-full .sp-branch, .sp-full .sp-dot, .sp-full .sp-word,
+  .sp-short .sp-mark, .sp-short .sp-dot { animation: none; stroke-dashoffset: 0; }
+  .sp-full .sp-ring, .sp-short .sp-ring { animation: none; opacity: 0; }
+  #splash.sp-out, #splash.sp-out .sp-stage { animation-duration: 160ms; }
+  .mk-burst, .mk-burst .mk-dot, .mk-breathe .mk-dot { animation: none; }
+  .mk-burst .mk-ring { animation: none; opacity: 0; }
+  .mk-wait { animation: sp-fade 0s linear 450ms forwards; }
+}

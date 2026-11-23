@@ -47,6 +47,16 @@ function mount(...nodes) {
   const h1 = app.querySelector("h1");
   document.title = (h1 ? h1.textContent + " - " : "") + "Remem";
   if (h1) { h1.tabIndex = -1; h1.focus({ preventScroll: true }); }          // a route change moves the reading position to the new heading
+  if (window.remSplashDone) { window.remSplashDone(); window.remSplashDone = null; }   // the first screen is up: the launch logo can go
+}
+function markSvg(cls, size) {                       // the Remem mark, drawn in place so its parts can move (see .mk-* in styles.css)
+  const NS = "http://www.w3.org/2000/svg", el = (tag, at) => { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); return e; };
+  const svg = el("svg", { viewBox: "0 0 512 512", width: size, height: size, class: "mk " + (cls || ""), "aria-hidden": "true" });
+  svg.append(el("rect", { class: "mk-tile", width: 512, height: 512, rx: 112 }),
+    el("path", { class: "mk-stem", pathLength: 1, d: "M164 366 L164 150" }), el("path", { class: "mk-branch", pathLength: 1, d: "M164 262 C164 206 210 170 274 170" }),
+    el("circle", { class: "mk-ring", cx: 346, cy: 170, r: 30 }), el("circle", { class: "mk-ring mk-ring2", cx: 346, cy: 170, r: 30 }),
+    el("circle", { class: "mk-dot", cx: 346, cy: 170, r: 30 }));
+  return svg;
 }
 function remount(nodes, focusSel) {           // same screen redrawn in place (the demo's what-if slider): keep the scroll position and the focus
   const y = window.scrollY, app = document.getElementById("app");
@@ -344,7 +354,7 @@ function renderNav() {
 
 // ---------------------------------------------------------------- views
 const THETA_UI = 0.85;
-function skeleton(n, hero) { return h("div", { "aria-busy": "true", "aria-label": "Loading" }, hero ? h("div", { class: "skel hero" }) : null, Array.from({ length: n }, () => h("div", { class: "skel" }))); }
+function skeleton(n, hero) { return h("div", { "aria-busy": "true", "aria-label": "Loading" }, h("div", { class: "mk-wait" }, markSvg("mk-breathe", 28)), hero ? h("div", { class: "skel hero" }) : null, Array.from({ length: n }, () => h("div", { class: "skel" }))); }
 function meter(R, fading, name) {      // the freshness bar: how much you still remember
   const pct = Math.round(R * 100);
   return h("div", { class: "meter" + (fading ? " fading" : ""), role: "meter", "aria-label": name ? name + ", recall" : "Recall", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": pct, "aria-valuetext": pct + "% recall" }, h("i", { style: "--v:" + R }));
@@ -579,7 +589,7 @@ function testDone(s, note) {               // the score, then each concept by na
     m.chosen_index == null || m.chosen_index === m.correct_index ? null
       : h("p", { class: "ans bad", dir: "auto" }, h("span", { class: "lab" }, "Your answer"), m.options[m.chosen_index]),
     h("p", { class: "ans good", dir: "auto" }, h("span", { class: "lab" }, "Right answer"), m.options[m.correct_index])));
-  mount(h("h1", {}, note ? "First quiz done" : "Test done"),
+  mount(h("div", { class: "mk-done" }, markSvg("mk-burst", 56)), h("h1", {}, note ? "First quiz done" : "Test done"),
     h("div", { class: "score" }, h("b", {}, s.right + " of " + s.total), h("span", {}, " right")),
     h("ul", { class: "ledger summary" }, rows),
     h("h2", {}, missed.length ? "Your mistakes" : "No mistakes this time"),
@@ -604,7 +614,7 @@ async function viewFinal() {               // the Remem Test: three unseen quest
     catch (e) { return mount(h("h1", {}, title), h("div", { class: "err", role: "alert" }, errText(e)), h("button", { class: "block", onclick: () => ask() }, "Try again"), back); }
     if (q.done) {
       play("end"); store.del("remem_due");
-      return mount(h("h1", {}, "Remem Test done"), h("div", { class: "score" }, h("b", {}, q.right + " of " + q.total), h("span", {}, " right")),
+      return mount(h("div", { class: "mk-done" }, markSvg("mk-burst", 56)), h("h1", {}, "Remem Test done"), h("div", { class: "score" }, h("b", {}, q.right + " of " + q.total), h("span", {}, " right")),
         h("p", { class: "muted" }, "Thank you. Your notes are unlocked again, so you can re-read any topic."), h("p", {}, h("a", { class: "btn primary block", href: "#/" }, "Back to today")));
     }
     const prog = progress(q.position - 1, q.total), t0 = performance.now(); let sent = false;
@@ -1177,7 +1187,7 @@ async function viewAdminTry(uid) {
     const right = picks.filter((p, i) => p === all[i].correct).length;
     notifySelf("fd1", { n: all.length, right });
     const wrong = all.map((x, i) => ({ x, p: picks[i] })).filter(r => r.p !== r.x.correct);
-    mount(h("h1", {}, "You got " + right + " of " + all.length),
+    mount(h("div", { class: "mk-done" }, markSvg("mk-burst", 56)), h("h1", {}, "You got " + right + " of " + all.length),
       h("p", { class: "muted" }, "Practice run on " + who + "'s questions. Nothing was saved. If notifications are on for this phone, \"Mogambo khush hua\" is on its way."),
       wrong.length ? h("h2", {}, "The ones you missed") : h("p", {}, "Perfect score. 🎉"),
       wrong.map(r => h("div", { class: "panel" }, h("div", { class: "muted small" }, r.x.concept), h("p", {}, r.x.stem),
