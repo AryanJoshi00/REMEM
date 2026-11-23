@@ -10,7 +10,7 @@ import sqlite3
 import tempfile
 import time
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from starlette.background import BackgroundTask
@@ -115,11 +115,15 @@ def final_status(_=Depends(admin_user)):
 
 
 @router.post("/final-test")
-def final_set(body: FinalIn, admin=Depends(admin_user)):
+def final_set(body: FinalIn, tasks: BackgroundTasks, admin=Depends(admin_user)):
     with db.session() as conn:
+        was = conn.execute("SELECT value FROM settings WHERE key='final_test_open'").fetchone()
         conn.execute("INSERT INTO settings(key,value) VALUES ('final_test_open',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                      ("1" if body.open else "0",))
         db.audit(conn, "final_test_open" if body.open else "final_test_close", admin["user_id"], ts=_now_ms())
+    if body.open and not (was and was["value"] == "1"):
+        from backend import push
+        tasks.add_task(push.announce_final)                  # the launch notification goes out after the reply (once per person)
     return {"open": body.open}
 
 

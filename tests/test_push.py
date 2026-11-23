@@ -172,3 +172,35 @@ def test_nudges_situations_and_rotation():
         for t, b in (x[1:3] for x in pool):
             out = (t + b).format(**base)
             assert "{" not in out and len(t.format(**base)) <= 50 and len(b.format(**base)) <= 120
+
+
+def test_remem_test_launch_and_daily_nudge(pushing):
+    c = pushing
+    h, _ = _due_student(c)
+    from backend import auth
+    with db.session() as conn:
+        auth.create_user(conn, "boss", "boss-pass-12", "admin")
+    ha = login(c, "boss", "boss-pass-12", consent=False)
+    n0 = len(c.sent)
+    assert c.post("/api/admin/final-test", json={"open": True}, headers=ha).json() == {"open": True}   # launch goes out in the background
+    launch = [p for _, p in c.sent[n0:]]
+    assert len(launch) == 1 and launch[0]["url"] == "./#/final" and launch[0]["tpl"].startswith("fl") and "{" not in launch[0]["title"] + launch[0]["body"]
+    c.post("/api/admin/final-test", json={"open": False}, headers=ha)
+    c.post("/api/admin/final-test", json={"open": True}, headers=ha)
+    assert len(c.sent) == n0 + 1                                                     # told once, even if reopened
+    with db.session() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM reminders WHERE kind='final' AND sent=1").fetchone()[0] == 1
+    out = push.run_once(_at(c.clock["t"] + config.MS_PER_DAY, 10))                  # next morning: the daily reminder is about the test
+    assert len(out) == 1 and c.sent[-1][1]["tpl"].startswith("fn") and c.sent[-1][1]["url"] == "./#/final"
+
+
+def test_final_copy_fills_and_fits():
+    from backend import nudges
+    for pool in (nudges.FINAL_LAUNCH, nudges.FINAL_LEFT, nudges.FINAL_NOT_STARTED):
+        for _, t, b in pool:
+            tt, bb = t.format(name="Rudra", n=15, left=6), b.format(name="Rudra", n=15, left=6)
+            assert "{" not in tt + bb and len(tt) <= 50 and len(bb) <= 120
+    assert nudges.final_reminder("JATIN GUPTA", 5, 3, 24, 10)["tpl"].startswith("fr")       # part-way through: "N left" lines
+    assert nudges.final_reminder("JATIN GUPTA", 5, 3, 24, 0)["tpl"].startswith("fn")        # not started yet
+    a = nudges.final_reminder(None, 5, 3, 24, 10)["tpl"]
+    assert nudges.final_reminder(None, 5, 3, 24, 10, last_id=a)["tpl"] != a                 # not the same line two days running

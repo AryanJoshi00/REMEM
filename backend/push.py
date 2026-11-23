@@ -108,6 +108,41 @@ def send_to_user(uid: int, payload: dict, kind: str, now: int, path=None) -> tup
         return record(conn, uid, subs, results, payload, kind, now)
 
 
+def remem_test(conn, uid: int) -> dict:
+    """The person's Remem Test: open?, total, answered, finished (late import: main imports this module)."""
+    from backend import main
+    return main.remem_test_state(conn, uid)
+
+
+def _name(conn, uid: int):
+    r = conn.execute("SELECT full_name FROM profiles WHERE user_id=?", (uid,)).fetchone()
+    return r[0] if r else None
+
+
+def announce_final(now: int | None = None, path=None) -> list[dict]:
+    """Once, when the owner opens the Remem Test: tell everyone who has questions in it (and has not been told before).
+    Sent straight away, whatever the hour, because the owner chooses the moment."""
+    now = now or int(time.time() * 1000)
+    if not enabled():
+        return []
+    todo = []
+    with db.session(path) as conn:
+        for (uid,) in conn.execute("SELECT DISTINCT p.user_id FROM push_subs p JOIN users u USING(user_id) WHERE u.active=1").fetchall():
+            if conn.execute("SELECT 1 FROM reminders WHERE user_id=? AND kind='final' AND sent>0", (uid,)).fetchone():
+                continue                                                  # told already (the test was opened before)
+            st = remem_test(conn, uid)
+            if st["open"] and st["total"] and not st["finished"]:
+                todo.append((uid, [dict(r) for r in conn.execute("SELECT * FROM push_subs WHERE user_id=?", (uid,))],
+                             nudges.final_launch(_name(conn, uid), uid, st["total"] - st["answered"])))
+    out = []
+    for uid, subs, payload in todo:
+        results = deliver(subs, payload)
+        with db.session(path) as conn:
+            sent, failed = record(conn, uid, subs, results, payload, "final", now)
+        out.append({"user_id": uid, "sent": sent, "failed": failed})
+    return out
+
+
 def run_once(now: int | None = None, path=None) -> list[dict]:
     """One round of the reminder rule. Returns what was sent (for logs and tests)."""
     now = now or int(time.time() * 1000)
@@ -119,6 +154,13 @@ def run_once(now: int | None = None, path=None) -> list[dict]:
             last = conn.execute("SELECT MAX(ts) FROM reminders WHERE user_id=? AND kind='due' AND sent>0", (uid,)).fetchone()[0]
             if last is not None and local_day(last) == local_day(now):
                 continue                                                  # already reminded today
+            st = remem_test(conn, uid)
+            if st["open"] and st["total"] and not st["finished"]:            # while the Remem Test is open, finishing it comes first
+                prev = conn.execute("SELECT detail FROM reminders WHERE user_id=? AND kind='due' AND detail LIKE 'tpl:f%' ORDER BY ts DESC LIMIT 1", (uid,)).fetchone()
+                payload = nudges.final_reminder(_name(conn, uid), uid, local_day(now), st["total"], st["answered"],
+                                                prev[0].split(";")[0][4:] if prev else None)
+                todo.append((uid, payload["count"], [dict(r) for r in conn.execute("SELECT * FROM push_subs WHERE user_id=?", (uid,))], payload))
+                continue
             n = due_count(conn, uid, now)
             if n:
                 todo.append((uid, n, [dict(r) for r in conn.execute("SELECT * FROM push_subs WHERE user_id=?", (uid,))],

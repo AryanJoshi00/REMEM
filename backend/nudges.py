@@ -146,3 +146,49 @@ def build(conn, uid: int, now: int, n: int) -> dict:
     hour = ((now + config.TZ_OFFSET_MS) % config.MS_PER_DAY) // 3_600_000
     tid, title, body = pick(context(conn, uid, now, n), uid, daily._local_day(now), last_id, hour)
     return {"title": title, "body": body, "count": n, "url": "./#/", "tpl": tid}
+
+
+# ---- the Remem Test (the pilot's final test): one launch message when the owner opens it, then a daily nudge until done.
+# {name} first name · {n} questions in the test · {left} still to answer
+FINAL_LAUNCH = [
+    ("fl1", "🎬 Picture abhi baaki hai… The Remem Test is LIVE", "{name}, {n} questions. The grand finale. Show the forgetting curve who's boss."),
+    ("fl2", "Lagaan maaf karwana hai? 🏏", "Toh Remem Test jeetna padega. {n} questions, one innings."),
+    ("fl3", "Sattar minute… 🏑", "Nahi, bas {n} questions. The Remem Test is open. Chak de!"),
+    ("fl4", "Mogambo khush hua? 😈", "Only if you ace the Remem Test. {n} questions are waiting for you."),
+    ("fl5", "📢 Breaking: the Remem Test has dropped", "{n} questions. No notes, no Ghajini tattoos. Sab yaad hai na?"),
+    ("fl6", "Final boss unlocked 🎮", "The Remem Test is open: {n} questions on everything you studied. Best of luck, {name}!"),
+]
+FINAL_LEFT = [
+    ("fr1", "{left} questions baaki hain 🏁", "Remem Test adhoora hai. Finish line dikh rahi hai, {name}."),
+    ("fr2", "Mogambo abhi khush nahi hua 😤", "{left} Remem Test questions to go. Khush kar do."),
+    ("fr3", "Interval khatam, picture shuru 🍿", "Your Remem Test is waiting. {left} questions to the climax."),
+    ("fr4", "Last over, {left} balls left 🏏", "Remem Test finish karo, match jeeto."),
+    ("fr5", "Picture abhi baaki hai mere dost 🎬", "{left} Remem Test questions. The ending is the best part."),
+]
+FINAL_NOT_STARTED = [
+    ("fn1", "Exam hall mein aapka swagat hai 📝", "The Remem Test is open and your {n} questions haven't started. 10 minutes, tops."),
+    ("fn2", "Kaabil bano… 🎓", "…kaamyaabi jhak maarke peeche aayegi. Pehle Remem Test: {n} questions."),
+    ("fn3", "{name}, the Remem Test is still waiting 👀", "{n} questions. It's the last thing I need from you. Promise. 🙏"),
+]
+
+
+def _rotate(pool, uid: int, day: int, last_id: str | None = None):
+    start = int(hashlib.sha1(f"final:{uid}".encode()).hexdigest(), 16) + day
+    for k in range(len(pool)):
+        t = pool[(start + k) % len(pool)]
+        if t[0] != last_id or len(pool) == 1:
+            return t
+    return pool[0]
+
+
+def final_launch(name: str | None, uid: int, n: int) -> dict:
+    tid, title, body = _rotate(FINAL_LAUNCH, uid, 0)
+    ctx = {"name": _first_name(name), "n": n}
+    return {"title": title.format(**ctx), "body": body.format(**ctx), "count": n, "url": "./#/final", "tpl": tid}
+
+
+def final_reminder(name: str | None, uid: int, day: int, total: int, answered: int, last_id: str | None = None) -> dict:
+    pool = FINAL_LEFT if answered else FINAL_NOT_STARTED
+    tid, title, body = _rotate(pool, uid, day, last_id)
+    ctx = {"name": _first_name(name), "n": total, "left": total - answered}
+    return {"title": title.format(**ctx), "body": body.format(**ctx), "count": total - answered, "url": "./#/final", "tpl": tid}

@@ -1025,7 +1025,7 @@ function finalCard(o, redo) {
   const f = o.final;
   const flip = async open => {
     const ok = await confirmSheet(open ? "Open the Remem Test?" : "Close the Remem Test?",
-      open ? "Everyone who has studied a topic can take it from now on (it shows on their Today screen). Do this once, near the end of the pilot."
+      open ? "Everyone who has studied a topic can take it from now on, and everyone with reminders on gets a notification right away. Do this once, near the end of the pilot."
            : "Nobody can answer more Remem Test questions until you open it again. Answers already given are kept.",
       open ? "Open it" : "Close it", "Cancel");
     if (!ok) return;
