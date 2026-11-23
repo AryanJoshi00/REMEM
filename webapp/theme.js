@@ -43,14 +43,18 @@
     else if (localStorage.getItem(DAY_KEY) === today) mode = "short";
     localStorage.setItem(DAY_KEY, today);
   } catch (e) { mode = still && still.matches ? "still" : "short"; }
-  root.classList.add("sp-" + mode);
-  var MIN = { full: 1250, short: 520, still: 220 }[mode], gone = false;
+  var standalone = window.matchMedia && (matchMedia("(display-mode: standalone)").matches || navigator.standalone === true);
+  root.classList.add("sp-" + mode, standalone ? "sp-app" : "sp-tab");     // a browser tab has no system splash before ours
+  var bars = document.querySelectorAll('meta[name="theme-color"]'), barWas = [];
+  for (var b = 0; b < bars.length; b++) { barWas.push(bars[b].getAttribute("content")); bars[b].setAttribute("content", "#f7f6f2"); }   // status bar matches the splash
+  var MIN = { full: 1380, short: 520, still: 220 }[mode], gone = false;
   function hide() {
     if (gone) return; gone = true;
     var el = document.getElementById("splash");
-    if (!el) return;
+    if (!el) { apply(); return; }
     el.classList.add("sp-out");
-    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); root.classList.remove("sp-" + mode); }, 340);
+    apply();                                                // status bar back to the theme's colour
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); root.classList.remove("sp-" + mode, "sp-app", "sp-tab"); }, 360);
   }
   window.remSplashDone = function () {                     // called by the app once its first screen is on the page
     setTimeout(hide, Math.max(0, MIN - (Date.now() - t0)));
